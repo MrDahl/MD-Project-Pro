@@ -1,0 +1,40 @@
+name: Deploy to GitHub Pages 🚀
+
+on:
+  push:
+    branches:
+      - main  # Kører automatisk når du pusher ændringer til main-branchen
+
+# Giver workflowen de nødvendige rettigheder til at skrive til GitHub Pages
+permissions:
+  contents: write
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout kildekode 📂
+        uses: actions/checkout@v4
+
+      - name: Opsæt Node.js 💻
+        uses: actions/setup-node@v4
+        with:
+          node-size: 20
+          node-version: 20
+          cache: 'npm'
+
+      - name: Installer afhængigheder 📦
+        run: npm ci || npm install
+
+      - name: Byg applikation 🏗️
+        run: npm run build
+        env:
+          # Undgår at fejle på eventuelle advarsler i eksterne biblioteker
+          CI: false 
+
+      - name: Udrul til GitHub Pages 🌐
+        uses: JamesIves/github-pages-deploy-action@v4
+        with:
+          folder: dist # Mappen som indeholder de færdigbyggede statiske filer
+          branch: gh-pages # Branchen som GitHub Pages læser filer fra
+          clean: true # Sletter gamle forældede filer automatisk

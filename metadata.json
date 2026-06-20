@@ -1,0 +1,6 @@
+{
+  "name": "MD Project - Planlægningsværktøj",
+  "description": "Et interaktivt projekt- og resursestyringsværktøj med Gantt-diagram, kritisk vej og budgettering.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
