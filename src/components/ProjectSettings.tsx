@@ -1,6 +1,6 @@
 import React, { useState } from "react";
-import { Settings, ProjectInfo, Stage } from "../types";
-import { Calendar, Clock, Plus, Trash2, CalendarX, Info, FileText, MapPin, User, Building, Palmtree, Layers } from "lucide-react";
+import { Settings, ProjectInfo, Stage, WeatherDelay } from "../types";
+import { Calendar, Clock, Plus, Trash2, CalendarX, Info, FileText, MapPin, User, Building, Palmtree, Layers, CloudSnow } from "lucide-react";
 
 interface ProjectSettingsProps {
   startDate: string;
@@ -8,6 +8,7 @@ interface ProjectSettingsProps {
   projectInfo?: ProjectInfo;
   holidays: string[];
   stages?: Stage[];
+  weatherDelays?: WeatherDelay[];
   onUpdateStartDate: (date: string) => void;
   onUpdateWorkHours: (hours: number) => void;
   onUpdateProjectInfo: (info: ProjectInfo) => void;
@@ -15,6 +16,8 @@ interface ProjectSettingsProps {
   onDeleteHoliday: (idx: number) => void;
   onAddStage: (stage: Stage) => void;
   onDeleteStage: (id: string) => void;
+  onAddWeatherDelay: (label: string, start: string, end: string) => void;
+  onDeleteWeatherDelay: (id: string) => void;
 }
 
 const PRESET_COLORS = [
@@ -33,6 +36,7 @@ export function ProjectSettings({
   projectInfo = { projectName: "MD Project Plan", address: "", customer: "", manager: "" },
   holidays,
   stages = [],
+  weatherDelays = [],
   onUpdateStartDate,
   onUpdateWorkHours,
   onUpdateProjectInfo,
@@ -40,6 +44,8 @@ export function ProjectSettings({
   onDeleteHoliday,
   onAddStage,
   onDeleteStage,
+  onAddWeatherDelay,
+  onDeleteWeatherDelay,
 }: ProjectSettingsProps) {
   const [newHoliday, setNewHoliday] = useState("");
 
@@ -47,6 +53,10 @@ export function ProjectSettings({
   const [stageColor, setStageColor] = useState("#4f46e5");
   const [stageStart, setStageStart] = useState("");
   const [stageEnd, setStageEnd] = useState("");
+
+  const [weatherLabel, setWeatherLabel] = useState("");
+  const [weatherStart, setWeatherStart] = useState("");
+  const [weatherEnd, setWeatherEnd] = useState("");
 
   const handleInfoChange = (field: keyof ProjectInfo, val: string) => {
     onUpdateProjectInfo({
@@ -366,6 +376,116 @@ export function ProjectSettings({
                     onClick={() => onDeleteStage(stg.id)}
                     className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg border-0 cursor-pointer transition active:scale-95"
                     title="Slet etape"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* 5. Weather Delays Card */}
+      <div className="bg-white border border-slate-100 rounded-xl p-5 shadow-xs flex flex-col gap-4 md:col-span-2">
+        <h3 className="text-base font-bold text-slate-800 border-b border-slate-100 pb-2 flex items-center gap-1.5">
+          <CloudSnow className="w-5 h-5 text-sky-600 animate-pulse" />
+          <span>Vejrlig & Force Majeure (Vejrspildsdage)</span>
+        </h3>
+
+        <p className="text-[11px] text-slate-500 leading-relaxed -mt-1">
+          Brug denne formular til at tildele vejrspildsdage eller andre uforudsete force majeure-betingelser (f.eks. dyb frost, skybrud, stormvejr). 
+          Tidsplanen vil automatisk forskyde berørte udendørs- eller generiske arbejdsopgaver omkring disse datoer, og markere dem i Gantt-diagrammet.
+        </p>
+
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (!weatherLabel.trim() || !weatherStart || !weatherEnd) return;
+            onAddWeatherDelay(weatherLabel, weatherStart, weatherEnd);
+            setWeatherLabel("");
+            setWeatherStart("");
+            setWeatherEnd("");
+          }}
+          className="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-slate-50 p-4 rounded-xl border border-slate-200"
+        >
+          <div className="flex flex-col gap-1 sm:col-span-1">
+            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Vejrsituation/Årsag</label>
+            <input
+              type="text"
+              value={weatherLabel}
+              onChange={(e) => setWeatherLabel(e.target.value)}
+              placeholder="F.eks. Frostperiode, Skybrud"
+              className="bg-white border border-slate-200 rounded-lg p-2 text-xs font-semibold text-slate-700 outline-none focus:border-slate-500"
+              required
+            />
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Startdato</label>
+            <input
+              type="date"
+              value={weatherStart}
+              onChange={(e) => setWeatherStart(e.target.value)}
+              className="bg-white border border-slate-200 rounded-lg p-1.5 text-xs font-semibold text-slate-700 outline-none focus:border-slate-500"
+              required
+            />
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Slutdato</label>
+            <input
+              type="date"
+              value={weatherEnd}
+              onChange={(e) => setWeatherEnd(e.target.value)}
+              className="bg-white border border-slate-200 rounded-lg p-1.5 text-xs font-semibold text-slate-700 outline-none focus:border-slate-500"
+              required
+            />
+          </div>
+
+          <div className="sm:col-span-3 flex justify-end mt-1">
+            <button
+              type="submit"
+              disabled={!weatherLabel || !weatherStart || !weatherEnd}
+              className="bg-sky-600 active:bg-sky-700 hover:bg-sky-700 text-white font-extrabold py-2 px-4 rounded-lg text-xs cursor-pointer flex items-center justify-center gap-1.5 shadow-xs h-9 disabled:opacity-50"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Registrér vejrspild</span>
+            </button>
+          </div>
+        </form>
+
+        <div className="flex flex-col gap-2">
+          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+            Registrerede vejrspildsdage ({weatherDelays.length}):
+          </span>
+
+          {weatherDelays.length === 0 ? (
+            <div className="text-center py-8 border border-dashed border-slate-200 rounded-lg text-[11px] text-slate-400">
+              Der er pt. ikke registreret nogen manuelle vejrspildsdage i tidsplanen.
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              {weatherDelays.map((wd) => (
+                <div
+                  key={wd.id}
+                  className="bg-sky-50/50 border border-sky-100 rounded-xl p-3 flex justify-between items-center text-xs transition hover:shadow-2xs"
+                >
+                  <div className="flex items-start gap-2.5 min-w-0">
+                    <span className="text-lg shrink-0 mt-0.5 select-none">❄️</span>
+                    <div className="min-w-0">
+                      <h4 className="font-bold text-sky-950 leading-tight truncate">{wd.label}</h4>
+                      <p className="text-[10px] text-sky-750 mt-1 font-semibold flex items-center gap-1 font-mono">
+                        <span>{formatDateLabel(wd.startDate)}</span>
+                        <span>-</span>
+                        <span>{formatDateLabel(wd.endDate)}</span>
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => onDeleteWeatherDelay(wd.id)}
+                    className="p-1.5 text-sky-450 hover:text-red-550 hover:bg-red-50 rounded-lg border-0 cursor-pointer transition active:scale-95"
+                    title="Fjern vejrspildperiode"
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>

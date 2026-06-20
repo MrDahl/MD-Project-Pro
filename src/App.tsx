@@ -38,14 +38,21 @@ const INITIAL_PROJECT_STATE: AppData = {
   trades: [],
   tasks: [],
   stages: [],
+  weatherDelays: [],
   scheduleError: null,
   startDateWarning: null,
 };
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<
+  const [activeTab, setActiveTab2] = useState<
     "tasks" | "gantt" | "resources" | "budget" | "settings" | "glossary"
   >("tasks");
+
+  // Keep compatibility
+  const setActiveTab = (tab: "tasks" | "gantt" | "resources" | "budget" | "settings" | "glossary") => {
+    setActiveTab2(tab);
+  };
+
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [wizardOpen, setWizardOpen] = useState(() => {
     // Hvis der ikke tidligere er fuldført en wizard, åbnes den automatisk
@@ -66,6 +73,7 @@ export default function App() {
           trades: parsed.trades || INITIAL_PROJECT_STATE.trades,
           tasks: parsed.tasks || INITIAL_PROJECT_STATE.tasks,
           stages: parsed.stages || INITIAL_PROJECT_STATE.stages || [],
+          weatherDelays: parsed.weatherDelays || INITIAL_PROJECT_STATE.weatherDelays || [],
           scheduleError: null,
           startDateWarning: null
         };
@@ -245,6 +253,28 @@ export default function App() {
       holidays: p.holidays.filter((_, i) => i !== idx),
     }));
     triggerToast("Fridag fjernet.");
+  };
+
+  const handleAddWeatherDelay = (label: string, startDate: string, endDate: string) => {
+    const newDelay = {
+      id: "delay-" + Date.now(),
+      label,
+      startDate,
+      endDate,
+    };
+    setAppState((p) => ({
+      ...p,
+      weatherDelays: [...(p.weatherDelays || []), newDelay],
+    }));
+    triggerToast(`Vejrspildsdage "${label}" registreret.`);
+  };
+
+  const handleDeleteWeatherDelay = (id: string) => {
+    setAppState((p) => ({
+      ...p,
+      weatherDelays: (p.weatherDelays || []).filter((wd) => wd.id !== id),
+    }));
+    triggerToast("Vejrspildsdag fjernet.");
   };
 
   // Full export/import operations JSON
@@ -829,6 +859,7 @@ export default function App() {
                 holidays={appState.holidays}
                 projectStartDate={appState.startDate}
                 stages={appState.stages || []}
+                weatherDelays={appState.weatherDelays || []}
                 onUpdateTasks={(ts) => setAppState((p) => ({ ...p, tasks: ts }))}
                 onEditTask={(task) => {
                   setEditTaskId(task.id);
@@ -1032,6 +1063,7 @@ export default function App() {
               projectInfo={appState.projectInfo}
               holidays={appState.holidays}
               stages={appState.stages || []}
+              weatherDelays={appState.weatherDelays || []}
               onUpdateStartDate={handleUpdateStartDate}
               onUpdateWorkHours={handleUpdateWorkHours}
               onUpdateProjectInfo={handleUpdateProjectInfo}
@@ -1039,6 +1071,8 @@ export default function App() {
               onDeleteHoliday={handleDeleteHoliday}
               onAddStage={handleAddStage}
               onDeleteStage={handleDeleteStage}
+              onAddWeatherDelay={handleAddWeatherDelay}
+              onDeleteWeatherDelay={handleDeleteWeatherDelay}
             />
           )}
 

@@ -16,6 +16,13 @@ export interface Stage {
   endDate: string; // "YYYY-MM-DD"
 }
 
+export interface WeatherDelay {
+  id: string;
+  label: string; // e.g., "Skybrud", "Frostperiode"
+  startDate: string; // "YYYY-MM-DD"
+  endDate: string; // "YYYY-MM-DD"
+}
+
 export interface Task {
   id: string;
   title: string;
@@ -29,6 +36,10 @@ export interface Task {
   
   // Stage association
   stageId?: string | null; 
+  
+  // Progress & Type additions
+  progress?: number; // 0-100 percentage of task completion
+  isMilestone?: boolean; // Milestone is a 0-day landmark
   
   // Recurring tasks properties
   isRecurring?: boolean;
@@ -65,6 +76,7 @@ export interface AppData {
   trades: Trade[];
   tasks: Task[];
   stages?: Stage[]; // List of stages
+  weatherDelays?: WeatherDelay[]; // Force Majeure / weather stoppages
   scheduleError: string | null;
   startDateWarning: string | null;
 }

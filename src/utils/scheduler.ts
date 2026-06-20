@@ -1,4 +1,4 @@
-import { Task, Trade, Settings, Stage } from "../types";
+import { Task, Trade, Settings, Stage, WeatherDelay } from "../types";
 
 // Helper to construct dates at 12:00 to avoid daylight savings drift
 export function createSafeDate(dateStr: string): Date {
@@ -22,6 +22,11 @@ export function isWorkingDay(dateObj: Date, allowWeekend: boolean, allowHoliday:
   if (isWeekend && !allowWeekend) return false;
 
   return true;
+}
+
+export function isWeatherDelayDay(dateObj: Date, weatherDelays: WeatherDelay[] = []): boolean {
+  const dateStr = toDateStr(dateObj);
+  return weatherDelays.some(delay => dateStr >= delay.startDate && dateStr <= delay.endDate);
 }
 
 export function detectCycle(tasks: Task[]): boolean {
@@ -58,7 +63,8 @@ export function calculateSchedule(
   holidays: string[],
   settings: Settings,
   projectStartDate: string,
-  stagesInput: Stage[] = []
+  stagesInput: Stage[] = [],
+  weatherDelays: WeatherDelay[] = []
 ): {
   tasks: Task[];
   projectEndDate: string | null;
@@ -165,13 +171,15 @@ export function calculateSchedule(
         expectedStart = depStart;
       }
 
-      // Skip non-working days for start date
-      while (!isWorkingDay(expectedStart, task.allowWeekend, task.allowHoliday, holidays)) {
+      // Skip non-working days & weather delays for start date
+      while (
+        !isWorkingDay(expectedStart, task.allowWeekend, task.allowHoliday, holidays) ||
+        isWeatherDelayDay(expectedStart, weatherDelays)
+      ) {
         expectedStart.setDate(expectedStart.getDate() + 1);
       }
 
       let expectedEnd = createSafeDate(toDateStr(expectedStart));
-      let daysAllocated = 1;
       let taskCost = 0;
       const tradeCostsTracker: { [tid: string]: number } = {};
 
@@ -194,27 +202,44 @@ export function calculateSchedule(
         return cost;
       };
 
-      // Set baseline day costs
-      activeTrades.forEach((tr) => {
-        tradeCostsTracker[tr.id] = tr.isFixedPrice ? tr.rate : getDayCost(expectedStart, tr);
-      });
+      if (task.isMilestone) {
+        // Milestones take 0 active working days and incur 0 cost
+        expectedEnd = createSafeDate(toDateStr(expectedStart));
+        taskCost = 0;
+      } else {
+        // Set baseline day costs for first day
+        activeTrades.forEach((tr) => {
+          tradeCostsTracker[tr.id] = tr.isFixedPrice ? tr.rate : getDayCost(expectedStart, tr);
+        });
 
-      // Advance dates to satisfy the duration
-      while (daysAllocated < task.duration) {
-        expectedEnd.setDate(expectedEnd.getDate() + 1);
+        // Advance dates to satisfy the duration (duration is in days)
+        let daysAllocated = 1;
+        while (daysAllocated < task.duration) {
+          expectedEnd.setDate(expectedEnd.getDate() + 1);
 
-        if (isWorkingDay(expectedEnd, task.allowWeekend, task.allowHoliday, holidays)) {
-          daysAllocated++;
-          activeTrades.forEach((tr) => {
-            if (!tr.isFixedPrice) {
-              tradeCostsTracker[tr.id] = (tradeCostsTracker[tr.id] || 0) + getDayCost(expectedEnd, tr);
-            }
-          });
+          if (
+            isWorkingDay(expectedEnd, task.allowWeekend, task.allowHoliday, holidays) &&
+            !isWeatherDelayDay(expectedEnd, weatherDelays)
+          ) {
+            daysAllocated++;
+            activeTrades.forEach((tr) => {
+              if (!tr.isFixedPrice) {
+                tradeCostsTracker[tr.id] = (tradeCostsTracker[tr.id] || 0) + getDayCost(expectedEnd, tr);
+              }
+            });
+          }
         }
-      }
 
-      for (const tid in tradeCostsTracker) {
-        taskCost += tradeCostsTracker[tid];
+        // Add fixed-price trades as well
+        activeTrades.forEach((tr) => {
+          if (tr.isFixedPrice) {
+            tradeCostsTracker[tr.id] = tr.rate; // Flat fixed rate
+          }
+        });
+
+        for (const tid in tradeCostsTracker) {
+          taskCost += tradeCostsTracker[tid];
+        }
       }
 
       const startStr = toDateStr(expectedStart);
@@ -276,8 +301,11 @@ export function calculateSchedule(
     while (curr.getTime() <= stopDateVal) {
       const actual = new Date(curr);
       
-      // Shift to next available work day if weekend/holiday is not permitted
-      while (!isWorkingDay(actual, task.allowWeekend, task.allowHoliday, holidays)) {
+      // Shift to next available work day if weekend/holiday is not permitted or weather delay is active
+      while (
+        !isWorkingDay(actual, task.allowWeekend, task.allowHoliday, holidays) ||
+        isWeatherDelayDay(actual, weatherDelays)
+      ) {
         actual.setDate(actual.getDate() + 1);
       }
 

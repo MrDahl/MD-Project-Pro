@@ -1,5 +1,5 @@
 import React, { useState, useRef } from "react";
-import { Task, Trade, Stage } from "../types";
+import { Task, Trade, Stage, WeatherDelay } from "../types";
 import { createSafeDate, toDateStr, isWorkingDay } from "../utils/scheduler";
 import { Calendar, Zap, RefreshCw, AlertCircle, ChevronLeft, ChevronRight, FolderDown, Flame, Layers } from "lucide-react";
 
@@ -9,6 +9,7 @@ interface GanttChartProps {
   holidays: string[];
   projectStartDate: string;
   stages?: Stage[];
+  weatherDelays?: WeatherDelay[];
   onUpdateTasks: (updatedTasks: Task[]) => void;
   onEditTask: (task: Task) => void;
 }
@@ -27,6 +28,7 @@ export function GanttChart({
   holidays,
   projectStartDate,
   stages = [],
+  weatherDelays = [],
   onUpdateTasks,
   onEditTask,
 }: GanttChartProps) {
@@ -347,7 +349,11 @@ export function GanttChart({
     dateList.forEach((date, idx) => {
       const stamp = date.getTime();
       if (stamp >= startStamp && stamp <= endStamp) {
-        const type = isWorkingDay(date, task.allowWeekend, task.allowHoliday, holidays) ? "work" : "rest";
+        const dateStr = toDateStr(date);
+        const isWeather = weatherDelays && weatherDelays.some(wd => dateStr >= wd.startDate && dateStr <= wd.endDate);
+        const isWork = isWorkingDay(date, task.allowWeekend, task.allowHoliday, holidays) && !isWeather;
+        const type = isWork ? "work" : "rest";
+        
         if (!currentSegment) {
           currentSegment = { startIndex: idx, endIndex: idx, type };
         } else if (currentSegment.type === type) {
@@ -700,22 +706,29 @@ export function GanttChart({
                      {/* Synchronized Base Background Grid columns */}
                     <div className="absolute inset-y-0 left-0 flex">
                       {dateList.map((date, idx) => {
+                        const dateStr = toDateStr(date);
                         const isWe = date.getDay() === 0 || date.getDay() === 6;
-                        const isHol = holidays.includes(toDateStr(date));
+                        const isHol = holidays.includes(dateStr);
+                        const isWeather = weatherDelays && weatherDelays.some(wd => dateStr >= wd.startDate && dateStr <= wd.endDate);
                         return (
                           <div
                             key={idx}
                             style={{ width: "48px" }}
-                            className={`shrink-0 border-r border-slate-100/60 h-full ${
-                              isHol ? "bg-purple-200/15" : isWe ? "bg-emerald-100/20" : "bg-white"
+                            className={`shrink-0 border-r border-slate-100/60 h-full relative ${
+                              isWeather ? "bg-sky-100/30" : isHol ? "bg-purple-200/15" : isWe ? "bg-emerald-100/20" : "bg-white"
                             }`}
-                          />
+                            title={isWeather ? "Uvejr / Vejrspildsdag (Arbejdsstop)" : undefined}
+                          >
+                            {isWeather && (
+                              <span className="absolute bottom-1 right-1 text-[10px] select-none text-sky-500 font-extrabold filter drop-shadow-[0_1px_1px_rgba(255,255,255,0.8)]">❄️</span>
+                            )}
+                          </div>
                         );
                       })}
                     </div>
 
-                    {/* Segment renderings - only if not recurring */}
-                    {!task.isRecurring && segments.map((seg, sIdx) => {
+                    {/* Segment renderings - only if not recurring and not milestone */}
+                    {!task.isRecurring && !task.isMilestone && segments.map((seg, sIdx) => {
                       const leftPx = seg.startIndex * 48;
                       const widthPx = (seg.endIndex - seg.startIndex + 1) * 48;
 
@@ -731,6 +744,7 @@ export function GanttChart({
                         };
 
                         const isBeingDragged = dragState?.taskId === task.id;
+                        const taskProgress = task.progress || 0;
 
                         return (
                           <div
@@ -739,7 +753,7 @@ export function GanttChart({
                             onPointerDown={(e) => handlePointerDown(e, task, "move")}
                             onPointerMove={handlePointerMove}
                             onPointerUp={(e) => handlePointerUp(e, task)}
-                            className={`absolute h-9 flex items-center justify-between text-white z-10 select-none cursor-grab active:cursor-grabbing border border-black/10 shadow-sm transition-[transform,shadow] ${
+                            className={`absolute h-9 flex items-center justify-between text-white z-10 select-none overflow-hidden cursor-grab active:cursor-grabbing border border-black/10 shadow-sm transition-[transform,shadow] ${
                               isFirstSeg && isLastSeg
                                 ? "rounded-lg"
                                 : isFirstSeg
@@ -751,7 +765,20 @@ export function GanttChart({
                               isBeingDragged ? "scale-y-[1.04] brightness-105 ring-2 ring-slate-500/20 shadow-md" : ""
                             }`}
                           >
-                            {/* Text is always placed directly on the right side of the entire task timeline inside a modern bubble */}
+                            {/* Visual Progress Shading Overlay */}
+                            {taskProgress > 0 && (
+                              <div
+                                style={{ width: `${taskProgress}%` }}
+                                className="absolute inset-y-0 left-0 bg-black/25 z-0"
+                              />
+                            )}
+
+                            {/* Center percentage label */}
+                            {taskProgress > 0 && (
+                              <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[9px] font-black text-white/90 z-10 select-none bg-black/15 px-1 rounded">
+                                {taskProgress}%
+                              </span>
+                            )}
 
                             {/* Right resize handle on the absolute last working segment of the task */}
                             {isLastWorkSegment && (
@@ -784,6 +811,31 @@ export function GanttChart({
                         );
                       }
                     })}
+
+                    {/* Milestone Diamond Rendering if is milestone */}
+                    {!task.isRecurring && task.isMilestone && (() => {
+                      const idx = dateList.findIndex((d) => toDateStr(d) === task.calcStart);
+                      if (idx === -1) return null;
+                      const leftPx = idx * 48 + 24 - 10; // centered in 48px cell (midpoint 24px - half of diamond 10px)
+                      return (
+                        <div
+                          style={{
+                            left: `${leftPx}px`,
+                            width: "20px",
+                            height: "20px",
+                          }}
+                          onClick={() => onEditTask(task)}
+                          className={`absolute rotate-45 z-15 flex items-center justify-center border border-white shadow-md cursor-pointer select-none transition hover:scale-110 active:scale-95 ${
+                            task.isCritical
+                              ? "bg-red-500 shadow-red-500/30"
+                              : "bg-amber-500 shadow-amber-500/30"
+                          }`}
+                          title={`${task.title} (Milepæl d. ${task.calcStart})`}
+                        >
+                          <div className="-rotate-45 text-[9px] text-white font-black pb-0.5">♦</div>
+                        </div>
+                      );
+                    })()}
 
                     {/* Recurring Work Occurrences badge renderings */}
                     {task.isRecurring && (task.occurrences || []).map((occDate, oIdx) => {
@@ -838,28 +890,38 @@ export function GanttChart({
       </div>
 
       {/* Visual Color Codes Footer Legend */}
-      <div className="flex flex-wrap gap-4 text-xs font-semibold text-slate-500 mt-1 select-none">
+      <div className="flex flex-wrap gap-x-5 gap-y-2.5 text-[11px] font-bold text-slate-500 mt-2 p-3 bg-slate-50 rounded-lg border border-slate-200/55 select-none md:items-center">
         <div className="flex items-center gap-1.5">
-          <span className="w-3.5 h-3.5 rounded bg-amber-500/10 border border-amber-300 flex items-center justify-center text-[10px]">💡</span>
-          <span>Tip: Træk i midten for at rykke, træk i højre kant af sidste blok for at ændre varighed</span>
+          <span className="w-3.5 h-3.5 rounded bg-amber-500/10 border border-amber-300 flex items-center justify-center text-[9px] shrink-0">💡</span>
+          <span>Tip: Træk bjælken for at rykke startdato. Træk i højre kant for at forlænge varigheden.</span>
         </div>
         <div className="flex items-center gap-1.5">
-          <span className="w-3 h-3 rounded bg-emerald-50 border border-emerald-100" />
-          <span>Weekend (lørdag-søndag)</span>
+          <span className="w-3 h-3 rounded bg-emerald-50 border border-emerald-100 shrink-0" />
+          <span>Weekend (lør-søn)</span>
         </div>
         <div className="flex items-center gap-1.5">
-          <span className="w-3 h-3 rounded bg-purple-100 border border-purple-200" />
-          <span>Feriedag/helligdag</span>
+          <span className="w-3 h-3 rounded bg-purple-100 border border-purple-200 shrink-0" />
+          <span>Helligdag</span>
         </div>
         <div className="flex items-center gap-1.5">
-          <span className="w-3.5 h-0.5 border-t-2 border-dashed border-slate-350" />
-          <span>Arbejdspause (stiplet linje)</span>
+          <span className="w-3.5 h-3.5 bg-sky-100 border border-sky-200/60 rounded flex items-center justify-center text-[8px] tracking-none shrink-0">❄️</span>
+          <span>Vejrspildsdag (Arbejdsstop)</span>
         </div>
         <div className="flex items-center gap-1.5">
-          <span className="w-3.5 h-3.5 rounded border border-red-200 bg-red-50 flex items-center justify-center shadow-2xs text-red-500">
-            <Flame className="w-3 h-3 text-red-500 fill-red-500 shrink-0" />
+          <div className="w-3 h-3 rotate-45 bg-amber-500 border border-white shadow-2xs shrink-0" />
+          <span>Milepæl (Vigtigt kontrolpunkt)</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <div className="w-5 h-3.5 bg-slate-400 border border-slate-500 relative rounded overflow-hidden shrink-0">
+            <div className="absolute inset-y-0 left-0 w-1/2 bg-black/25" />
+          </div>
+          <span>Færdiggørelsesgrad (mørk skygge)</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="w-3.5 h-3.5 rounded border border-red-200 bg-red-50 flex items-center justify-center shadow-3xs text-red-500 shrink-0">
+            <Flame className="w-2.5 h-2.5 text-red-500 fill-red-500" />
           </span>
-          <span className="font-extrabold text-red-650">Kritisk Vej (Forsinkelse her skubber hele deadline)</span>
+          <span className="font-extrabold text-red-650">Kritisk Vej (Skubber hele projektets uoverensstemmelse)</span>
         </div>
       </div>
     </div>

@@ -21,9 +21,11 @@ export function TaskForm({ tasks, trades, stages, editTaskId, onSave, onCancel }
   const [allowWeekend, setAllowWeekend] = useState(false);
   const [allowHoliday, setAllowHoliday] = useState(false);
 
-  // Stage & Recurrence
+  // Stage, Recurrence, Progress & Type additions
   const [stageId, setStageId] = useState("");
   const [isRecurring, setIsRecurring] = useState(false);
+  const [progress, setProgress] = useState<number>(0);
+  const [isMilestone, setIsMilestone] = useState(false);
   const [recurringInterval, setRecurringInterval] = useState<number>(7);
   const [recurringPrice, setRecurringPrice] = useState<number>(1500);
   const [recurringRangeType, setRecurringRangeType] = useState<"project" | "stages">("project");
@@ -43,6 +45,8 @@ export function TaskForm({ tasks, trades, stages, editTaskId, onSave, onCancel }
         setAllowHoliday(task.allowHoliday);
         setStageId(task.stageId || "");
         setIsRecurring(task.isRecurring || false);
+        setProgress(task.progress || 0);
+        setIsMilestone(task.isMilestone || false);
         setRecurringInterval(task.recurringInterval || 7);
         setRecurringPrice(task.recurringPrice || 1500);
         setRecurringRangeType(task.recurringRangeType || "project");
@@ -64,6 +68,8 @@ export function TaskForm({ tasks, trades, stages, editTaskId, onSave, onCancel }
     setAllowHoliday(false);
     setStageId("");
     setIsRecurring(false);
+    setProgress(0);
+    setIsMilestone(false);
     setRecurringInterval(7);
     setRecurringPrice(1500);
     setRecurringRangeType("project");
@@ -113,13 +119,15 @@ export function TaskForm({ tasks, trades, stages, editTaskId, onSave, onCancel }
       title,
       desc,
       manualStart: isRecurring ? null : (manualStart || null),
-      duration: isRecurring ? 0 : Math.max(1, duration),
+      duration: isRecurring ? 0 : (isMilestone ? 0 : Math.max(1, duration)),
       tradeIds: selectedTradeIds,
       dependencyId: isRecurring ? null : (dependencyId || null),
       allowWeekend,
       allowHoliday,
       stageId: isRecurring ? null : (stageId || null),
       isRecurring,
+      progress: isRecurring ? 0 : progress,
+      isMilestone: isRecurring ? false : isMilestone,
       recurringInterval: isRecurring ? Math.max(1, recurringInterval) : undefined,
       recurringPrice: isRecurring ? Math.max(0, recurringPrice) : undefined,
       recurringRangeType: isRecurring ? recurringRangeType : undefined,
@@ -184,22 +192,69 @@ export function TaskForm({ tasks, trades, stages, editTaskId, onSave, onCancel }
       {/* Normal Task Section */}
       {!isRecurring && (
         <>
+          {/* Type of normal tasks: Milestone & Progress selectors */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-slate-50/50 border border-slate-200/60 p-3 rounded-xl">
+            {/* Milestone Toggle */}
+            <div className="flex items-center justify-between">
+              <div className="flex flex-col">
+                <span className="text-xs font-bold text-slate-800">Marker som Milepæl?</span>
+                <span className="text-[10px] text-slate-500 mt-0.5">Et centralt kontrolpunkt (0 dg. varighed).</span>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={isMilestone}
+                  onChange={(e) => setIsMilestone(e.target.checked)}
+                  className="sr-only peer"
+                />
+                <div className="w-10 h-5.5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4.5 after:w-4.5 after:transition-all peer-checked:bg-slate-700"></div>
+              </label>
+            </div>
+
+            {/* Task Progress Selector */}
+            <div className="flex flex-col gap-1">
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Færdiggørelsesgrad</label>
+              <div className="flex bg-white border border-slate-200 rounded-lg p-0.5">
+                {[0, 25, 50, 75, 100].map((val) => (
+                  <button
+                    key={val}
+                    type="button"
+                    onClick={() => setProgress(val)}
+                    className={`flex-1 text-center py-1 rounded-md text-[10px] font-extrabold transition cursor-pointer select-none ${
+                      progress === val
+                        ? "bg-slate-700 text-white shadow-xs"
+                        : "text-slate-600 hover:bg-slate-50"
+                    }`}
+                  >
+                    {val}%
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
           {/* Row 2: Duration & Manual Start */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="flex flex-col gap-1">
-              <label className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
-                <Clock className="w-3.5 h-3.5 text-slate-400" />
-                <span>Varighed (arbejdsdage)</span>
-              </label>
-              <input
-                type="number"
-                value={duration}
-                onChange={(e) => setDuration(Math.max(1, parseInt(e.target.value) || 1))}
-                className="bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs font-bold text-slate-700 outline-none focus:border-slate-500"
-                min={1}
-                required
-              />
-            </div>
+            {isMilestone ? (
+              <div className="flex flex-col justify-center bg-amber-50/50 border border-amber-200/40 rounded-lg p-3 text-[10px] text-amber-900 font-bold">
+                ♦ Milepæl aktiveret: Opgaven varer 0 dage og fungerer som en markant deadline i tidsplanen.
+              </div>
+            ) : (
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
+                  <Clock className="w-3.5 h-3.5 text-slate-400" />
+                  <span>Varighed (arbejdsdage)</span>
+                </label>
+                <input
+                  type="number"
+                  value={duration}
+                  onChange={(e) => setDuration(Math.max(1, parseInt(e.target.value) || 1))}
+                  className="bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs font-bold text-slate-700 outline-none focus:border-slate-500"
+                  min={1}
+                  required
+                />
+              </div>
+            )}
 
             <div className="flex flex-col gap-1">
               <label className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
