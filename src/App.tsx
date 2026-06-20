@@ -45,12 +45,22 @@ const INITIAL_PROJECT_STATE: AppData = {
 
 export default function App() {
   const [activeTab, setActiveTab2] = useState<
-    "tasks" | "gantt" | "resources" | "budget" | "settings" | "glossary"
-  >("tasks");
+    "tidsplan" | "resources" | "budget" | "settings" | "glossary"
+  >("tidsplan");
+
+  const [tidsplanView, setTidsplanView] = useState<"gantt" | "list">("gantt");
 
   // Keep compatibility
-  const setActiveTab = (tab: "tasks" | "gantt" | "resources" | "budget" | "settings" | "glossary") => {
-    setActiveTab2(tab);
+  const setActiveTab = (tab: string) => {
+    if (tab === "tasks") {
+      setActiveTab2("tidsplan");
+      setTidsplanView("list");
+    } else if (tab === "gantt") {
+      setActiveTab2("tidsplan");
+      setTidsplanView("gantt");
+    } else {
+      setActiveTab2(tab as any);
+    }
   };
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -476,18 +486,16 @@ export default function App() {
               className="w-full px-4 py-3 flex items-center justify-between font-extrabold text-sm text-slate-800 bg-slate-50 hover:bg-slate-100/80 transition cursor-pointer"
             >
               <div className="flex items-center gap-2">
-                {activeTab === "tasks" && <ListChecks className="w-5 h-5 text-slate-700" />}
-                {activeTab === "gantt" && <CalendarDays className="w-5 h-5 text-slate-700" />}
+                {activeTab === "tidsplan" && <CalendarDays className="w-5 h-5 text-slate-700" />}
                 {activeTab === "resources" && <UsersRound className="w-5 h-5 text-slate-700" />}
                 {activeTab === "budget" && <DollarSign className="w-5 h-5 text-slate-700" />}
                 {activeTab === "settings" && <SettingsIcon className="w-5 h-5 text-slate-700" />}
                 {activeTab === "glossary" && <HelpCircle className="w-5 h-5 text-slate-700" />}
                 <span className="capitalize">
-                  {activeTab === "tasks" && `Opgaver (${appState.tasks.length})`}
-                  {activeTab === "gantt" && "Gantt"}
-                  {activeTab === "resources" && "Resurser"}
+                  {activeTab === "tidsplan" && `Tidsplan (${appState.tasks.length})`}
+                  {activeTab === "resources" && "Faggrupper"}
                   {activeTab === "budget" && "Økonomi"}
-                  {activeTab === "settings" && "Projekt"}
+                  {activeTab === "settings" && "Projekt & Kalender"}
                   {activeTab === "glossary" && "Vidensbase"}
                 </span>
               </div>
@@ -508,33 +516,20 @@ export default function App() {
                 >
                   <button
                     onClick={() => {
-                      setActiveTab("tasks");
+                      setActiveTab2("tidsplan");
                       setMobileMenuOpen(false);
                     }}
                     className={`w-full px-5 py-3 text-left font-bold text-xs flex items-center gap-3 transition cursor-pointer ${
-                      activeTab === "tasks" ? "text-slate-900 bg-slate-100" : "text-slate-600 hover:bg-slate-50"
-                    }`}
-                  >
-                    <ListChecks className="w-4 h-4 shrink-0" />
-                    <span>Opgaver ({appState.tasks.length})</span>
-                  </button>
-
-                  <button
-                    onClick={() => {
-                      setActiveTab("gantt");
-                      setMobileMenuOpen(false);
-                    }}
-                    className={`w-full px-5 py-3 text-left font-bold text-xs flex items-center gap-3 transition cursor-pointer ${
-                      activeTab === "gantt" ? "text-slate-900 bg-slate-100" : "text-slate-600 hover:bg-slate-50"
+                      activeTab === "tidsplan" ? "text-slate-900 bg-slate-100" : "text-slate-600 hover:bg-slate-50"
                     }`}
                   >
                     <CalendarDays className="w-4 h-4 shrink-0" />
-                    <span>Gantt</span>
+                    <span>Tidsplan & Gantt ({appState.tasks.length})</span>
                   </button>
 
                   <button
                     onClick={() => {
-                      setActiveTab("resources");
+                      setActiveTab2("resources");
                       setMobileMenuOpen(false);
                     }}
                     className={`w-full px-5 py-3 text-left font-bold text-xs flex items-center gap-3 transition cursor-pointer ${
@@ -542,12 +537,12 @@ export default function App() {
                     }`}
                   >
                     <UsersRound className="w-4 h-4 shrink-0" />
-                    <span>Resurser</span>
+                    <span>Faggrupper</span>
                   </button>
 
                   <button
                     onClick={() => {
-                      setActiveTab("budget");
+                      setActiveTab2("budget");
                       setMobileMenuOpen(false);
                     }}
                     className={`w-full px-5 py-3 text-left font-bold text-xs flex items-center gap-3 transition cursor-pointer ${
@@ -555,12 +550,12 @@ export default function App() {
                     }`}
                   >
                     <DollarSign className="w-4 h-4 shrink-0" />
-                    <span>Økonomi</span>
+                    <span>Økonomi & Budget</span>
                   </button>
 
                   <button
                     onClick={() => {
-                      setActiveTab("settings");
+                      setActiveTab2("settings");
                       setMobileMenuOpen(false);
                     }}
                     className={`w-full px-5 py-3 text-left font-bold text-xs flex items-center gap-3 transition cursor-pointer ${
@@ -568,12 +563,12 @@ export default function App() {
                     }`}
                   >
                     <SettingsIcon className="w-4 h-4 shrink-0" />
-                    <span>Projekt</span>
+                    <span>Projekt & Kalender</span>
                   </button>
 
                   <button
                     onClick={() => {
-                      setActiveTab("glossary");
+                      setActiveTab2("glossary");
                       setMobileMenuOpen(false);
                     }}
                     className={`w-full px-5 py-3 text-left font-bold text-xs flex items-center gap-3 transition cursor-pointer ${
@@ -581,7 +576,7 @@ export default function App() {
                     }`}
                   >
                     <HelpCircle className="w-4 h-4 shrink-0" />
-                    <span>Vidensbase</span>
+                    <span>Vidensbase (?)</span>
                   </button>
                 </motion.div>
               )}
@@ -591,31 +586,19 @@ export default function App() {
           {/* Desktop Tab Selector Bar (hidden on mobile, visible on sm and up) */}
           <div className="hidden sm:flex border-b border-slate-200 overflow-x-auto pb-px scrollbar-hide gap-1 max-w-full">
             <button
-              onClick={() => setActiveTab("tasks")}
+              onClick={() => setActiveTab2("tidsplan")}
               className={`px-2.5 sm:px-4 py-2 sm:py-3 font-semibold text-[10px] sm:text-xs flex flex-col sm:flex-row items-center gap-1 sm:gap-1.5 cursor-pointer whitespace-nowrap transition-all border-b-2 min-h-[48px] sm:min-h-[44px] flex-1 sm:flex-initial ${
-                activeTab === "tasks"
-                  ? "border-slate-800 text-slate-900 bg-white rounded-t-lg font-black"
-                  : "border-transparent text-slate-500 hover:text-slate-800"
-              }`}
-            >
-              <ListChecks className="w-5 h-5 sm:w-4 sm:h-4 shrink-0 text-slate-500 group-hover:text-slate-800" />
-              <span>Opgaver ({appState.tasks.length})</span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab("gantt")}
-              className={`px-2.5 sm:px-4 py-2 sm:py-3 font-semibold text-[10px] sm:text-xs flex flex-col sm:flex-row items-center gap-1 sm:gap-1.5 cursor-pointer whitespace-nowrap transition-all border-b-2 min-h-[48px] sm:min-h-[44px] flex-1 sm:flex-initial ${
-                activeTab === "gantt"
+                activeTab === "tidsplan"
                   ? "border-slate-800 text-slate-900 bg-white rounded-t-lg font-black"
                   : "border-transparent text-slate-500 hover:text-slate-800"
               }`}
             >
               <CalendarDays className="w-5 h-5 sm:w-4 sm:h-4 shrink-0 text-slate-500 group-hover:text-slate-800" />
-              <span>Gantt</span>
+              <span>Tidsplan & Gantt ({appState.tasks.length})</span>
             </button>
 
             <button
-              onClick={() => setActiveTab("resources")}
+              onClick={() => setActiveTab2("resources")}
               className={`px-2.5 sm:px-4 py-2 sm:py-3 font-semibold text-[10px] sm:text-xs flex flex-col sm:flex-row items-center gap-1 sm:gap-1.5 cursor-pointer whitespace-nowrap transition-all border-b-2 min-h-[48px] sm:min-h-[44px] flex-1 sm:flex-initial ${
                 activeTab === "resources"
                   ? "border-slate-800 text-slate-900 bg-white rounded-t-lg font-black"
@@ -623,11 +606,11 @@ export default function App() {
               }`}
             >
               <UsersRound className="w-5 h-5 sm:w-4 sm:h-4 shrink-0 text-slate-500 group-hover:text-slate-800" />
-              <span>Resurser</span>
+              <span>Faggrupper</span>
             </button>
 
             <button
-              onClick={() => setActiveTab("budget")}
+              onClick={() => setActiveTab2("budget")}
               className={`px-2.5 sm:px-4 py-2 sm:py-3 font-semibold text-[10px] sm:text-xs flex flex-col sm:flex-row items-center gap-1 sm:gap-1.5 cursor-pointer whitespace-nowrap transition-all border-b-2 min-h-[48px] sm:min-h-[44px] flex-1 sm:flex-initial ${
                 activeTab === "budget"
                   ? "border-slate-800 text-slate-900 bg-white rounded-t-lg font-black"
@@ -639,7 +622,7 @@ export default function App() {
             </button>
 
             <button
-              onClick={() => setActiveTab("settings")}
+              onClick={() => setActiveTab2("settings")}
               className={`px-2.5 sm:px-4 py-2 sm:py-3 font-semibold text-[10px] sm:text-xs flex flex-col sm:flex-row items-center gap-1 sm:gap-1.5 cursor-pointer whitespace-nowrap transition-all border-b-2 min-h-[48px] sm:min-h-[44px] flex-1 sm:flex-initial ${
                 activeTab === "settings"
                   ? "border-slate-800 text-slate-900 bg-white rounded-t-lg font-black"
@@ -647,11 +630,11 @@ export default function App() {
               }`}
             >
               <SettingsIcon className="w-5 h-5 sm:w-4 sm:h-4 shrink-0 text-slate-500 group-hover:text-slate-800" />
-              <span>Projekt</span>
+              <span>Projekt & Indstillinger</span>
             </button>
 
             <button
-              onClick={() => setActiveTab("glossary")}
+              onClick={() => setActiveTab2("glossary")}
               className={`px-3 py-2 sm:py-3 flex items-center justify-center cursor-pointer transition-all border-b-2 min-h-[48px] sm:min-h-[44px] ${
                 activeTab === "glossary"
                   ? "border-slate-800 text-slate-900 bg-white rounded-t-lg font-black bg-slate-50"
@@ -666,206 +649,257 @@ export default function App() {
 
         {/* Tab layouts with fast simple state selectors */}
         <div className="flex-1 w-full overflow-hidden">
-          {/* TAP 1: Tasks Manager Layout */}
-          {activeTab === "tasks" && (
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 md:gap-6">
-              {/* Task Forms Component */}
-              <div className="lg:col-span-5 flex flex-col gap-4">
-                <TaskForm
-                  tasks={appState.tasks}
-                  trades={appState.trades}
-                  stages={appState.stages || []}
-                  editTaskId={editTaskId}
-                  onSave={(t) => {
-                    handleSaveTask(t);
-                  }}
-                  onCancel={() => setEditTaskId(null)}
-                />
-                
-                {/* Visual info card inside task view */}
-                <div className="bg-slate-100/60 border border-slate-200 rounded-xl p-4 flex gap-3 text-xs leading-relaxed">
-                  <span className="text-lg shrink-0">💡</span>
-                  <div>
-                    <span className="font-extrabold text-slate-700 block mb-0.5">Automatisk beregning</span>
-                    <p className="text-slate-500 font-medium">
-                      Hver gang du opretter eller ændrer en dagsplan, justeres overenskomstmæssige weekendtillæg, ferielønninger og tidsbjælker øjeblikkeligt!
-                    </p>
-                  </div>
-                </div>
+          {/* TAP 1: Combined Tidsplan & Gantt Chart Layout */}
+          {activeTab === "tidsplan" && (
+            <div className="flex flex-col gap-4">
+              {/* Inner Sub-navigation toggle */}
+              <div className="flex bg-slate-100/80 p-1.5 rounded-xl self-start max-w-full border border-slate-200/50 shadow-3xs select-none">
+                <button
+                  type="button"
+                  onClick={() => setTidsplanView("gantt")}
+                  className={`flex items-center gap-2 px-4 py-2 text-xs font-black transition-all cursor-pointer rounded-lg ${
+                    tidsplanView === "gantt"
+                      ? "bg-white text-slate-900 shadow-xs"
+                      : "text-slate-500 hover:text-slate-800 hover:bg-white/40"
+                  }`}
+                >
+                  <CalendarDays className="w-4 h-4 text-slate-600" />
+                  <span>Tidslinje (Gantt)</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTidsplanView("list")}
+                  className={`flex items-center gap-2 px-4 py-2 text-xs font-black transition-all cursor-pointer rounded-lg ${
+                    tidsplanView === "list"
+                      ? "bg-white text-slate-900 shadow-xs"
+                      : "text-slate-500 hover:text-slate-800 hover:bg-white/40"
+                  }`}
+                >
+                  <ListChecks className="w-4 h-4 text-slate-600" />
+                  <span>Opgaver & Oprettelse ({appState.tasks.length})</span>
+                </button>
               </div>
 
-              {/* Scheduled Tasks List Panel representing Opgaver */}
-              <div className="lg:col-span-7 flex flex-col gap-3">
-                <h3 className="text-[10px] md:text-xs font-bold text-slate-400 uppercase tracking-wider mb-1 px-1">
-                  Oprettede opgaver ({appState.tasks.length})
-                </h3>
+              {/* View Rendering based on selected view mode */}
+              <div className="w-full">
+                {tidsplanView === "list" ? (
+                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 md:gap-6">
+                    {/* Task Forms Component */}
+                    <div className="lg:col-span-5 flex flex-col gap-4">
+                      <TaskForm
+                        tasks={appState.tasks}
+                        trades={appState.trades}
+                        stages={appState.stages || []}
+                        editTaskId={editTaskId}
+                        onSave={(t) => {
+                          handleSaveTask(t);
+                        }}
+                        onCancel={() => setEditTaskId(null)}
+                      />
+                      
+                      {/* Visual info card inside task view */}
+                      <div className="bg-slate-100/60 border border-slate-200 rounded-xl p-4 flex gap-3 text-xs leading-relaxed select-none">
+                        <span className="text-lg shrink-0">💡</span>
+                        <div>
+                          <span className="font-extrabold text-slate-700 block mb-0.5">Automatisk beregning</span>
+                          <p className="text-slate-500 font-medium">
+                            Hver gang du opretter eller ændrer en dagsplan, justeres overenskomstmæssige weekendtillæg, ferielønninger og tidsbjælker øjeblikkeligt!
+                          </p>
+                        </div>
+                      </div>
+                    </div>
 
-                {appState.tasks.length === 0 ? (
-                  <div className="bg-white border border-dashed border-slate-200 p-8 md:p-12 text-center rounded-xl text-xs text-slate-400 flex flex-col items-center justify-center">
-                    <ListChecks className="w-10 h-10 text-slate-200 mb-2" />
-                    <p className="font-semibold text-slate-500">Intet planlagt endnu</p>
-                    <p className="text-[10px] text-slate-400 mt-1 max-w-xs leading-relaxed">
-                      Brug formularen og giv opgaven faggrupper og varighed for at se dem her.
-                    </p>
+                    {/* Scheduled Tasks List Panel representing Opgaver */}
+                    <div className="lg:col-span-7 flex flex-col gap-3">
+                      <h3 className="text-[10px] md:text-xs font-bold text-slate-400 uppercase tracking-wider mb-1 px-1">
+                        Oprettede opgaver ({appState.tasks.length})
+                      </h3>
+
+                      {appState.tasks.length === 0 ? (
+                        <div className="bg-white border border-dashed border-slate-200 p-8 md:p-12 text-center rounded-xl text-xs text-slate-400 flex flex-col items-center justify-center">
+                          <ListChecks className="w-10 h-10 text-slate-200 mb-2" />
+                          <p className="font-semibold text-slate-500">Intet planlagt endnu</p>
+                          <p className="text-[10px] text-slate-400 mt-1 max-w-xs leading-relaxed">
+                            Brug formularen til venstre og giv opgaven faggrupper og varighed for at se dem her.
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="flex flex-col gap-3">
+                          {calculatedTasks.map((t, tIdx) => {
+                            const taskNum = tIdx + 1;
+                            return (
+                              <div
+                                key={t.id}
+                                className={`bg-white border p-4 rounded-xl flex flex-col gap-3 shadow-2xs hover:shadow-xs transition relative ${
+                                  t.isCritical ? "border-l-4 border-l-red-500 ring-1 ring-red-500/10" : "border-slate-200"
+                                }`}
+                              >
+                                <div className="flex justify-between items-start gap-3">
+                                  <div className="min-w-0 flex-1">
+                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                      <h4 className="font-black text-xs md:text-sm text-slate-800 tracking-tight truncate max-w-[180px] xs:max-w-full">
+                                        {taskNum}. {t.title}
+                                      </h4>
+                                      {t.isCritical && (
+                                        <span className="bg-red-50 border border-red-200 text-red-700 font-extrabold text-[8px] md:text-[9px] px-2 py-0.5 rounded-full flex items-center gap-0.5">
+                                          <Flame className="w-2.5 h-2.5 text-red-500 fill-red-500 shrink-0" />
+                                          <span>Kritisk</span>
+                                        </span>
+                                      )}
+                                    </div>
+                                    
+                                    {/* Stage Etape Badge & Recurrence Badge Row */}
+                                    <div className="flex flex-wrap gap-1.5 mt-1.5">
+                                      {t.stageId && (() => {
+                                        const stg = (appState.stages || []).find((s) => s.id === t.stageId);
+                                        if (!stg) return null;
+                                        return (
+                                          <span
+                                            className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg text-[9px] font-extrabold leading-tight shadow-3xs"
+                                            style={{
+                                              backgroundColor: `${stg.color}12`,
+                                              color: stg.color,
+                                              borderColor: `${stg.color}30`,
+                                              borderWidth: "1px",
+                                            }}
+                                          >
+                                            <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: stg.color }} />
+                                            <span>{stg.name}</span>
+                                          </span>
+                                        );
+                                      })()}
+
+                                      {t.isRecurring && (
+                                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg text-[9px] font-extrabold leading-tight bg-slate-50 text-slate-750 border border-slate-200 shadow-3xs">
+                                          <span className="relative flex h-1.5 w-1.5">
+                                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-slate-400 opacity-75"></span>
+                                            <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-slate-500"></span>
+                                          </span>
+                                          <span>Tjeneste: Gentages hver {t.recurringInterval} dag</span>
+                                        </span>
+                                      )}
+                                    </div>
+
+                                    {t.desc && <p className="text-[11px] md:text-xs text-slate-450 mt-2.5 font-medium leading-normal">{t.desc}</p>}
+                                  </div>
+
+                                  <div className="flex gap-1 shrink-0">
+                                    <button
+                                      onClick={() => setEditTaskId(t.id)}
+                                      className="p-2 bg-slate-50 hover:bg-slate-100 text-slate-400 hover:text-slate-600 rounded-lg cursor-pointer border border-slate-100 transition active:scale-95 min-h-[36px] min-w-[36px] flex items-center justify-center"
+                                      title="Rediger"
+                                    >
+                                      <Pencil className="w-3.5 h-3.5" />
+                                    </button>
+                                    <button
+                                      onClick={() => handleDeleteTask(t.id)}
+                                      className="p-2 bg-red-50 hover:bg-red-100 text-red-400 hover:text-red-700 rounded-lg cursor-pointer border-0 transition active:scale-95 min-h-[36px] min-w-[36px] flex items-center justify-center"
+                                      title="Slet"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
+                                </div>
+
+                                {/* Calendar info card */}
+                                <div className="grid grid-cols-2 bg-slate-50 border border-slate-100 p-2 rounded-lg text-[10px] font-bold text-slate-600 gap-2">
+                                  <div>
+                                    <span className="text-slate-400 text-[8px] uppercase tracking-wider block leading-none mb-1">
+                                      {t.isRecurring ? "Første udførelse" : "Startdato"}
+                                    </span>
+                                    <span className="block truncate font-mono">
+                                      {t.isRecurring ? "↻ " : "🏁 "}
+                                      {t.calcStart ? new Date(`${t.calcStart}T12:00:00`).toLocaleDateString("da-DK") : "Afventer"}
+                                    </span>
+                                  </div>
+                                  <div className="text-right">
+                                    <span className="text-slate-400 text-[8px] uppercase tracking-wider block leading-none mb-1">
+                                      {t.isRecurring ? "Sidste udførelse (Beregnet)" : "Slutdato"}
+                                    </span>
+                                    <span className="block truncate font-mono">
+                                      {t.isRecurring ? `✓ (${(t.occurrences || []).length} gentagelser)` : "🏆 "}
+                                      {t.calcEnd ? new Date(`${t.calcEnd}T12:00:00`).toLocaleDateString("da-DK") : "Afventer"}
+                                    </span>
+                                  </div>
+                                </div>
+
+                                {/* Badges resources and pricing inside the card */}
+                                <div className="flex justify-between items-center mt-0.5 flex-wrap gap-2 text-[10px]">
+                                  <div className="flex gap-1 flex-wrap">
+                                    {(t.tradeIds || []).map((tid) => {
+                                      const tr = appState.trades.find((x) => x.id === tid);
+                                      if (!tr) return null;
+                                      return (
+                                        <span
+                                          key={tr.id}
+                                          className="px-2 py-0.5 rounded-full font-bold border shrink-0 text-[10px]"
+                                          style={{
+                                            backgroundColor: `${tr.color}15`,
+                                            color: tr.color,
+                                            borderColor: `${tr.color}35`,
+                                          }}
+                                        >
+                                          {tr.name}
+                                        </span>
+                                      );
+                                    })}
+                                    {(t.tradeIds || []).length === 0 && (
+                                      <span className="text-slate-400 font-medium">Ingen faggrupper</span>
+                                    )}
+                                  </div>
+
+                                  <div className="font-extrabold text-xs text-slate-800 font-mono">
+                                    {(t.calcCost || 0).toLocaleString("da-DK")} kr.
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 ) : (
-                  <div className="flex flex-col gap-3">
-                    {calculatedTasks.map((t, tIdx) => {
-                      const taskNum = tIdx + 1;
-                      return (
-                        <div
-                          key={t.id}
-                          className={`bg-white border p-4 rounded-xl flex flex-col gap-3 shadow-2xs hover:shadow-xs transition relative ${
-                            t.isCritical ? "border-l-4 border-l-red-500 ring-1 ring-red-500/10" : "border-slate-200"
-                          }`}
-                        >
-                          <div className="flex justify-between items-start gap-3">
-                            <div className="min-w-0 flex-1">
-                              <div className="flex items-center gap-1.5 flex-wrap">
-                                <h4 className="font-black text-xs md:text-sm text-slate-800 tracking-tight truncate max-w-[180px] xs:max-w-full">
-                                  {taskNum}. {t.title}
-                                </h4>
-                                {t.isCritical && (
-                                  <span className="bg-red-50 border border-red-200 text-red-700 font-extrabold text-[8px] md:text-[9px] px-2 py-0.5 rounded-full flex items-center gap-0.5">
-                                    <Flame className="w-2.5 h-2.5 text-red-500 fill-red-500 shrink-0" />
-                                    <span>Kritisk</span>
-                                  </span>
-                                )}
-                              </div>
-                              
-                              {/* Stage Etape Badge & Recurrence Badge Row */}
-                              <div className="flex flex-wrap gap-1.5 mt-1.5">
-                                {t.stageId && (() => {
-                                  const stg = (appState.stages || []).find((s) => s.id === t.stageId);
-                                  if (!stg) return null;
-                                  return (
-                                    <span
-                                      className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg text-[9px] font-extrabold leading-tight shadow-3xs"
-                                      style={{
-                                        backgroundColor: `${stg.color}12`,
-                                        color: stg.color,
-                                        borderColor: `${stg.color}30`,
-                                        borderWidth: "1px",
-                                      }}
-                                    >
-                                      <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: stg.color }} />
-                                      <span>{stg.name}</span>
-                                    </span>
-                                  );
-                                })()}
+                  <div className="bg-white border border-slate-200 p-3 md:p-5 rounded-2xl shadow-xs">
+                    <div className="flex flex-wrap items-center justify-between gap-3 mb-4 px-1">
+                      <div>
+                        <h3 className="text-sm md:text-base font-black text-slate-800 tracking-tight select-none flex items-center gap-1.5 leading-none">
+                          <CalendarDays className="w-5 h-5 text-slate-700" />
+                          <span>Tidsplan & Gantt-diagram</span>
+                        </h3>
+                        <p className="text-[10px] text-slate-400 font-semibold mt-1 leading-normal">
+                          Træk i midten for at forskyde opgaverne på den rigtige rækkefølge eller træk højre kant for at ændre varigheden.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditTaskId(null);
+                          setTidsplanView("list");
+                        }}
+                        className="bg-slate-900 active:bg-black hover:bg-black text-white font-black text-[10px] md:text-xs py-2 px-3 rounded-lg cursor-pointer transition select-none flex items-center gap-1 shadow-xs min-h-[34px]"
+                      >
+                        <PlusCircle className="w-3.5 h-3.5" />
+                        <span>Opret ny opgave</span>
+                      </button>
+                    </div>
 
-                                {t.isRecurring && (
-                                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg text-[9px] font-extrabold leading-tight bg-slate-50 text-slate-750 border border-slate-200 shadow-3xs">
-                                    <span className="relative flex h-1.5 w-1.5">
-                                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-slate-400 opacity-75"></span>
-                                      <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-slate-500"></span>
-                                    </span>
-                                    <span>Tjeneste: Gentages hver {t.recurringInterval} dag</span>
-                                  </span>
-                                )}
-                              </div>
-
-                              {t.desc && <p className="text-[11px] md:text-xs text-slate-450 mt-2.5 font-medium leading-normal">{t.desc}</p>}
-                            </div>
-
-                            <div className="flex gap-1 shrink-0">
-                              <button
-                                onClick={() => setEditTaskId(t.id)}
-                                className="p-2 bg-slate-50 hover:bg-slate-100 text-slate-400 hover:text-slate-600 rounded-lg cursor-pointer border border-slate-100 transition active:scale-95 min-h-[36px] min-w-[36px] flex items-center justify-center"
-                                title="Rediger"
-                              >
-                                <Pencil className="w-3.5 h-3.5" />
-                              </button>
-                              <button
-                                onClick={() => handleDeleteTask(t.id)}
-                                className="p-2 bg-red-50 hover:bg-red-100 text-red-400 hover:text-red-700 rounded-lg cursor-pointer border-0 transition active:scale-95 min-h-[36px] min-w-[36px] flex items-center justify-center"
-                                title="Slet"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-                          </div>
-
-                          {/* Calendar info card */}
-                          <div className="grid grid-cols-2 bg-slate-50 border border-slate-100 p-2 rounded-lg text-[10px] font-bold text-slate-600 gap-2">
-                            <div>
-                              <span className="text-slate-400 text-[8px] uppercase tracking-wider block leading-none mb-1">
-                                {t.isRecurring ? "Første udførelse" : "Startdato"}
-                              </span>
-                              <span className="block truncate font-mono">
-                                {t.isRecurring ? "↻ " : "🏁 "}
-                                {t.calcStart ? new Date(`${t.calcStart}T12:00:00`).toLocaleDateString("da-DK") : "Afventer"}
-                              </span>
-                            </div>
-                            <div className="text-right">
-                              <span className="text-slate-400 text-[8px] uppercase tracking-wider block leading-none mb-1">
-                                {t.isRecurring ? "Sidste udførelse (Beregnet)" : "Slutdato"}
-                              </span>
-                              <span className="block truncate font-mono">
-                                {t.isRecurring ? `✓ (${(t.occurrences || []).length} gentagelser)` : "🏆 "}
-                                {t.calcEnd ? new Date(`${t.calcEnd}T12:00:00`).toLocaleDateString("da-DK") : "Afventer"}
-                              </span>
-                            </div>
-                          </div>
-
-                          {/* Badges resources and pricing inside the card */}
-                          <div className="flex justify-between items-center mt-0.5 flex-wrap gap-2 text-[10px]">
-                            <div className="flex gap-1 flex-wrap">
-                              {(t.tradeIds || []).map((tid) => {
-                                const tr = appState.trades.find((x) => x.id === tid);
-                                if (!tr) return null;
-                                return (
-                                  <span
-                                    key={tr.id}
-                                    className="px-2 py-0.5 rounded-full font-bold border shrink-0 text-[10px]"
-                                    style={{
-                                      backgroundColor: `${tr.color}15`,
-                                      color: tr.color,
-                                      borderColor: `${tr.color}35`,
-                                    }}
-                                  >
-                                    {tr.name}
-                                  </span>
-                                );
-                              })}
-                              {(t.tradeIds || []).length === 0 && (
-                                <span className="text-slate-400 font-medium">Ingen faggrupper</span>
-                              )}
-                            </div>
-
-                            <div className="font-extrabold text-xs text-slate-800 font-mono">
-                              {(t.calcCost || 0).toLocaleString("da-DK")} kr.
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
+                    <GanttChart
+                      tasks={calculatedTasks}
+                      trades={appState.trades}
+                      holidays={appState.holidays}
+                      projectStartDate={appState.startDate}
+                      stages={appState.stages || []}
+                      weatherDelays={appState.weatherDelays || []}
+                      onUpdateTasks={(ts) => setAppState((p) => ({ ...p, tasks: ts }))}
+                      onEditTask={(task) => {
+                        setEditTaskId(task.id);
+                        setTidsplanView("list");
+                      }}
+                    />
                   </div>
                 )}
               </div>
-            </div>
-          )}
-
-          {/* TAP 2: Gantt Chart */}
-          {activeTab === "gantt" && (
-            <div className="bg-white border border-slate-200 p-3 md:p-5 rounded-2xl shadow-xs">
-              <h3 className="text-sm md:text-base font-black text-slate-800 tracking-tight select-none mb-3 flex items-center gap-1.5 px-1">
-                <CalendarDays className="w-5 h-5 text-slate-700" />
-                <span>Tidsplan & Gantt diagram</span>
-              </h3>
-              <GanttChart
-                tasks={calculatedTasks}
-                trades={appState.trades}
-                holidays={appState.holidays}
-                projectStartDate={appState.startDate}
-                stages={appState.stages || []}
-                weatherDelays={appState.weatherDelays || []}
-                onUpdateTasks={(ts) => setAppState((p) => ({ ...p, tasks: ts }))}
-                onEditTask={(task) => {
-                  setEditTaskId(task.id);
-                  setActiveTab("tasks");
-                }}
-              />
             </div>
           )}
 
