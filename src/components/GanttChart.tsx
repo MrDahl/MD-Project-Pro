@@ -62,7 +62,9 @@ export function GanttChart({
   const [columnCollapsed, setColumnCollapsed] = useState(false);
 
   // Holiday dates mapped for backward-compatible utilities
-  const holidayDates = holidays.map((h) => h.date);
+  const holidayDates = (holidays || [])
+    .map((h) => h && typeof h === "object" ? h.date : String(h))
+    .filter(Boolean);
 
   // States for interactive day clicking & details modal
   const [selectedDayDate, setSelectedDayDate] = useState<string | null>(null);
@@ -571,8 +573,8 @@ export function GanttChart({
               {dateList.map((date, idx) => {
                 const dateStr = toDateStr(date);
                 const isWe = date.getDay() === 0 || date.getDay() === 6;
-                const isHol = holidays.some((h) => h.date === dateStr);
-                const foundHoliday = holidays.find((h) => h.date === dateStr);
+                const isHol = holidays && holidays.some((h) => h && (typeof h === "string" ? h === dateStr : h.date === dateStr));
+                const foundHoliday = holidays && holidays.find((h) => h && (typeof h === "string" ? h === dateStr : h.date === dateStr));
                 const isWeather = weatherDelays && weatherDelays.some(wd => dateStr >= wd.startDate && dateStr <= wd.endDate);
                 const foundWeather = weatherDelays ? weatherDelays.find(wd => dateStr >= wd.startDate && dateStr <= wd.endDate) : null;
                 
@@ -581,27 +583,36 @@ export function GanttChart({
                     key={idx}
                     onClick={() => {
                       setSelectedDayDate(dateStr);
-                      setDayHolidayName(foundHoliday?.name || "");
+                      setDayHolidayName(foundHoliday && typeof foundHoliday === "object" ? foundHoliday.name : "Lukkedag");
                       setDayWeatherLabel(foundWeather?.label || "");
                       setDayWeatherEnd(foundWeather?.endDate || dateStr);
                       setDayActionType(foundWeather ? "weather" : "holiday");
                     }}
                     title={`${date.toLocaleDateString("da-DK", { weekday: "long", day: "numeric", month: "long" })}${
-                      foundHoliday ? `\nLukkedag: ${foundHoliday.name}` : ""
+                      foundHoliday && typeof foundHoliday === "object" ? `\nLukkedag: ${foundHoliday.name}` : ""
                     }${
                       foundWeather ? `\nUvejr/Arbejdsstop: ${foundWeather.label}` : ""
                     }\n\nKlik for at tilføje/fjerne helligdag eller uvejr!`}
                     style={{ width: "48px" }}
-                    className={`shrink-0 h-full border-r border-slate-200/65 text-center flex flex-col items-center justify-center py-2 cursor-pointer transition hover:bg-slate-200 hover:brightness-105 active:scale-95 ${
-                      isHol ? "bg-purple-200 font-extrabold text-slate-950" : isWeather ? "bg-sky-200 font-extrabold text-slate-950" : isWe ? "bg-emerald-100" : "bg-slate-50"
+                    className={`relative shrink-0 h-full border-r border-slate-250 text-center flex flex-col items-center justify-center py-2 cursor-pointer transition hover:bg-slate-200 hover:brightness-105 active:scale-95 ${
+                      isHol ? "bg-purple-100/95 font-extrabold text-purple-950" : isWeather ? "bg-sky-100/95 font-extrabold text-sky-950" : isWe ? "bg-emerald-50/70" : "bg-slate-50"
                     }`}
                   >
+                    {/* Colored indicator bar at the top */}
+                    {isHol && <div className="absolute top-0 inset-x-0 h-1 bg-purple-500" />}
+                    {isWeather && <div className="absolute top-0 inset-x-0 h-1 bg-sky-500" />}
+                    {isWe && !isHol && !isWeather && <div className="absolute top-0 inset-x-0 h-1 bg-emerald-400" />}
+
                     <span className="text-[8.5px] uppercase font-black text-slate-400 select-none">
                       {formatHeaderMonth(date)}
                     </span>
-                    <span className={`text-[12px] font-black mt-0.5 select-none ${isWe || isHol || isWeather ? "text-slate-905" : "text-slate-805"}`}>
-                      {formatHeaderDayNum(date)}
-                    </span>
+                    <div className="flex items-center gap-0.5 mt-0.5 select-none font-black">
+                      <span className={`text-[12px] font-black ${isWe || isHol || isWeather ? "text-slate-900" : "text-slate-800"}`}>
+                        {formatHeaderDayNum(date)}
+                      </span>
+                      {isHol && <span className="text-[10px]" title={foundHoliday && typeof foundHoliday === "object" ? foundHoliday.name : "Lukkedag"}>🇩🇰</span>}
+                      {isWeather && <span className="text-[10px]" title={foundWeather?.label}>❄️</span>}
+                    </div>
                   </div>
                 );
               })}
@@ -653,7 +664,7 @@ export function GanttChart({
                             key={idx}
                             style={{ width: "48px" }}
                             className={`shrink-0 border-r border-slate-100/60 h-full ${
-                              isHol ? "bg-purple-200/10" : isWe ? "bg-emerald-100/10" : ""
+                              isHol ? "bg-purple-100/80" : isWe ? "bg-emerald-100/10" : ""
                             }`}
                           />
                         );
@@ -756,8 +767,7 @@ export function GanttChart({
 
                   {/* Horizontal Timeline cells containing the styled segments */}
                   <div style={{ width: `${dateList.length * 48}px` }} className="shrink-0 h-full relative flex items-center">
-                    
-                     {/* Synchronized Base Background Grid columns */}
+                          {/* Synchronized Base Background Grid columns */}
                     <div className="absolute inset-y-0 left-0 flex">
                       {dateList.map((date, idx) => {
                         const dateStr = toDateStr(date);
@@ -768,13 +778,16 @@ export function GanttChart({
                           <div
                             key={idx}
                             style={{ width: "48px" }}
-                            className={`shrink-0 border-r border-slate-100/60 h-full relative ${
-                              isWeather ? "bg-sky-100/30" : isHol ? "bg-purple-200/15" : isWe ? "bg-emerald-100/20" : "bg-white"
+                            className={`shrink-0 border-r border-slate-200/60 h-full relative ${
+                              isWeather ? "bg-sky-100/40" : isHol ? "bg-purple-50/90 border-l border-l-purple-200/40" : isWe ? "bg-emerald-50/40" : "bg-white"
                             }`}
-                            title={isWeather ? "Uvejr / Vejrspildsdag (Arbejdsstop)" : undefined}
+                            title={isWeather ? "Uvejr / Vejrspildsdag (Arbejdsstop)" : isHol ? "Offentlig Lukkedag / Ferie" : undefined}
                           >
                             {isWeather && (
                               <span className="absolute bottom-1 right-1 text-[10px] select-none text-sky-500 font-extrabold filter drop-shadow-[0_1px_1px_rgba(255,255,255,0.8)]">❄️</span>
+                            )}
+                            {isHol && (
+                              <span className="absolute bottom-1 right-1 text-[10px] select-none text-purple-400 font-black filter drop-shadow-[0_1px_1px_rgba(255,255,255,0.8)]">🇩🇰</span>
                             )}
                           </div>
                         );
@@ -975,7 +988,7 @@ export function GanttChart({
           <span className="w-3.5 h-3.5 rounded border border-red-200 bg-red-50 flex items-center justify-center shadow-3xs text-red-500 shrink-0">
             <Flame className="w-2.5 h-2.5 text-red-500 fill-red-500" />
           </span>
-          <span className="font-extrabold text-red-650">Kritisk Vej (Skubber hele projektets uoverensstemmelse)</span>
+          <span className="font-extrabold text-red-650">Kritisk Vej (Forsinkelse her skubber hele projektets slutdato)</span>
         </div>
       </div>
 

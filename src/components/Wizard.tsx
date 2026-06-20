@@ -25,6 +25,7 @@ interface WizardProps {
     holidays: string[];
     stages: Stage[];
     trades: Trade[];
+    includeDanishHolidays?: boolean;
   }) => void;
   onClose?: () => void;
   isOpen: boolean;
@@ -44,6 +45,7 @@ export function Wizard({ onComplete, onClose, isOpen }: WizardProps) {
   // Step 2: Calendar & Start Date
   const [startDate, setStartDate] = useState("2026-06-22"); // Default upcoming Monday
   const [includeSummerHoliday, setIncludeSummerHoliday] = useState(false); // Automagic summer holiday (e.g., July 13th to July 31st 2026)
+  const [includeDanishHolidays, setIncludeDanishHolidays] = useState(true); // Automatically load Danish public holidays
   const [customHolidays, setCustomHolidays] = useState<string[]>([]);
   const [newHoliday, setNewHoliday] = useState("");
 
@@ -220,6 +222,7 @@ export function Wizard({ onComplete, onClose, isOpen }: WizardProps) {
       holidays: holidays.sort(),
       stages: stages,
       trades: trades,
+      includeDanishHolidays: includeDanishHolidays,
     });
   };
 
@@ -385,9 +388,29 @@ export function Wizard({ onComplete, onClose, isOpen }: WizardProps) {
                   </label>
                 </div>
 
+                {/* Danish holidays automatic load option */}
+                <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 flex items-start gap-3.5 mt-1">
+                  <input
+                    type="checkbox"
+                    id="danish-hol-cb"
+                    checked={includeDanishHolidays}
+                    onChange={(e) => setIncludeDanishHolidays(e.target.checked)}
+                    className="w-4 h-4 text-slate-700 h-4 w-4 accent-slate-800 shrink-0 mt-0.5 cursor-pointer"
+                  />
+                  <label htmlFor="danish-hol-cb" className="cursor-pointer select-none w-full">
+                    <span className="text-xs font-bold text-slate-800 block flex items-center justify-between gap-2">
+                      <span>Automatisk indlæsning af de danske helligdage (kalendarium.dk)</span>
+                      <span className="text-[9px] bg-purple-100 text-purple-850 px-1.5 py-0.5 rounded-full font-black uppercase">Anbefalet</span>
+                    </span>
+                    <span className="text-[10px] text-slate-500 block mt-1 leading-normal">
+                      Henter automatisk alle officielle danske helligdage som skærtorsdag, langfredag, påskedag, 2. påskedag, Kr. himmelfart, pinsedag, 2. pinsedag, grundlovsdag, jul m.fl. for dit projektår.
+                    </span>
+                  </label>
+                </div>
+
                 {/* Custom Holidays list configuration inline */}
                 <div className="flex flex-col gap-2 mt-2">
-                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Manuelt tilføk øvrige fridage / lukkedage (valgfrit)</label>
+                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Manuelt tilføj øvrige fridage / lukkedage (valgfrit)</label>
                   <div className="flex gap-2">
                     <input
                       type="date"

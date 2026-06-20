@@ -121,12 +121,30 @@ export default function App() {
     holidays: string[];
     stages: Stage[];
     trades: Trade[];
+    includeDanishHolidays?: boolean;
   }) => {
+    const year = parseInt(completedData.startDate.split("-")[0]) || new Date().getFullYear();
     const formattedHolidays: Holiday[] = (completedData.holidays || []).map((dateStr, idx) => ({
       id: `hol-wiz-${idx}-${Date.now()}`,
       date: dateStr,
-      name: "Helligdag",
+      name: "Lukkedag / Ferie",
     }));
+
+    if (completedData.includeDanishHolidays) {
+      const fallback = getFallbackDanishHolidays(year);
+      fallback.forEach((fH, fIdx) => {
+        if (!formattedHolidays.some(h => h.date === fH.date)) {
+          formattedHolidays.push({
+            id: `hol-wiz-den-${fIdx}-${Date.now()}`,
+            date: fH.date,
+            name: fH.name
+          });
+        }
+      });
+    }
+
+    // Sort combined holidays
+    formattedHolidays.sort((a, b) => a.date.localeCompare(b.date));
 
     setAppState({
       startDate: completedData.startDate,
@@ -141,7 +159,7 @@ export default function App() {
     });
     localStorage.setItem("msProjectWizardCompleted", "true");
     setWizardOpen(false);
-    triggerToast("Velkommen! Dit nye projekt er konfigureret.");
+    triggerToast("Velkommen! Dit nye projekt er konfigureret med lukkedage.");
   };
 
   const [editTaskId, setEditTaskId] = useState<string | null>(null);
@@ -155,39 +173,92 @@ export default function App() {
   const [scheduleError, setScheduleError] = useState<string | null>(null);
   const [startDateWarning, setStartDateWarning] = useState<string | null>(null);
 
-  // Synchronize Danish holidays automatically from Kalendarium API or calculation fallback on startup
+  // Synchronize Danish holidays automatically from Kalendarium API or calculation fallback for all years involved in the project
   useEffect(() => {
-    const year = parseInt(appState.startDate.split("-")[0]) || new Date().getFullYear();
-    
+    const startYear = parseInt(appState.startDate.split("-")[0]) || new Date().getFullYear();
+    const targetYears = [startYear];
+
+    // Read end date if available
+    if (projectEndDate) {
+      const endYear = parseInt(projectEndDate.split("-")[0]);
+      if (endYear && endYear > startYear) {
+        for (let y = startYear + 1; y <= endYear; y++) {
+          if (!targetYears.includes(y)) targetYears.push(y);
+        }
+      }
+    }
+
+    // Inspect any calculated task years to be safe
+    calculatedTasks.forEach((t) => {
+      if (t.calcStartDate) {
+        const y = parseInt(t.calcStartDate.split("-")[0]);
+        if (y && !targetYears.includes(y)) targetYears.push(y);
+      }
+      if (t.calcEndDate) {
+        const y = parseInt(t.calcEndDate.split("-")[0]);
+        if (y && !targetYears.includes(y)) targetYears.push(y);
+      }
+    });
+
+    const existingYears = new Set(
+      appState.holidays
+        .map((h) => h && typeof h === "object" ? h.date : String(h))
+        .filter(Boolean)
+        .map((dStr) => parseInt(dStr.split("-")[0]))
+        .filter(Boolean)
+    );
+
+    const missingYears = targetYears.filter((y) => !existingYears.has(y));
+
+    if (missingYears.length === 0) return;
+
     const syncHolidays = async () => {
       try {
-        const response = await fetch("https://api.kalendarium.dk/v1/holidays");
-        let fetchedData: { date: string; name: string }[] = [];
-        if (response.ok) {
-          const raw = await response.json();
-          if (Array.isArray(raw)) {
-            fetchedData = raw
-              .filter((item: any) => item.date && item.date.startsWith(String(year)))
-              .map((item: any) => ({
-                id: `hol-kal-${item.date}-${Date.now()}`,
-                date: item.date,
-                name: item.name || "Helligdag"
-              }));
+        let fetchedHols: { id: string; date: string; name: string }[] = [];
+        try {
+          const response = await fetch("https://api.kalendarium.dk/v1/holidays");
+          if (response.ok) {
+            const raw = await response.json();
+            if (Array.isArray(raw)) {
+              missingYears.forEach((y) => {
+                const foundInRaw = raw
+                  .filter((item: any) => item.date && item.date.startsWith(String(y)))
+                  .map((item: any) => ({
+                    id: `hol-kal-${item.date}-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+                    date: item.date,
+                    name: item.name || "Helligdag"
+                  }));
+                if (foundInRaw.length > 0) {
+                  fetchedHols.push(...foundInRaw);
+                } else {
+                  const fallback = getFallbackDanishHolidays(y);
+                  fetchedHols.push(...fallback.map((h, i) => ({
+                    id: `hol-fall-${y}-${i}-${Date.now()}`,
+                    date: h.date,
+                    name: h.name
+                  })));
+                }
+              });
+            }
           }
+        } catch (fetchErr) {
+          console.warn("Kalendarium api fetch failed, using mathematical fallback", fetchErr);
         }
-        
-        if (fetchedData.length === 0) {
-          const fallback = getFallbackDanishHolidays(year);
-          fetchedData = fallback.map((h, i) => ({
-            id: `hol-fall-${year}-${i}-${Date.now()}`,
-            date: h.date,
-            name: h.name
-          }));
+
+        if (fetchedHols.length === 0) {
+          missingYears.forEach((y) => {
+            const fallback = getFallbackDanishHolidays(y);
+            fetchedHols.push(...fallback.map((h, i) => ({
+              id: `hol-fall-${y}-${i}-${Date.now()}`,
+              date: h.date,
+              name: h.name
+            })));
+          });
         }
 
         setAppState((p) => {
           const existingDates = p.holidays.map((h) => h && typeof h === "object" ? h.date : String(h));
-          const newUniqueHols = fetchedData.filter((fh) => !existingDates.includes(fh.date));
+          const newUniqueHols = fetchedHols.filter((fh) => !existingDates.includes(fh.date));
           if (newUniqueHols.length === 0) return p;
           
           return {
@@ -200,33 +271,17 @@ export default function App() {
           };
         });
       } catch (err) {
-        console.error("Kunne ikke kontakte Kalendarium API. Bruger fallback.", err);
-        const fallback = getFallbackDanishHolidays(year);
-        const formatted = fallback.map((h, idx) => ({
-          id: `hol-fall-${year}-${idx}-${Date.now()}`,
-          date: h.date,
-          name: h.name
-        }));
-        setAppState((p) => {
-          const existingDates = p.holidays.map((h) => h && typeof h === "object" ? h.date : String(h));
-          const newUnique = formatted.filter((fh) => !existingDates.includes(fh.date));
-          if (newUnique.length === 0) return p;
-          return {
-            ...p,
-            holidays: [...p.holidays, ...newUnique].sort((a, b) => {
-              const dateA = a && typeof a === "object" ? a.date : String(a);
-              const dateB = b && typeof b === "object" ? b.date : String(b);
-              return (dateA || "").localeCompare(dateB || "");
-            })
-          };
-        });
+        console.error("Fejl under indlæsning af helligdage", err);
       }
     };
 
-    if (appState.holidays.length === 0) {
-      syncHolidays();
-    }
-  }, [appState.startDate, appState.holidays.length]);
+    syncHolidays();
+  }, [
+    appState.startDate, 
+    appState.holidays.length, 
+    projectEndDate, 
+    calculatedTasks.map(t => `${t.calcStartDate || ""}_${t.calcEndDate || ""}`).join(",")
+  ]);
 
   // Trigger calendar recalculation every time core parameters mutate
   useEffect(() => {
@@ -478,7 +533,7 @@ export default function App() {
           <div>
             <h1 className="text-xs md:text-sm font-black tracking-tight text-slate-800 mb-0">MD Project</h1>
             <span className="text-[9px] md:text-[10px] text-slate-500 font-extrabold block leading-none font-mono">
-              version 0.1.4
+              version 0.8.4
             </span>
           </div>
         </div>
@@ -1295,17 +1350,22 @@ function getFallbackDanishHolidays(year: number): { date: string; name: string }
     return res;
   };
 
-  return [
+  const holidaysList = [
     { date: `${year}-01-01`, name: "Nytårsdag" },
     { date: formatDate(addDays(easterDate, -3)), name: "Skærtorsdag" },
     { date: formatDate(addDays(easterDate, -2)), name: "Langfredag" },
     { date: formatDate(easterDate), name: "Påskedag" },
     { date: formatDate(addDays(easterDate, 1)), name: "2. påskedag" },
-    { date: formatDate(addDays(easterDate, 26)), name: "Store bededag" },
     { date: formatDate(addDays(easterDate, 39)), name: "Kristi himmelfartsdag" },
     { date: formatDate(addDays(easterDate, 49)), name: "Pinsedag" },
     { date: formatDate(addDays(easterDate, 50)), name: "2. pinsedag" },
     { date: `${year}-12-25`, name: "Juledag" },
     { date: `${year}-12-26`, name: "2. juledag" }
   ];
+
+  if (year < 2024) {
+    holidaysList.push({ date: formatDate(addDays(easterDate, 26)), name: "Store bededag" });
+  }
+
+  return holidaysList.sort((a, b) => a.date.localeCompare(b.date));
 }
