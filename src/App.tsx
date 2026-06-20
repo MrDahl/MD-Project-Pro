@@ -74,12 +74,32 @@ export default function App() {
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
+        
+        // Robust normalization of holidays
+        const rawHolidays = parsed.holidays || INITIAL_PROJECT_STATE.holidays;
+        const normalizedHolidays: Holiday[] = Array.isArray(rawHolidays)
+          ? rawHolidays.map((h: any, idx: number) => {
+              if (typeof h === "string") {
+                return {
+                  id: `hol-norm-${idx}-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+                  date: h,
+                  name: "Lukkedag / Ferie"
+                };
+              }
+              return {
+                id: h?.id || `hol-norm-${idx}-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+                date: h?.date || "",
+                name: h?.name || "Lukkedag / Ferie"
+              };
+            }).filter(h => h.date)
+          : [];
+
         // Ensure standard object structure
         return {
           startDate: parsed.startDate || INITIAL_PROJECT_STATE.startDate,
           settings: parsed.settings || INITIAL_PROJECT_STATE.settings,
           projectInfo: parsed.projectInfo || INITIAL_PROJECT_STATE.projectInfo,
-          holidays: parsed.holidays || INITIAL_PROJECT_STATE.holidays,
+          holidays: normalizedHolidays,
           trades: parsed.trades || INITIAL_PROJECT_STATE.trades,
           tasks: parsed.tasks || INITIAL_PROJECT_STATE.tasks,
           stages: parsed.stages || INITIAL_PROJECT_STATE.stages || [],
@@ -166,13 +186,17 @@ export default function App() {
         }
 
         setAppState((p) => {
-          const existingDates = p.holidays.map((h) => h.date);
+          const existingDates = p.holidays.map((h) => h && typeof h === "object" ? h.date : String(h));
           const newUniqueHols = fetchedData.filter((fh) => !existingDates.includes(fh.date));
           if (newUniqueHols.length === 0) return p;
           
           return {
             ...p,
-            holidays: [...p.holidays, ...newUniqueHols].sort((a, b) => a.date.localeCompare(b.date))
+            holidays: [...p.holidays, ...newUniqueHols].sort((a, b) => {
+              const dateA = a && typeof a === "object" ? a.date : String(a);
+              const dateB = b && typeof b === "object" ? b.date : String(b);
+              return (dateA || "").localeCompare(dateB || "");
+            })
           };
         });
       } catch (err) {
@@ -184,12 +208,16 @@ export default function App() {
           name: h.name
         }));
         setAppState((p) => {
-          const existingDates = p.holidays.map((h) => h.date);
+          const existingDates = p.holidays.map((h) => h && typeof h === "object" ? h.date : String(h));
           const newUnique = formatted.filter((fh) => !existingDates.includes(fh.date));
           if (newUnique.length === 0) return p;
           return {
             ...p,
-            holidays: [...p.holidays, ...newUnique].sort((a, b) => a.date.localeCompare(b.date))
+            holidays: [...p.holidays, ...newUnique].sort((a, b) => {
+              const dateA = a && typeof a === "object" ? a.date : String(a);
+              const dateB = b && typeof b === "object" ? b.date : String(b);
+              return (dateA || "").localeCompare(dateB || "");
+            })
           };
         });
       }

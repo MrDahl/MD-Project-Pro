@@ -255,27 +255,39 @@ export function ProjectSettings({
             </div>
           ) : (
             <div className="flex flex-col gap-1.5 max-h-[160px] overflow-y-auto pr-1">
-              {[...holidays].sort((a, b) => a.date.localeCompare(b.date)).map((h, i) => (
-                <div
-                  key={h.id || h.date + i}
-                  className="bg-slate-50 border border-slate-100 p-2.5 rounded-lg flex justify-between items-center text-xs text-slate-650 font-medium"
-                >
-                  <div className="flex flex-col gap-0.5">
-                    <span className="font-extrabold text-slate-800">{h.name}</span>
-                    <span className="text-[10px] text-slate-400 font-mono mt-0.5">
-                      {formatDateLabel(h.date)}
-                    </span>
-                  </div>
-                  <button
-                    onClick={() => onDeleteHoliday(holidays.indexOf(h))}
-                    type="button"
-                    className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 active:scale-95 transition cursor-pointer rounded-lg border-0"
-                    title="Slet lukkedag"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              ))}
+              {[...holidays]
+                .filter((h) => h)
+                .sort((a, b) => {
+                  const dateA = a && typeof a === "object" ? a.date : String(a);
+                  const dateB = b && typeof b === "object" ? b.date : String(b);
+                  return (dateA || "").localeCompare(dateB || "");
+                })
+                .map((h, i) => {
+                  const itemKey = h && typeof h === "object" ? (h.id || h.date) : `hol-${i}`;
+                  const itemName = h && typeof h === "object" ? (h.name || "Lukkedag") : "Lukkedag";
+                  const itemDate = h && typeof h === "object" ? h.date : String(h);
+                  return (
+                    <div
+                      key={itemKey + "-" + i}
+                      className="bg-slate-50 border border-slate-100 p-2.5 rounded-lg flex justify-between items-center text-xs text-slate-650 font-medium"
+                    >
+                      <div className="flex flex-col gap-0.5">
+                        <span className="font-extrabold text-slate-800">{itemName}</span>
+                        <span className="text-[10px] text-slate-400 font-mono mt-0.5">
+                          {formatDateLabel(itemDate)}
+                        </span>
+                      </div>
+                      <button
+                        onClick={() => onDeleteHoliday(holidays.indexOf(h))}
+                        type="button"
+                        className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 active:scale-95 transition cursor-pointer rounded-lg border-0"
+                        title="Slet lukkedag"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  );
+                })}
             </div>
           )}
         </div>

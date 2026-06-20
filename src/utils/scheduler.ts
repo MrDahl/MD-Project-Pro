@@ -76,7 +76,9 @@ export function calculateSchedule(
   let startDateWarning: string | null = null;
 
   // Convert named Holiday array to simple string date array for back-compatibility
-  const holidayDates = (holidays || []).map((h) => typeof h === "string" ? h : (h as any).date);
+  const holidayDates = (holidays || [])
+    .map((h) => h ? (typeof h === "string" ? h : h.date) : "")
+    .filter(Boolean);
 
   // Clear previous metrics
   const tasks = tasksInput.map((t) => ({
