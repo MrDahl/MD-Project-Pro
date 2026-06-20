@@ -390,7 +390,7 @@ export function GanttChart({
       if (stamp >= startStamp && stamp <= endStamp) {
         const dateStr = toDateStr(date);
         const isWeather = weatherDelays && weatherDelays.some(wd => dateStr >= wd.startDate && dateStr <= wd.endDate);
-        const isWork = isWorkingDay(date, task.allowWeekend, task.allowHoliday, holidayDates) && !isWeather;
+        const isWork = isWorkingDay(date, task.allowWeekend, task.allowHoliday, holidayDates) && (task.weatherIndependent || !isWeather);
         const type = isWork ? "work" : "rest";
         
         if (!currentSegment) {
