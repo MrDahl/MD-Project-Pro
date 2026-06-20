@@ -9,7 +9,11 @@ interface Term {
   example: string;
 }
 
-export function Glossary() {
+interface GlossaryProps {
+  onTriggerWizard?: () => void;
+}
+
+export function Glossary({ onTriggerWizard }: GlossaryProps) {
   const [activeIdx, setActiveIdx] = useState<number>(0);
 
   const TERMS: Term[] = [
@@ -102,7 +106,7 @@ export function Glossary() {
         {/* Selected Term detail panel */}
         <div className="md:col-span-8 flex flex-col gap-3.5 bg-slate-50 p-4 rounded-xl border border-slate-100 leading-relaxed text-xs">
           <div>
-            <span className="text-[10px] font-bold text-indigo-600 uppercase tracking-wider">Faglig Definition:</span>
+            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Faglig Definition:</span>
             <p className="text-slate-900 font-bold text-sm mt-0.5">{TERMS[activeIdx].definition}</p>
           </div>
 
@@ -116,6 +120,23 @@ export function Glossary() {
             <p className="text-slate-700 font-medium mt-0.5">{TERMS[activeIdx].example}</p>
           </div>
         </div>
+
+        {/* Wizard launcher footer inside glossary */}
+        {onTriggerWizard && (
+          <div className="md:col-span-12 border-t border-slate-200/60 pt-4 mt-2 flex flex-col sm:flex-row items-center justify-between gap-3 p-4 bg-slate-50/70 rounded-xl border border-slate-200/80">
+            <div className="text-left">
+              <span className="font-extrabold text-slate-800 text-xs block">Har du brug for en hurtig introduktion?</span>
+              <p className="text-[11px] text-slate-500 mt-0.5">Du kan genstarte opsætnings-guiden (Wizard) for at slette dine kladder og sætte et nyt projekt op fra bunden.</p>
+            </div>
+            <button
+              onClick={onTriggerWizard}
+              className="px-4 py-2 bg-slate-800 hover:bg-slate-900 active:scale-95 text-white text-xs font-extrabold rounded-lg cursor-pointer transition shadow-2xs flex items-center gap-1.5 shrink-0"
+            >
+              <RefreshCcw className="w-4 h-4 shrink-0 text-slate-200" />
+              <span>Gense opsætningsguiden</span>
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

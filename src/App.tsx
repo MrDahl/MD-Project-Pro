@@ -6,6 +6,7 @@ import { Glossary } from "./components/Glossary";
 import { TaskForm } from "./components/TaskForm";
 import { TradeForm } from "./components/TradeForm";
 import { ProjectSettings } from "./components/ProjectSettings";
+import { Wizard } from "./components/Wizard";
 import { motion, AnimatePresence } from "motion/react";
 import {
   FolderUp,
@@ -30,54 +31,13 @@ import {
 
 // Initialize baseline project start data if custom local storage is empty
 const INITIAL_PROJECT_STATE: AppData = {
-  startDate: "2026-06-15",
+  startDate: "2026-06-22",
   settings: { workHoursPerDay: 7.4 },
-  projectInfo: { projectName: "MD Project", address: "", customer: "", manager: "" },
-  holidays: ["2026-06-25"], // Fallback approximate holiday
-  trades: [
-    { id: "tr-lead-elec", name: "Elektriker (Svend)", rate: 320, isFixedPrice: false, weekendSupplement: 50, holidaySupplement: 100, color: "#3b82f6" },
-    { id: "tr-plumb", name: "VVS-installatør", rate: 360, isFixedPrice: false, weekendSupplement: 60, holidaySupplement: 100, color: "#10b981" },
-    { id: "tr-machine", name: "Gravemaskine leje", rate: 4500, isFixedPrice: true, weekendSupplement: 0, holidaySupplement: 0, color: "#f97316" },
-  ],
-  tasks: [
-    {
-      id: "task-digging",
-      title: "Udgravning til kabler",
-      desc: "Gravemaskinen forbereder jorden til kabeltrækket under terræn.",
-      duration: 3,
-      manualStart: null,
-      tradeIds: ["tr-machine"],
-      dependencyId: null,
-      allowWeekend: false,
-      allowHoliday: false,
-    },
-    {
-      id: "task-laying",
-      title: "Kabellægning",
-      desc: "Træk af 4x10 mm2 stikledning i jorden.",
-      duration: 2,
-      manualStart: null,
-      tradeIds: ["tr-lead-elec"],
-      dependencyId: "task-digging",
-      allowWeekend: false,
-      allowHoliday: false,
-    },
-    {
-      id: "task-tavle",
-      title: "El-tavle montage",
-      desc: "Opbygning og mærkning af gruppetavle.",
-      duration: 4,
-      manualStart: null,
-      tradeIds: ["tr-lead-elec"],
-      dependencyId: "task-laying",
-      allowWeekend: false,
-      allowHoliday: false,
-    },
-  ],
-  stages: [
-    { id: "stage-prep", name: "Etape 1: Forberedelse & Udgravning", color: "#3b82f6", startDate: "2026-06-15", endDate: "2026-06-21" },
-    { id: "stage-install", name: "Etape 2: Installation & Test", color: "#10b981", startDate: "2026-06-22", endDate: "2026-06-30" },
-  ],
+  projectInfo: { projectName: "Nyt Projekt", address: "", customer: "", manager: "" },
+  holidays: [],
+  trades: [],
+  tasks: [],
+  stages: [],
   scheduleError: null,
   startDateWarning: null,
 };
@@ -87,6 +47,10 @@ export default function App() {
     "tasks" | "gantt" | "resources" | "budget" | "settings" | "glossary"
   >("tasks");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [wizardOpen, setWizardOpen] = useState(() => {
+    // Hvis der ikke tidligere er fuldført en wizard, åbnes den automatisk
+    return !localStorage.getItem("msProjectWizardCompleted");
+  });
 
   const [appState, setAppState] = useState<AppData>(() => {
     const saved = localStorage.getItem("msProjectMobileData");
@@ -111,6 +75,30 @@ export default function App() {
     }
     return INITIAL_PROJECT_STATE;
   });
+
+  const handleWizardComplete = (completedData: {
+    projectInfo: ProjectInfo;
+    startDate: string;
+    settings: Settings;
+    holidays: string[];
+    stages: Stage[];
+    trades: Trade[];
+  }) => {
+    setAppState({
+      startDate: completedData.startDate,
+      settings: completedData.settings,
+      projectInfo: completedData.projectInfo,
+      holidays: completedData.holidays,
+      trades: completedData.trades,
+      stages: completedData.stages,
+      tasks: [],
+      scheduleError: null,
+      startDateWarning: null,
+    });
+    localStorage.setItem("msProjectWizardCompleted", "true");
+    setWizardOpen(false);
+    triggerToast("Velkommen! Dit nye projekt er konfigureret.");
+  };
 
   const [editTaskId, setEditTaskId] = useState<string | null>(null);
   const [editTradeId, setEditTradeId] = useState<string | null>(null);
@@ -337,7 +325,7 @@ export default function App() {
       {/* Top Header Panel - Fully Responsive (Light Styled) */}
       <header className="bg-slate-50 border-b border-slate-200 text-slate-800 px-4 md:px-6 py-3 md:py-4 flex justify-between items-center sticky top-0 z-50 shadow-xs">
         <div className="flex items-center gap-2.5">
-          <div className="w-9 h-9 md:w-10 md:h-10 bg-indigo-600 rounded-xl flex items-center justify-center text-white font-black text-lg md:text-xl shadow-md border border-indigo-500/20 select-none leading-none">
+          <div className="w-9 h-9 md:w-10 md:h-10 bg-slate-800 rounded-xl flex items-center justify-center text-white font-black text-lg md:text-xl shadow-md border border-slate-750/20 select-none leading-none">
             MD
           </div>
           <div>
@@ -373,7 +361,7 @@ export default function App() {
         {/* Modern high-density Page Title Section with FolderKanban and Project Name */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-white border border-slate-200 p-4 rounded-xl shadow-xs">
           <div className="flex items-center gap-3">
-            <div className="p-2.5 bg-indigo-50 text-indigo-600 rounded-xl">
+            <div className="p-2.5 bg-slate-100 text-slate-700 rounded-xl">
               <FolderKanban className="w-5 h-5 shrink-0" />
             </div>
             <div className="flex flex-col">
@@ -458,12 +446,12 @@ export default function App() {
               className="w-full px-4 py-3 flex items-center justify-between font-extrabold text-sm text-slate-800 bg-slate-50 hover:bg-slate-100/80 transition cursor-pointer"
             >
               <div className="flex items-center gap-2">
-                {activeTab === "tasks" && <ListChecks className="w-5 h-5 text-indigo-600" />}
-                {activeTab === "gantt" && <CalendarDays className="w-5 h-5 text-indigo-600" />}
-                {activeTab === "resources" && <UsersRound className="w-5 h-5 text-indigo-600" />}
-                {activeTab === "budget" && <DollarSign className="w-5 h-5 text-indigo-600" />}
-                {activeTab === "settings" && <SettingsIcon className="w-5 h-5 text-indigo-600" />}
-                {activeTab === "glossary" && <HelpCircle className="w-5 h-5 text-indigo-600" />}
+                {activeTab === "tasks" && <ListChecks className="w-5 h-5 text-slate-700" />}
+                {activeTab === "gantt" && <CalendarDays className="w-5 h-5 text-slate-700" />}
+                {activeTab === "resources" && <UsersRound className="w-5 h-5 text-slate-700" />}
+                {activeTab === "budget" && <DollarSign className="w-5 h-5 text-slate-700" />}
+                {activeTab === "settings" && <SettingsIcon className="w-5 h-5 text-slate-700" />}
+                {activeTab === "glossary" && <HelpCircle className="w-5 h-5 text-slate-700" />}
                 <span className="capitalize">
                   {activeTab === "tasks" && `Opgaver (${appState.tasks.length})`}
                   {activeTab === "gantt" && "Gantt"}
@@ -494,7 +482,7 @@ export default function App() {
                       setMobileMenuOpen(false);
                     }}
                     className={`w-full px-5 py-3 text-left font-bold text-xs flex items-center gap-3 transition cursor-pointer ${
-                      activeTab === "tasks" ? "text-indigo-600 bg-indigo-50/40" : "text-slate-600 hover:bg-slate-50"
+                      activeTab === "tasks" ? "text-slate-900 bg-slate-100" : "text-slate-600 hover:bg-slate-50"
                     }`}
                   >
                     <ListChecks className="w-4 h-4 shrink-0" />
@@ -507,7 +495,7 @@ export default function App() {
                       setMobileMenuOpen(false);
                     }}
                     className={`w-full px-5 py-3 text-left font-bold text-xs flex items-center gap-3 transition cursor-pointer ${
-                      activeTab === "gantt" ? "text-indigo-600 bg-indigo-50/40" : "text-slate-600 hover:bg-slate-50"
+                      activeTab === "gantt" ? "text-slate-900 bg-slate-100" : "text-slate-600 hover:bg-slate-50"
                     }`}
                   >
                     <CalendarDays className="w-4 h-4 shrink-0" />
@@ -520,7 +508,7 @@ export default function App() {
                       setMobileMenuOpen(false);
                     }}
                     className={`w-full px-5 py-3 text-left font-bold text-xs flex items-center gap-3 transition cursor-pointer ${
-                      activeTab === "resources" ? "text-indigo-600 bg-indigo-50/40" : "text-slate-600 hover:bg-slate-50"
+                      activeTab === "resources" ? "text-slate-900 bg-slate-100" : "text-slate-600 hover:bg-slate-50"
                     }`}
                   >
                     <UsersRound className="w-4 h-4 shrink-0" />
@@ -533,7 +521,7 @@ export default function App() {
                       setMobileMenuOpen(false);
                     }}
                     className={`w-full px-5 py-3 text-left font-bold text-xs flex items-center gap-3 transition cursor-pointer ${
-                      activeTab === "budget" ? "text-indigo-600 bg-indigo-50/40" : "text-slate-600 hover:bg-slate-50"
+                      activeTab === "budget" ? "text-slate-900 bg-slate-100" : "text-slate-600 hover:bg-slate-50"
                     }`}
                   >
                     <DollarSign className="w-4 h-4 shrink-0" />
@@ -546,7 +534,7 @@ export default function App() {
                       setMobileMenuOpen(false);
                     }}
                     className={`w-full px-5 py-3 text-left font-bold text-xs flex items-center gap-3 transition cursor-pointer ${
-                      activeTab === "settings" ? "text-indigo-600 bg-indigo-50/40" : "text-slate-600 hover:bg-slate-50"
+                      activeTab === "settings" ? "text-slate-900 bg-slate-100" : "text-slate-600 hover:bg-slate-50"
                     }`}
                   >
                     <SettingsIcon className="w-4 h-4 shrink-0" />
@@ -559,7 +547,7 @@ export default function App() {
                       setMobileMenuOpen(false);
                     }}
                     className={`w-full px-5 py-3 text-left font-bold text-xs flex items-center gap-3 transition cursor-pointer ${
-                      activeTab === "glossary" ? "text-indigo-600 bg-indigo-50/40" : "text-slate-600 hover:bg-slate-50"
+                      activeTab === "glossary" ? "text-slate-900 bg-slate-100" : "text-slate-600 hover:bg-slate-50"
                     }`}
                   >
                     <HelpCircle className="w-4 h-4 shrink-0" />
@@ -737,10 +725,10 @@ export default function App() {
                                 })()}
 
                                 {t.isRecurring && (
-                                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg text-[9px] font-extrabold leading-tight bg-indigo-50 text-indigo-700 border border-indigo-200 shadow-3xs">
+                                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg text-[9px] font-extrabold leading-tight bg-slate-50 text-slate-750 border border-slate-200 shadow-3xs">
                                     <span className="relative flex h-1.5 w-1.5">
-                                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
-                                      <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-indigo-500"></span>
+                                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-slate-400 opacity-75"></span>
+                                      <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-slate-500"></span>
                                     </span>
                                     <span>Tjeneste: Gentages hver {t.recurringInterval} dag</span>
                                   </span>
@@ -832,7 +820,7 @@ export default function App() {
           {activeTab === "gantt" && (
             <div className="bg-white border border-slate-200 p-3 md:p-5 rounded-2xl shadow-xs">
               <h3 className="text-sm md:text-base font-black text-slate-800 tracking-tight select-none mb-3 flex items-center gap-1.5 px-1">
-                <CalendarDays className="w-5 h-5 text-indigo-600" />
+                <CalendarDays className="w-5 h-5 text-slate-700" />
                 <span>Tidsplan & Gantt diagram</span>
               </h3>
               <GanttChart
@@ -945,12 +933,12 @@ export default function App() {
             <div className="bg-white border border-slate-200 rounded-2xl p-4 md:p-5 shadow-xs flex flex-col gap-4 md:gap-5 select-none print:shadow-none print:border-none print:p-0">
               <div className="flex justify-between items-center border-b border-slate-100 pb-3 print:hidden gap-2">
                 <h3 className="text-xs md:text-sm font-black text-slate-800 tracking-tight flex items-center gap-1.5">
-                  <DollarSign className="w-4 h-4 text-indigo-600" />
+                  <DollarSign className="w-4 h-4 text-slate-700" />
                   <span>Finansielt overblik & Sagspris</span>
                 </h3>
                 <button
                   onClick={() => window.print()}
-                  className="flex items-center gap-1 text-[10px] md:text-xs font-extrabold text-slate-600 hover:text-indigo-600 bg-slate-50 border border-slate-200 px-3 py-2 rounded-lg cursor-pointer hover:bg-slate-100 active:scale-95 transition shadow-2xs select-none min-h-[36px]"
+                  className="flex items-center gap-1 text-[10px] md:text-xs font-extrabold text-slate-600 hover:text-slate-850 bg-slate-50 border border-slate-200 px-3 py-2 rounded-lg cursor-pointer hover:bg-slate-100 active:scale-95 transition shadow-2xs select-none min-h-[36px]"
                   title="Gem eller udskriv rapport"
                 >
                   <Printer className="w-4 h-4" />
@@ -977,7 +965,7 @@ export default function App() {
                 </span>
                 <div className="text-[11px] md:text-xs text-slate-500 font-bold mt-1 max-w-sm">
                   Planlagt deadline:{" "}
-                  <span className="text-indigo-600 font-extrabold">
+                  <span className="text-slate-800 font-black">
                     {projectEndDate ? new Date(`${projectEndDate}T12:00:00`).toLocaleDateString("da-DK", { day: "numeric", month: "long", year: "numeric" }) : "Ingen"}
                   </span>
                 </div>
@@ -1057,13 +1045,33 @@ export default function App() {
           {/* TAP 6: Glossary / Vidensbase */}
           {activeTab === "glossary" && (
             <div className="bg-white border border-slate-200 p-4 md:p-6 rounded-2xl shadow-xs">
-              <Glossary />
+              <Glossary onTriggerWizard={() => setWizardOpen(true)} />
             </div>
           )}
         </div>
       </main>
 
+      {/* Minimalistisk Footer */}
+      <footer className="bg-slate-50 border-t border-slate-200/60 py-4 text-center text-xs text-slate-400 select-none print:hidden">
+        <p className="font-medium">
+          Udviklet af{" "}
+          <a
+            href="https://www.marcdahl.dk"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-slate-500 hover:text-slate-800 font-extrabold hover:underline transition"
+          >
+            Marc Sonne Dahl
+          </a>
+        </p>
+      </footer>
 
+      {/* Projekt-guide / Wizard */}
+      <Wizard
+        isOpen={wizardOpen}
+        onComplete={handleWizardComplete}
+        onClose={() => setWizardOpen(false)}
+      />
 
       {/* Persistent slide-up toast notification panel */}
       <AnimatePresence>

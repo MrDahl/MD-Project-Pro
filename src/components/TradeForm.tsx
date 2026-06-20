@@ -73,7 +73,7 @@ export function TradeForm({ trades, editTradeId, onSave, onCancel }: TradeFormPr
   return (
     <form onSubmit={handleSubmit} className="bg-white border border-slate-100 rounded-xl p-5 shadow-xs flex flex-col gap-4 select-none">
       <h3 className="text-base font-bold text-slate-800 border-b border-slate-100 pb-2 flex items-center gap-1.5">
-        <Plus className="w-5 h-5 text-indigo-600" />
+        <Plus className="w-5 h-5 text-slate-750" />
         <span>{editTradeId ? "Rediger Faggruppe / Resurse" : "Opret Ny Faggruppe / Resurse"}</span>
       </h3>
 
@@ -85,7 +85,7 @@ export function TradeForm({ trades, editTradeId, onSave, onCancel }: TradeFormPr
           value={name}
           onChange={(e) => setName(e.target.value)}
           placeholder="F.eks. Skurvogn, Elektriker (svend), Murer..."
-          className="bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs font-semibold text-slate-700 outline-none focus:border-indigo-500"
+          className="bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs font-semibold text-slate-700 outline-none focus:border-slate-500"
           required
         />
       </div>
@@ -96,7 +96,7 @@ export function TradeForm({ trades, editTradeId, onSave, onCancel }: TradeFormPr
           type="checkbox"
           checked={isFixedPrice}
           onChange={(e) => setIsFixedPrice(e.target.checked)}
-          className="w-4 h-4 accent-indigo-600"
+          className="w-4 h-4 accent-slate-700"
         />
         <span>Fast pris / Engangsbeløb (Beregnes pr. tilknyttet opgave i stedet for timepris dagspris)</span>
       </label>
@@ -111,7 +111,7 @@ export function TradeForm({ trades, editTradeId, onSave, onCancel }: TradeFormPr
           type="number"
           value={rate}
           onChange={(e) => setRate(Math.max(0, parseInt(e.target.value) || 0))}
-          className="bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs font-bold text-slate-700 outline-none focus:border-indigo-500"
+          className="bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs font-bold text-slate-700 outline-none focus:border-slate-500"
           min={0}
           required
         />
@@ -130,7 +130,7 @@ export function TradeForm({ trades, editTradeId, onSave, onCancel }: TradeFormPr
               value={weekendSupplement}
               onChange={(e) => setWeekendSupplement(Math.max(0, parseInt(e.target.value) || 0))}
               placeholder="F.eks. 50"
-              className="bg-white border border-slate-200 rounded-lg p-2.5 text-xs font-bold text-slate-700 outline-none focus:border-indigo-500"
+              className="bg-white border border-slate-200 rounded-lg p-2.5 text-xs font-bold text-slate-700 outline-none focus:border-slate-500"
               min={0}
               required
             />
@@ -146,7 +146,7 @@ export function TradeForm({ trades, editTradeId, onSave, onCancel }: TradeFormPr
               value={holidaySupplement}
               onChange={(e) => setHolidaySupplement(Math.max(0, parseInt(e.target.value) || 0))}
               placeholder="F.eks. 100"
-              className="bg-white border border-slate-200 rounded-lg p-2.5 text-xs font-bold text-slate-700 outline-none focus:border-indigo-500"
+              className="bg-white border border-slate-200 rounded-lg p-2.5 text-xs font-bold text-slate-700 outline-none focus:border-slate-500"
               min={0}
               required
             />
@@ -168,7 +168,7 @@ export function TradeForm({ trades, editTradeId, onSave, onCancel }: TradeFormPr
                 type="button"
                 onClick={() => setColor(c)}
                 className={`w-6 h-6 rounded-full border cursor-pointer hover:scale-110 active:scale-95 transition ${
-                  color === c ? "border-slate-900 ring-2 ring-indigo-500/20 shadow-xs" : "border-transparent"
+                  color === c ? "border-slate-900 ring-2 ring-slate-500/25 shadow-xs" : "border-transparent"
                 }`}
                 style={{ backgroundColor: c }}
               />
@@ -189,7 +189,7 @@ export function TradeForm({ trades, editTradeId, onSave, onCancel }: TradeFormPr
       <div className="flex gap-2 border-t border-slate-100 pt-3">
         <button
           type="submit"
-          className="flex-1 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white text-xs font-extrabold py-3 rounded-lg flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
+          className="flex-1 bg-slate-700 hover:bg-slate-800 active:bg-slate-900 text-white text-xs font-extrabold py-3 rounded-lg flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
         >
           <Save className="w-4 h-4" />
           <span>{editTradeId ? "Opdater Resurse" : "Tilføj Resurse"}</span>

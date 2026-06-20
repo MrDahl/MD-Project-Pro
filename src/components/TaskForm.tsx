@@ -131,15 +131,15 @@ export function TaskForm({ tasks, trades, stages, editTaskId, onSave, onCancel }
   return (
     <form onSubmit={handleSubmit} className="bg-white border border-slate-100 rounded-xl p-5 shadow-xs flex flex-col gap-4 select-none">
       <h3 className="text-base font-bold text-slate-800 border-b border-slate-100 pb-2 flex items-center gap-1.5">
-        <Plus className="w-5 h-5 text-indigo-600" />
+        <Plus className="w-5 h-5 text-slate-850" />
         <span>{editTaskId ? "Rediger Opgave" : "Opret Ny Opgave"}</span>
       </h3>
 
       {/* Toggle is recurring task */}
-      <div className="bg-indigo-50/40 border border-indigo-100/50 p-3 rounded-lg flex items-center justify-between">
+      <div className="bg-slate-50 border border-slate-200/80 p-3 rounded-lg flex items-center justify-between">
         <div className="flex flex-col">
-          <span className="text-xs font-bold text-indigo-900 flex items-center gap-1.5">
-            <RefreshCw className="w-3.5 h-3.5 text-indigo-500 animate-spin-slow" />
+          <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+            <RefreshCw className="w-3.5 h-3.5 text-slate-550 animate-spin-slow" />
             <span>Er dette en tilbagevendende serviceopgave?</span>
           </span>
           <span className="text-[10px] text-slate-500 mt-0.5">
@@ -153,7 +153,7 @@ export function TaskForm({ tasks, trades, stages, editTaskId, onSave, onCancel }
             onChange={(e) => setIsRecurring(e.target.checked)}
             className="sr-only peer"
           />
-          <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+          <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-slate-700"></div>
         </label>
       </div>
 
@@ -165,7 +165,7 @@ export function TaskForm({ tasks, trades, stages, editTaskId, onSave, onCancel }
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           placeholder={isRecurring ? "F.eks. Ugentlig Affaldshåndtering eller Sikkerhedstjek..." : "F.eks. Træk føringsveje eller Aflevering..."}
-          className="bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs font-semibold text-slate-700 outline-none focus:border-indigo-500"
+          className="bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs font-semibold text-slate-700 outline-none focus:border-slate-500"
           required
         />
       </div>
@@ -177,7 +177,7 @@ export function TaskForm({ tasks, trades, stages, editTaskId, onSave, onCancel }
           onChange={(e) => setDesc(e.target.value)}
           placeholder="Noter til montøren på farten..."
           rows={2}
-          className="bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs text-slate-700 outline-none focus:border-indigo-500 resize-none"
+          className="bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs text-slate-700 outline-none focus:border-slate-500 resize-none"
         />
       </div>
 
@@ -195,7 +195,7 @@ export function TaskForm({ tasks, trades, stages, editTaskId, onSave, onCancel }
                 type="number"
                 value={duration}
                 onChange={(e) => setDuration(Math.max(1, parseInt(e.target.value) || 1))}
-                className="bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs font-bold text-slate-700 outline-none focus:border-indigo-500"
+                className="bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs font-bold text-slate-700 outline-none focus:border-slate-500"
                 min={1}
                 required
               />
@@ -210,7 +210,7 @@ export function TaskForm({ tasks, trades, stages, editTaskId, onSave, onCancel }
                 type="date"
                 value={manualStart}
                 onChange={(e) => setManualStart(e.target.value)}
-                className="bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs font-semibold text-slate-700 outline-none focus:border-indigo-500"
+                className="bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs font-semibold text-slate-700 outline-none focus:border-slate-500"
               />
             </div>
           </div>
@@ -224,7 +224,7 @@ export function TaskForm({ tasks, trades, stages, editTaskId, onSave, onCancel }
             <select
               value={stageId}
               onChange={(e) => setStageId(e.target.value)}
-              className="bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs font-bold text-slate-700 outline-none focus:border-indigo-500"
+              className="bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs font-bold text-slate-700 outline-none focus:border-slate-500"
             >
               <option value="">Ingen specifik etape (Frisvævende)</option>
               {stages.map((stg) => (
@@ -244,7 +244,7 @@ export function TaskForm({ tasks, trades, stages, editTaskId, onSave, onCancel }
             <select
               value={dependencyId}
               onChange={(e) => setDependencyId(e.target.value)}
-              className="bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs font-bold text-slate-700 outline-none focus:border-indigo-500"
+              className="bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs font-bold text-slate-700 outline-none focus:border-slate-500"
             >
               <option value="">Starter med projektet eller manuel startdato</option>
               {tasks.map((t) => {
@@ -266,8 +266,8 @@ export function TaskForm({ tasks, trades, stages, editTaskId, onSave, onCancel }
 
       {/* Recurring Task Options */}
       {isRecurring && (
-        <div className="flex flex-col gap-4 border border-indigo-100 bg-indigo-50/15 p-4 rounded-xl">
-          <span className="text-[10px] font-black uppercase text-indigo-700 tracking-wider">Parametre for gentagende service</span>
+        <div className="flex flex-col gap-4 border border-slate-200 bg-slate-50/70 p-4 rounded-xl">
+          <span className="text-[10px] font-black uppercase text-slate-700 tracking-wider">Parametre for gentagende service</span>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="flex flex-col gap-1">
@@ -279,7 +279,7 @@ export function TaskForm({ tasks, trades, stages, editTaskId, onSave, onCancel }
                 type="number"
                 value={recurringInterval}
                 onChange={(e) => setRecurringInterval(Math.max(1, parseInt(e.target.value) || 1))}
-                className="bg-white border border-slate-200 rounded-lg p-2.5 text-xs font-bold text-slate-700 outline-none focus:border-indigo-500"
+                className="bg-white border border-slate-200 rounded-lg p-2.5 text-xs font-bold text-slate-700 outline-none focus:border-slate-500"
                 min={1}
                 required
               />
@@ -294,7 +294,7 @@ export function TaskForm({ tasks, trades, stages, editTaskId, onSave, onCancel }
                 type="number"
                 value={recurringPrice}
                 onChange={(e) => setRecurringPrice(Math.max(0, parseInt(e.target.value) || 0))}
-                className="bg-white border border-slate-200 rounded-lg p-2.5 text-xs font-bold text-indigo-700 outline-none focus:border-indigo-500"
+                className="bg-white border border-slate-200 rounded-lg p-2.5 text-xs font-bold text-slate-800 outline-none focus:border-slate-500"
                 min={0}
                 required
               />
@@ -311,7 +311,7 @@ export function TaskForm({ tasks, trades, stages, editTaskId, onSave, onCancel }
                   value="project"
                   checked={recurringRangeType === "project"}
                   onChange={() => setRecurringRangeType("project")}
-                  className="w-4 h-4 accent-indigo-600"
+                  className="w-4 h-4 accent-slate-700"
                 />
                 <span>Hele projektets varighed</span>
               </label>
@@ -323,7 +323,7 @@ export function TaskForm({ tasks, trades, stages, editTaskId, onSave, onCancel }
                   value="stages"
                   checked={recurringRangeType === "stages"}
                   onChange={() => setRecurringRangeType("stages")}
-                  className="w-4 h-4 accent-indigo-600"
+                  className="w-4 h-4 accent-slate-700"
                 />
                 <span>Kun under bestemte etaper / faser</span>
               </label>
@@ -346,7 +346,7 @@ export function TaskForm({ tasks, trades, stages, editTaskId, onSave, onCancel }
                         onClick={() => toggleRecurringStageSelection(stg.id)}
                         className={`px-2.5 py-1.5 rounded-lg border text-[10px] font-bold flex items-center gap-1.5 cursor-pointer transition ${
                           checked
-                            ? "bg-indigo-600 border-indigo-600 text-white"
+                            ? "bg-slate-800 border-slate-800 text-white"
                             : "bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-600"
                         }`}
                       >
@@ -400,7 +400,7 @@ export function TaskForm({ tasks, trades, stages, editTaskId, onSave, onCancel }
             type="checkbox"
             checked={allowWeekend}
             onChange={(e) => setAllowWeekend(e.target.checked)}
-            className="w-4 h-4 accent-indigo-600"
+            className="w-4 h-4 accent-slate-700"
           />
           <span>Tillad weekendarbejde / kørsel</span>
         </label>
@@ -410,7 +410,7 @@ export function TaskForm({ tasks, trades, stages, editTaskId, onSave, onCancel }
             type="checkbox"
             checked={allowHoliday}
             onChange={(e) => setAllowHoliday(e.target.checked)}
-            className="w-4 h-4 accent-indigo-600"
+            className="w-4 h-4 accent-slate-700"
           />
           <span>Arbejde på helligdage</span>
         </label>
@@ -420,7 +420,7 @@ export function TaskForm({ tasks, trades, stages, editTaskId, onSave, onCancel }
       <div className="flex gap-2 border-t border-slate-100 pt-3">
         <button
           type="submit"
-          className="flex-1 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white text-xs font-extrabold py-3 rounded-lg flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
+          className="flex-1 bg-slate-700 hover:bg-slate-800 active:bg-slate-900 text-white text-xs font-extrabold py-3 rounded-lg flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
         >
           <Save className="w-4 h-4" />
           <span>{editTaskId ? "Opdater Opgave" : "Opret Opgave"}</span>

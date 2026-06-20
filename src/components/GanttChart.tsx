@@ -103,8 +103,8 @@ export function GanttChart({
         const centerY = rowY + rowHeight / 2;
 
         if (seg.type === "work") {
-          const colors = (task.tradeIds || []).map(tid => trades.find(tr => tr.id === tid)?.color || "#4f46e5");
-          const hexColor = colors[0] || "#4f46e5";
+          const colors = (task.tradeIds || []).map(tid => trades.find(tr => tr.id === tid)?.color || "#475569");
+          const hexColor = colors[0] || "#475569";
           
           rowsMarkup += `
             <rect x="${leftPx}" y="${rowY + 6}" width="${widthPx}" height="${rowHeight - 12}" fill="${hexColor}" rx="4" stroke="rgba(0,0,0,0.1)" stroke-width="1" />
@@ -191,7 +191,7 @@ export function GanttChart({
             color: #0f172a;
           }
           .btn {
-            background-color: #4f46e5;
+            background-color: #334155;
             color: white;
             border: none;
             padding: 8px 16px;
@@ -204,7 +204,7 @@ export function GanttChart({
             gap: 6px;
           }
           .btn:hover {
-            background-color: #4338ca;
+            background-color: #1e293b;
           }
           .svg-container {
             min-width: ${totalSvgWidth}px;
@@ -318,17 +318,17 @@ export function GanttChart({
 
   const getMultiColorGradient = (taskTradeIds: string[]) => {
     const validIds = (taskTradeIds || []).filter((id) => trades.some((tr) => tr.id === id));
-    if (validIds.length === 0) return "#4f46e5"; // default indigo
+    if (validIds.length === 0) return "#475569"; // default slate
     if (validIds.length === 1) {
       const tr = trades.find((x) => x.id === validIds[0]);
-      return tr ? tr.color : "#4f46e5";
+      return tr ? tr.color : "#475569";
     }
 
     const pct = 100 / validIds.length;
     const stops: string[] = [];
     validIds.forEach((id, i) => {
       const tr = trades.find((x) => x.id === id);
-      const color = tr ? tr.color : "#4f46e5";
+      const color = tr ? tr.color : "#475569";
       stops.push(`${color} ${i * pct}%`, `${color} ${(i + 1) * pct}%`);
     });
     return `linear-gradient(90deg, ${stops.join(", ")})`;
@@ -481,7 +481,7 @@ export function GanttChart({
         </div>
         <button
           onClick={exportFullGantt}
-          className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs rounded-lg shadow-sm border-0 transition active:scale-95 flex items-center gap-1.5 cursor-pointer leading-none"
+          className="px-3.5 py-1.5 bg-slate-700 hover:bg-slate-800 text-white font-extrabold text-xs rounded-lg shadow-sm border-0 transition active:scale-95 flex items-center gap-1.5 cursor-pointer leading-none"
         >
           <FolderDown className="w-3.5 h-3.5" />
           <span>Hent fuld tidsplan (HTML/PDF)</span>
@@ -539,7 +539,7 @@ export function GanttChart({
                     <span className="text-[8px] uppercase font-black text-slate-400">
                       {formatHeaderMonth(date)}
                     </span>
-                    <span className={`text-[11px] font-black mt-0.5 ${isWe || isHol ? "text-indigo-900" : "text-slate-800"}`}>
+                    <span className={`text-[11px] font-black mt-0.5 ${isWe || isHol ? "text-slate-900" : "text-slate-800"}`}>
                       {formatHeaderDayNum(date)}
                     </span>
                   </div>
@@ -556,18 +556,18 @@ export function GanttChart({
               const eIdx = stage.endDate ? dateList.findIndex((d) => toDateStr(d) === stage.endDate) : -1;
 
               return (
-                <div key={stage.id} className="flex border-b border-dashed border-slate-200 bg-indigo-50/5 hover:bg-indigo-50/10 transition h-14 relative items-center">
+                <div key={stage.id} className="flex border-b border-dashed border-slate-200 bg-slate-50/40 hover:bg-slate-100/30 transition h-14 relative items-center">
                   {/* Left Label */}
                   {columnCollapsed ? (
                     <div
-                      className="w-11 shrink-0 border-r border-slate-250 h-full flex items-center justify-center sticky left-0 bg-indigo-50/10 z-20 shadow-xs"
+                      className="w-11 shrink-0 border-r border-slate-250 h-full flex items-center justify-center sticky left-0 bg-slate-100/50 z-20 shadow-xs"
                       title={stage.name}
                     >
                       <Layers className="w-3.5 h-3.5" style={{ color: stage.color }} />
                     </div>
                   ) : (
                     <div
-                      className="w-52 shrink-0 border-r border-slate-250 p-3 h-full flex flex-col justify-center sticky left-0 bg-indigo-50/20 z-20 shadow-xs"
+                      className="w-52 shrink-0 border-r border-slate-250 p-3 h-full flex flex-col justify-center sticky left-0 bg-slate-100/30 z-20 shadow-xs"
                     >
                       <div className="flex items-center gap-1.5 min-w-0">
                         <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: stage.color }} />
@@ -582,7 +582,7 @@ export function GanttChart({
                   )}
 
                   {/* Horizontal Cell background and Span */}
-                  <div style={{ width: `${dateList.length * 48}px` }} className="shrink-0 h-full relative flex items-center bg-indigo-50/5">
+                  <div style={{ width: `${dateList.length * 48}px` }} className="shrink-0 h-full relative flex items-center bg-slate-50/20">
                     {/* Synchronized Base Background Grid columns */}
                     <div className="absolute inset-y-0 left-0 flex">
                       {dateList.map((date, idx) => {
@@ -748,7 +748,7 @@ export function GanttChart({
                                 ? "rounded-r-lg"
                                 : "rounded-none"
                             } ${task.isCritical ? "border-2 border-red-500 shadow-md shadow-red-500/10" : ""} ${
-                              isBeingDragged ? "scale-y-[1.04] brightness-105 ring-2 ring-indigo-500/20 shadow-md" : ""
+                              isBeingDragged ? "scale-y-[1.04] brightness-105 ring-2 ring-slate-500/20 shadow-md" : ""
                             }`}
                           >
                             {/* Text is always placed directly on the right side of the entire task timeline inside a modern bubble */}
@@ -791,8 +791,8 @@ export function GanttChart({
                       if (idx === -1) return null;
 
                       const leftPx = idx * 48 + 12; // center nicely within the 48px column (48 - 24) / 2 = 12
-                      const colors = (task.tradeIds || []).map(tid => trades.find(tr => tr.id === tid)?.color || "#4f46e5");
-                      const colorHex = colors[0] || "#4f46e5";
+                      const colors = (task.tradeIds || []).map(tid => trades.find(tr => tr.id === tid)?.color || "#475569");
+                      const colorHex = colors[0] || "#475569";
 
                       return (
                         <div

@@ -91,7 +91,7 @@ export function ProjectSettings({
       {/* 1. Project Information Card */}
       <div className="bg-white border border-slate-100 rounded-xl p-5 shadow-xs flex flex-col gap-4">
         <h3 className="text-base font-bold text-slate-800 border-b border-slate-100 pb-2 flex items-center gap-1.5">
-          <FileText className="w-5 h-5 text-indigo-600" />
+          <FileText className="w-5 h-5 text-slate-700" />
           <span>Projektinformation</span>
         </h3>
 
@@ -102,7 +102,7 @@ export function ProjectSettings({
             value={projectInfo.projectName || ""}
             onChange={(e) => handleInfoChange("projectName", e.target.value)}
             placeholder="f.eks. Renovering Hansen"
-            className="bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs font-bold text-slate-700 outline-none focus:border-indigo-500"
+            className="bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs font-bold text-slate-700 outline-none focus:border-slate-500"
           />
         </div>
 
@@ -116,7 +116,7 @@ export function ProjectSettings({
             value={projectInfo.address || ""}
             onChange={(e) => handleInfoChange("address", e.target.value)}
             placeholder="f.eks. Nørregade 42, Aarhus"
-            className="bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs font-bold text-slate-700 outline-none focus:border-indigo-500"
+            className="bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs font-bold text-slate-700 outline-none focus:border-slate-500"
           />
         </div>
 
@@ -130,7 +130,7 @@ export function ProjectSettings({
             value={projectInfo.customer || ""}
             onChange={(e) => handleInfoChange("customer", e.target.value)}
             placeholder="f.eks. M. Hansen Holding"
-            className="bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs font-bold text-slate-700 outline-none focus:border-indigo-500"
+            className="bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs font-bold text-slate-700 outline-none focus:border-slate-500"
           />
         </div>
 
@@ -144,7 +144,7 @@ export function ProjectSettings({
             value={projectInfo.manager || ""}
             onChange={(e) => handleInfoChange("manager", e.target.value)}
             placeholder="f.eks. Byggeleder Olsen"
-            className="bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs font-bold text-slate-700 outline-none focus:border-indigo-500"
+            className="bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs font-bold text-slate-700 outline-none focus:border-slate-500"
           />
         </div>
       </div>
@@ -152,7 +152,7 @@ export function ProjectSettings({
       {/* 2. Settings configuration Card */}
       <div className="bg-white border border-slate-100 rounded-xl p-5 shadow-xs flex flex-col gap-4">
         <h3 className="text-base font-bold text-slate-800 border-b border-slate-100 pb-2 flex items-center gap-1.5">
-          <Calendar className="w-5 h-5 text-indigo-600" />
+          <Calendar className="w-5 h-5 text-slate-700" />
           <span>Projektindstillinger</span>
         </h3>
 
@@ -162,7 +162,7 @@ export function ProjectSettings({
             type="date"
             value={startDate}
             onChange={(e) => onUpdateStartDate(e.target.value)}
-            className="bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs font-bold text-slate-700 outline-none focus:border-indigo-500"
+            className="bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs font-bold text-slate-700 outline-none focus:border-slate-500"
           />
           <span className="text-[10px] text-slate-400 font-medium">
             Tidsplanen vil automatisk kaskadeskubbe til højre med start herfra.
@@ -178,7 +178,7 @@ export function ProjectSettings({
             type="number"
             value={settings.workHoursPerDay}
             onChange={(e) => onUpdateWorkHours(Math.max(1, parseFloat(e.target.value) || 7.4))}
-            className="bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs font-bold text-slate-700 outline-none focus:border-indigo-500"
+            className="bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs font-bold text-slate-700 outline-none focus:border-slate-500"
             step="0.1"
             min={1}
             max={24}
@@ -200,7 +200,7 @@ export function ProjectSettings({
       {/* 3. Custom Holidays list Card */}
       <div className="bg-white border border-slate-100 rounded-xl p-5 shadow-xs flex flex-col gap-4">
         <h3 className="text-base font-bold text-slate-800 border-b border-slate-100 pb-2 flex items-center gap-1.5">
-          <CalendarX className="w-5 h-5 text-indigo-600" />
+          <CalendarX className="w-5 h-5 text-slate-750" />
           <span>Kalender & Helligdage / Fridage</span>
         </h3>
 
@@ -210,12 +210,12 @@ export function ProjectSettings({
             type="date"
             value={newHoliday}
             onChange={(e) => setNewHoliday(e.target.value)}
-            className="flex-1 bg-slate-50 border border-slate-200 p-2 text-xs font-semibold text-slate-700 outline-none focus:border-indigo-500 rounded-lg"
+            className="flex-1 bg-slate-50 border border-slate-200 p-2 text-xs font-semibold text-slate-700 outline-none focus:border-slate-500 rounded-lg"
           />
           <button
             type="submit"
             disabled={!newHoliday}
-            className="bg-indigo-600 active:bg-indigo-700 text-white hover:bg-indigo-700 p-2.5 rounded-lg text-xs font-bold cursor-pointer disabled:opacity-50 shrink-0 flex items-center justify-center gap-1 shadow-xs"
+            className="bg-slate-700 active:bg-slate-800 text-white hover:bg-slate-800 p-2.5 rounded-lg text-xs font-bold cursor-pointer disabled:opacity-50 shrink-0 flex items-center justify-center gap-1 shadow-xs"
           >
             <Plus className="w-3.5 h-3.5" />
             <span>Markér fridag</span>
@@ -260,7 +260,7 @@ export function ProjectSettings({
       {/* 4. Stages / Etaper Card */}
       <div className="bg-white border border-slate-100 rounded-xl p-5 shadow-xs flex flex-col gap-4 md:col-span-2">
         <h3 className="text-base font-bold text-slate-800 border-b border-slate-100 pb-2 flex items-center gap-1.5">
-          <Layers className="w-5 h-5 text-indigo-600" />
+          <Layers className="w-5 h-5 text-slate-700" />
           <span>Etaper & Projektfaser</span>
         </h3>
         
@@ -276,7 +276,7 @@ export function ProjectSettings({
               value={stageName}
               onChange={(e) => setStageName(e.target.value)}
               placeholder="F.eks. Etape 1: Fundament"
-              className="bg-white border border-slate-200 rounded-lg p-2 text-xs font-semibold text-slate-700 outline-none focus:border-indigo-500"
+              className="bg-white border border-slate-200 rounded-lg p-2 text-xs font-semibold text-slate-700 outline-none focus:border-slate-500"
               required
             />
           </div>
@@ -287,7 +287,7 @@ export function ProjectSettings({
               type="date"
               value={stageStart}
               onChange={(e) => setStageStart(e.target.value)}
-              className="bg-white border border-slate-200 rounded-lg p-1.5 text-xs font-semibold text-slate-700 outline-none focus:border-indigo-500"
+              className="bg-white border border-slate-200 rounded-lg p-1.5 text-xs font-semibold text-slate-700 outline-none focus:border-slate-500"
               required
             />
           </div>
@@ -298,7 +298,7 @@ export function ProjectSettings({
               type="date"
               value={stageEnd}
               onChange={(e) => setStageEnd(e.target.value)}
-              className="bg-white border border-slate-200 rounded-lg p-1.5 text-xs font-semibold text-slate-700 outline-none focus:border-indigo-500"
+              className="bg-white border border-slate-200 rounded-lg p-1.5 text-xs font-semibold text-slate-700 outline-none focus:border-slate-500"
               required
             />
           </div>
@@ -327,7 +327,7 @@ export function ProjectSettings({
           <div className="flex items-end justify-end">
             <button
               type="submit"
-              className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold py-2 px-4 rounded-lg text-xs cursor-pointer flex items-center justify-center gap-1.5 shadow-xs h-9"
+              className="w-full bg-slate-700 hover:bg-slate-800 text-white font-extrabold py-2 px-4 rounded-lg text-xs cursor-pointer flex items-center justify-center gap-1.5 shadow-xs h-9"
             >
               <Plus className="w-4 h-4" />
               <span>Opret etape</span>
