@@ -20,6 +20,7 @@ export function TaskForm({ tasks, trades, stages, editTaskId, onSave, onCancel }
   const [dependencyId, setDependencyId] = useState("");
   const [allowWeekend, setAllowWeekend] = useState(false);
   const [allowHoliday, setAllowHoliday] = useState(false);
+  const [weatherIndependent, setWeatherIndependent] = useState(false);
 
   // Stage, Recurrence, Progress & Type additions
   const [stageId, setStageId] = useState("");
@@ -43,6 +44,7 @@ export function TaskForm({ tasks, trades, stages, editTaskId, onSave, onCancel }
         setDependencyId(task.dependencyId || "");
         setAllowWeekend(task.allowWeekend);
         setAllowHoliday(task.allowHoliday);
+        setWeatherIndependent(task.weatherIndependent || false);
         setStageId(task.stageId || "");
         setIsRecurring(task.isRecurring || false);
         setProgress(task.progress || 0);
@@ -66,6 +68,7 @@ export function TaskForm({ tasks, trades, stages, editTaskId, onSave, onCancel }
     setDependencyId("");
     setAllowWeekend(false);
     setAllowHoliday(false);
+    setWeatherIndependent(false);
     setStageId("");
     setIsRecurring(false);
     setProgress(0);
@@ -124,6 +127,7 @@ export function TaskForm({ tasks, trades, stages, editTaskId, onSave, onCancel }
       dependencyId: isRecurring ? null : (dependencyId || null),
       allowWeekend,
       allowHoliday,
+      weatherIndependent,
       stageId: isRecurring ? null : (stageId || null),
       isRecurring,
       progress: isRecurring ? 0 : progress,
@@ -449,7 +453,7 @@ export function TaskForm({ tasks, trades, stages, editTaskId, onSave, onCancel }
       </div>
 
       {/* Constraints Weekend/Holiday permissions boxes */}
-      <div className="flex flex-col sm:flex-row gap-4 bg-slate-50/50 p-2.5 rounded-lg border border-slate-100">
+      <div className="flex flex-col gap-3 sm:flex-row sm:gap-4 bg-slate-50/50 p-2.5 rounded-lg border border-slate-100">
         <label className="flex items-center gap-2 text-xs font-bold text-slate-600 cursor-pointer select-none">
           <input
             type="checkbox"
@@ -468,6 +472,16 @@ export function TaskForm({ tasks, trades, stages, editTaskId, onSave, onCancel }
             className="w-4 h-4 accent-slate-700"
           />
           <span>Arbejde på helligdage</span>
+        </label>
+
+        <label className="flex items-center gap-2 text-xs font-bold text-slate-600 cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={weatherIndependent}
+            onChange={(e) => setWeatherIndependent(e.target.checked)}
+            className="w-4 h-4 accent-slate-700"
+          />
+          <span>Vejr-uafhængig opgave</span>
         </label>
       </div>
 

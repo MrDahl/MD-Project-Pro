@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { AppData, Task, Trade, Settings, ProjectInfo, Stage } from "./types";
+import { AppData, Task, Trade, Settings, ProjectInfo, Stage, Holiday } from "./types";
 import { calculateSchedule } from "./utils/scheduler";
 import { GanttChart } from "./components/GanttChart";
 import { Glossary } from "./components/Glossary";
@@ -102,11 +102,17 @@ export default function App() {
     stages: Stage[];
     trades: Trade[];
   }) => {
+    const formattedHolidays: Holiday[] = (completedData.holidays || []).map((dateStr, idx) => ({
+      id: `hol-wiz-${idx}-${Date.now()}`,
+      date: dateStr,
+      name: "Helligdag",
+    }));
+
     setAppState({
       startDate: completedData.startDate,
       settings: completedData.settings,
       projectInfo: completedData.projectInfo,
-      holidays: completedData.holidays,
+      holidays: formattedHolidays,
       trades: completedData.trades,
       stages: completedData.stages,
       tasks: [],
@@ -128,6 +134,71 @@ export default function App() {
   const [projectTotalCost, setProjectTotalCost] = useState<number>(0);
   const [scheduleError, setScheduleError] = useState<string | null>(null);
   const [startDateWarning, setStartDateWarning] = useState<string | null>(null);
+
+  // Synchronize Danish holidays automatically from Kalendarium API or calculation fallback on startup
+  useEffect(() => {
+    const year = parseInt(appState.startDate.split("-")[0]) || new Date().getFullYear();
+    
+    const syncHolidays = async () => {
+      try {
+        const response = await fetch("https://api.kalendarium.dk/v1/holidays");
+        let fetchedData: { date: string; name: string }[] = [];
+        if (response.ok) {
+          const raw = await response.json();
+          if (Array.isArray(raw)) {
+            fetchedData = raw
+              .filter((item: any) => item.date && item.date.startsWith(String(year)))
+              .map((item: any) => ({
+                id: `hol-kal-${item.date}-${Date.now()}`,
+                date: item.date,
+                name: item.name || "Helligdag"
+              }));
+          }
+        }
+        
+        if (fetchedData.length === 0) {
+          const fallback = getFallbackDanishHolidays(year);
+          fetchedData = fallback.map((h, i) => ({
+            id: `hol-fall-${year}-${i}-${Date.now()}`,
+            date: h.date,
+            name: h.name
+          }));
+        }
+
+        setAppState((p) => {
+          const existingDates = p.holidays.map((h) => h.date);
+          const newUniqueHols = fetchedData.filter((fh) => !existingDates.includes(fh.date));
+          if (newUniqueHols.length === 0) return p;
+          
+          return {
+            ...p,
+            holidays: [...p.holidays, ...newUniqueHols].sort((a, b) => a.date.localeCompare(b.date))
+          };
+        });
+      } catch (err) {
+        console.error("Kunne ikke kontakte Kalendarium API. Bruger fallback.", err);
+        const fallback = getFallbackDanishHolidays(year);
+        const formatted = fallback.map((h, idx) => ({
+          id: `hol-fall-${year}-${idx}-${Date.now()}`,
+          date: h.date,
+          name: h.name
+        }));
+        setAppState((p) => {
+          const existingDates = p.holidays.map((h) => h.date);
+          const newUnique = formatted.filter((fh) => !existingDates.includes(fh.date));
+          if (newUnique.length === 0) return p;
+          return {
+            ...p,
+            holidays: [...p.holidays, ...newUnique].sort((a, b) => a.date.localeCompare(b.date))
+          };
+        });
+      }
+    };
+
+    if (appState.holidays.length === 0) {
+      syncHolidays();
+    }
+  }, [appState.startDate, appState.holidays.length]);
 
   // Trigger calendar recalculation every time core parameters mutate
   useEffect(() => {
@@ -251,10 +322,18 @@ export default function App() {
     }));
   };
 
-  const handleAddHoliday = (date: string) => {
-    if (appState.holidays.includes(date)) return;
-    setAppState((p) => ({ ...p, holidays: [...p.holidays, date].sort() }));
-    triggerToast("Lukkedag markeret i kalenderen.");
+  const handleAddHoliday = (date: string, name: string = "Lukkedag") => {
+    if (appState.holidays.some((h) => h.date === date)) return;
+    const newHol: Holiday = {
+      id: "hol-" + Date.now() + "-" + Math.random().toString(36).substr(2, 4),
+      date,
+      name: name || "Lukkedag"
+    };
+    setAppState((p) => ({
+      ...p,
+      holidays: [...p.holidays, newHol]
+    }));
+    triggerToast(`Lukkedag "${name}" markeret i kalenderen.`);
   };
 
   const handleDeleteHoliday = (idx: number) => {
@@ -262,7 +341,7 @@ export default function App() {
       ...p,
       holidays: p.holidays.filter((_, i) => i !== idx),
     }));
-    triggerToast("Fridag fjernet.");
+    triggerToast("Fridag/Lukkedag fjernet.");
   };
 
   const handleAddWeatherDelay = (label: string, startDate: string, endDate: string) => {
@@ -524,7 +603,7 @@ export default function App() {
                     }`}
                   >
                     <CalendarDays className="w-4 h-4 shrink-0" />
-                    <span>Tidsplan & Gantt ({appState.tasks.length})</span>
+                    <span>Opgaver ({appState.tasks.length})</span>
                   </button>
 
                   <button
@@ -537,7 +616,7 @@ export default function App() {
                     }`}
                   >
                     <UsersRound className="w-4 h-4 shrink-0" />
-                    <span>Faggrupper</span>
+                    <span>Resurser</span>
                   </button>
 
                   <button
@@ -594,7 +673,7 @@ export default function App() {
               }`}
             >
               <CalendarDays className="w-5 h-5 sm:w-4 sm:h-4 shrink-0 text-slate-500 group-hover:text-slate-800" />
-              <span>Tidsplan & Gantt ({appState.tasks.length})</span>
+              <span>Tidsplan ({appState.tasks.length})</span>
             </button>
 
             <button
@@ -606,7 +685,7 @@ export default function App() {
               }`}
             >
               <UsersRound className="w-5 h-5 sm:w-4 sm:h-4 shrink-0 text-slate-500 group-hover:text-slate-800" />
-              <span>Faggrupper</span>
+              <span>Resurser</span>
             </button>
 
             <button
@@ -630,7 +709,7 @@ export default function App() {
               }`}
             >
               <SettingsIcon className="w-5 h-5 sm:w-4 sm:h-4 shrink-0 text-slate-500 group-hover:text-slate-800" />
-              <span>Projekt & Indstillinger</span>
+              <span>Indstillinger</span>
             </button>
 
             <button
@@ -664,7 +743,7 @@ export default function App() {
                   }`}
                 >
                   <CalendarDays className="w-4 h-4 text-slate-600" />
-                  <span>Tidslinje (Gantt)</span>
+                  <span>Gantt</span>
                 </button>
                 <button
                   type="button"
@@ -676,7 +755,7 @@ export default function App() {
                   }`}
                 >
                   <ListChecks className="w-4 h-4 text-slate-600" />
-                  <span>Opgaver & Oprettelse ({appState.tasks.length})</span>
+                  <span>Opgaver ({appState.tasks.length})</span>
                 </button>
               </div>
 
@@ -896,6 +975,10 @@ export default function App() {
                         setEditTaskId(task.id);
                         setTidsplanView("list");
                       }}
+                      onAddHoliday={handleAddHoliday}
+                      onDeleteHoliday={handleDeleteHoliday}
+                      onAddWeatherDelay={handleAddWeatherDelay}
+                      onDeleteWeatherDelay={handleDeleteWeatherDelay}
                     />
                   </div>
                 )}
@@ -1157,4 +1240,44 @@ export default function App() {
       </AnimatePresence>
     </div>
   );
+}
+
+function getFallbackDanishHolidays(year: number): { date: string; name: string }[] {
+  const g = year % 19;
+  const c = Math.floor(year / 100);
+  const h = (c - Math.floor(c / 4) - Math.floor((8 * c + 13) / 25) + 19 * g + 15) % 30;
+  const i = h - Math.floor(h / 28) * (1 - Math.floor(h / 28) * Math.floor(29 / (h + 1)) * Math.floor((21 - g) / 11));
+  const j = (year + Math.floor(year / 4) + i + 2 - c + Math.floor(c / 4)) % 7;
+  const l = i - j;
+  const month = 3 + Math.floor((l + 40) / 44);
+  const day = l + 28 - 31 * Math.floor(month / 4);
+
+  const easterDate = new Date(year, month - 1, day);
+  
+  const formatDate = (d: Date) => {
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const dd = String(d.getDate()).padStart(2, "0");
+    return `${yyyy}-${mm}-${dd}`;
+  };
+
+  const addDays = (d: Date, days: number) => {
+    const res = new Date(d);
+    res.setDate(res.getDate() + days);
+    return res;
+  };
+
+  return [
+    { date: `${year}-01-01`, name: "Nytårsdag" },
+    { date: formatDate(addDays(easterDate, -3)), name: "Skærtorsdag" },
+    { date: formatDate(addDays(easterDate, -2)), name: "Langfredag" },
+    { date: formatDate(easterDate), name: "Påskedag" },
+    { date: formatDate(addDays(easterDate, 1)), name: "2. påskedag" },
+    { date: formatDate(addDays(easterDate, 26)), name: "Store bededag" },
+    { date: formatDate(addDays(easterDate, 39)), name: "Kristi himmelfartsdag" },
+    { date: formatDate(addDays(easterDate, 49)), name: "Pinsedag" },
+    { date: formatDate(addDays(easterDate, 50)), name: "2. pinsedag" },
+    { date: `${year}-12-25`, name: "Juledag" },
+    { date: `${year}-12-26`, name: "2. juledag" }
+  ];
 }

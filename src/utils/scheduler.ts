@@ -1,4 +1,4 @@
-import { Task, Trade, Settings, Stage, WeatherDelay } from "../types";
+import { Task, Trade, Settings, Stage, WeatherDelay, Holiday } from "../types";
 
 // Helper to construct dates at 12:00 to avoid daylight savings drift
 export function createSafeDate(dateStr: string): Date {
@@ -60,7 +60,7 @@ export function detectCycle(tasks: Task[]): boolean {
 export function calculateSchedule(
   tasksInput: Task[],
   trades: Trade[],
-  holidays: string[],
+  holidays: Holiday[],
   settings: Settings,
   projectStartDate: string,
   stagesInput: Stage[] = [],
@@ -74,6 +74,9 @@ export function calculateSchedule(
 } {
   let scheduleError: string | null = null;
   let startDateWarning: string | null = null;
+
+  // Convert named Holiday array to simple string date array for back-compatibility
+  const holidayDates = (holidays || []).map((h) => typeof h === "string" ? h : (h as any).date);
 
   // Clear previous metrics
   const tasks = tasksInput.map((t) => ({
@@ -173,8 +176,8 @@ export function calculateSchedule(
 
       // Skip non-working days & weather delays for start date
       while (
-        !isWorkingDay(expectedStart, task.allowWeekend, task.allowHoliday, holidays) ||
-        isWeatherDelayDay(expectedStart, weatherDelays)
+        !isWorkingDay(expectedStart, task.allowWeekend, task.allowHoliday, holidayDates) ||
+        (!task.weatherIndependent && isWeatherDelayDay(expectedStart, weatherDelays))
       ) {
         expectedStart.setDate(expectedStart.getDate() + 1);
       }
@@ -192,7 +195,7 @@ export function calculateSchedule(
         let cost = settings.workHoursPerDay * tr.rate;
         const dayOfWeek = dObj.getDay();
         const isWe = dayOfWeek === 0 || dayOfWeek === 6;
-        const isHol = holidays.includes(toDateStr(dObj));
+        const isHol = holidayDates.includes(toDateStr(dObj));
 
         if (isHol) {
           cost += cost * (tr.holidaySupplement / 100);
@@ -218,8 +221,8 @@ export function calculateSchedule(
           expectedEnd.setDate(expectedEnd.getDate() + 1);
 
           if (
-            isWorkingDay(expectedEnd, task.allowWeekend, task.allowHoliday, holidays) &&
-            !isWeatherDelayDay(expectedEnd, weatherDelays)
+            isWorkingDay(expectedEnd, task.allowWeekend, task.allowHoliday, holidayDates) &&
+            (task.weatherIndependent || !isWeatherDelayDay(expectedEnd, weatherDelays))
           ) {
             daysAllocated++;
             activeTrades.forEach((tr) => {
@@ -303,8 +306,8 @@ export function calculateSchedule(
       
       // Shift to next available work day if weekend/holiday is not permitted or weather delay is active
       while (
-        !isWorkingDay(actual, task.allowWeekend, task.allowHoliday, holidays) ||
-        isWeatherDelayDay(actual, weatherDelays)
+        !isWorkingDay(actual, task.allowWeekend, task.allowHoliday, holidayDates) ||
+        (!task.weatherIndependent && isWeatherDelayDay(actual, weatherDelays))
       ) {
         actual.setDate(actual.getDate() + 1);
       }

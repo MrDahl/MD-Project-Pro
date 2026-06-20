@@ -1,18 +1,18 @@
 import React, { useState } from "react";
-import { Settings, ProjectInfo, Stage, WeatherDelay } from "../types";
+import { Settings, ProjectInfo, Stage, WeatherDelay, Holiday } from "../types";
 import { Calendar, Clock, Plus, Trash2, CalendarX, Info, FileText, MapPin, User, Building, Palmtree, Layers, CloudSnow } from "lucide-react";
 
 interface ProjectSettingsProps {
   startDate: string;
   settings: Settings;
   projectInfo?: ProjectInfo;
-  holidays: string[];
+  holidays: Holiday[];
   stages?: Stage[];
   weatherDelays?: WeatherDelay[];
   onUpdateStartDate: (date: string) => void;
   onUpdateWorkHours: (hours: number) => void;
   onUpdateProjectInfo: (info: ProjectInfo) => void;
-  onAddHoliday: (date: string) => void;
+  onAddHoliday: (date: string, name: string) => void;
   onDeleteHoliday: (idx: number) => void;
   onAddStage: (stage: Stage) => void;
   onDeleteStage: (id: string) => void;
@@ -48,6 +48,7 @@ export function ProjectSettings({
   onDeleteWeatherDelay,
 }: ProjectSettingsProps) {
   const [newHoliday, setNewHoliday] = useState("");
+  const [newHolidayName, setNewHolidayName] = useState("");
 
   const [stageName, setStageName] = useState("");
   const [stageColor, setStageColor] = useState("#4f46e5");
@@ -68,8 +69,9 @@ export function ProjectSettings({
   const handleAddHoliday = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newHoliday) return;
-    onAddHoliday(newHoliday);
+    onAddHoliday(newHoliday, newHolidayName.trim() || "Ferie / Helligdag");
     setNewHoliday("");
+    setNewHolidayName("");
   };
 
   const handleCreateStage = (e: React.FormEvent) => {
@@ -215,20 +217,29 @@ export function ProjectSettings({
         </h3>
 
         {/* Add holiday form */}
-        <form onSubmit={handleAddHoliday} className="flex gap-2">
-          <input
-            type="date"
-            value={newHoliday}
-            onChange={(e) => setNewHoliday(e.target.value)}
-            className="flex-1 bg-slate-50 border border-slate-200 p-2 text-xs font-semibold text-slate-700 outline-none focus:border-slate-500 rounded-lg"
-          />
+        <form onSubmit={handleAddHoliday} className="flex flex-col gap-2">
+          <div className="flex gap-2">
+            <input
+              type="date"
+              value={newHoliday}
+              onChange={(e) => setNewHoliday(e.target.value)}
+              className="flex-1 bg-slate-50 border border-slate-200 p-2 text-xs font-semibold text-slate-700 outline-none focus:border-slate-500 rounded-lg"
+            />
+            <input
+              type="text"
+              value={newHolidayName}
+              onChange={(e) => setNewHolidayName(e.target.value)}
+              placeholder="F.eks. Sommerferie, Grundlovsdag"
+              className="flex-1 bg-slate-50 border border-slate-200 p-2 text-xs font-semibold text-slate-700 outline-none focus:border-slate-500 rounded-lg"
+            />
+          </div>
           <button
             type="submit"
             disabled={!newHoliday}
-            className="bg-slate-700 active:bg-slate-800 text-white hover:bg-slate-800 p-2.5 rounded-lg text-xs font-bold cursor-pointer disabled:opacity-50 shrink-0 flex items-center justify-center gap-1 shadow-xs"
+            className="w-full bg-slate-700 active:bg-slate-800 text-white hover:bg-slate-800 p-2.5 rounded-lg text-xs font-extrabold cursor-pointer disabled:opacity-50 shrink-0 flex items-center justify-center gap-1.5 shadow-xs"
           >
-            <Plus className="w-3.5 h-3.5" />
-            <span>Markér fridag</span>
+            <Plus className="w-4 h-4" />
+            <span>Tilføj navngivet fridag / helligdag</span>
           </button>
         </form>
 
@@ -244,18 +255,21 @@ export function ProjectSettings({
             </div>
           ) : (
             <div className="flex flex-col gap-1.5 max-h-[160px] overflow-y-auto pr-1">
-              {[...holidays].sort().map((h, i) => (
+              {[...holidays].sort((a, b) => a.date.localeCompare(b.date)).map((h, i) => (
                 <div
-                  key={h + i}
-                  className="bg-slate-50 border border-slate-100 p-2.5 rounded-lg flex justify-between items-center text-xs text-slate-600 font-medium"
+                  key={h.id || h.date + i}
+                  className="bg-slate-50 border border-slate-100 p-2.5 rounded-lg flex justify-between items-center text-xs text-slate-650 font-medium"
                 >
-                  <span className="flex items-center gap-1.5 leading-none">
-                    <Palmtree className="w-4 h-4 text-purple-600 shrink-0" />
-                    <span>{formatDateLabel(h)}</span>
-                  </span>
+                  <div className="flex flex-col gap-0.5">
+                    <span className="font-extrabold text-slate-800">{h.name}</span>
+                    <span className="text-[10px] text-slate-400 font-mono mt-0.5">
+                      {formatDateLabel(h.date)}
+                    </span>
+                  </div>
                   <button
                     onClick={() => onDeleteHoliday(holidays.indexOf(h))}
-                    className="p-1 text-slate-400 hover:text-red-500 hover:bg-red-50 active:scale-95 transition cursor-pointer rounded-lg border-0"
+                    type="button"
+                    className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 active:scale-95 transition cursor-pointer rounded-lg border-0"
                     title="Slet lukkedag"
                   >
                     <Trash2 className="w-3.5 h-3.5" />

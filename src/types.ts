@@ -48,6 +48,9 @@ export interface Task {
   recurringRangeType?: "project" | "stages"; 
   recurringStageIds?: string[]; // which stages it repeats during
 
+  // Weather delay toggle
+  weatherIndependent?: boolean;
+
   // Calculated properties
   calcStart?: string | null;
   calcEnd?: string | null;
@@ -55,6 +58,12 @@ export interface Task {
   isCritical?: boolean;
   tradeCosts?: { [tradeId: string]: number };
   occurrences?: string[]; // List of YYYY-MM-DD dates where recurring task takes place
+}
+
+export interface Holiday {
+  id: string;
+  date: string; // "YYYY-MM-DD"
+  name: string; // e.g. "Skærtorsdag", "Sommerferie"
 }
 
 export interface Settings {
@@ -72,7 +81,7 @@ export interface AppData {
   startDate: string;
   settings: Settings;
   projectInfo?: ProjectInfo;
-  holidays: string[]; // "YYYY-MM-DD"
+  holidays: Holiday[]; // Named holidays and vacations
   trades: Trade[];
   tasks: Task[];
   stages?: Stage[]; // List of stages
