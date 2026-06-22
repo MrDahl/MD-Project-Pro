@@ -291,7 +291,8 @@ export default function App() {
       appState.holidays,
       appState.settings,
       appState.startDate,
-      appState.stages || []
+      appState.stages || [],
+      appState.weatherDelays || []
     );
 
     setCalculatedTasks(res.tasks);

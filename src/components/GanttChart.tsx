@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { Task, Trade, Stage, WeatherDelay, Holiday } from "../types";
 import { createSafeDate, toDateStr, isWorkingDay } from "../utils/scheduler";
 import {
@@ -17,7 +17,8 @@ import {
   ExternalLink,
   ShieldCheck,
   CloudLightning,
-  Sun
+  Sun,
+  SlidersHorizontal
 } from "lucide-react";
 
 interface GanttChartProps {
@@ -75,80 +76,137 @@ export function GanttChart({
 
   const [activeDetailTask, setActiveDetailTask] = useState<Task | null>(null);
 
+  // --- VISNINGSFILTER STATES ---
+  type ScopeType = "all" | "stage" | "month" | "year";
+  const [filterScope, setFilterScope] = useState<ScopeType>("all");
+  const [selectedStageId, setSelectedStageId] = useState<string>("");
+  const [selectedMonthStr, setSelectedMonthStr] = useState<string>("");
+  const [selectedYearVal, setSelectedYearVal] = useState<number>(0);
+
+  // --- HTML/PDF EXPORT ENGINE (PRESERVES VISUAL DESIGN & LIGHT THEMES) ---
   const exportFullGantt = () => {
-    // Collect facts for export
     const totalCostStr = tasks.reduce((sum, t) => sum + (t.calcCost || 0), 0).toLocaleString("da-DK") + " kr.";
-    const scheduledTasks = tasks.filter((t) => t.calcStart && t.calcEnd);
-    
-    // Build columns, grid coordinates
+    const activeTasks = filteredTasks;
+    const activeDates = dateList;
+    const activeStages = filteredStages;
+
+    // Dimensions
     const labelWidth = 180;
     const colWidth = 44;
     const rowHeight = 36;
     const headerHeight = 60;
-    const dateColCount = dateList.length;
+    const dateColCount = activeDates.length;
     const totalSvgWidth = labelWidth + dateColCount * colWidth + 40;
-    const totalSvgHeight = headerHeight + scheduledTasks.length * rowHeight + 80;
+    const totalSvgHeight = headerHeight + (activeStages.length + activeTasks.length) * rowHeight + 80;
 
     // Generate colors, grid structure, segments to SVG
     let gridColsMarkup = "";
     let gridDatesMarkup = "";
     
-    dateList.forEach((date, idx) => {
+    activeDates.forEach((date, idx) => {
+      const dateStr = toDateStr(date);
       const isWe = date.getDay() === 0 || date.getDay() === 6;
-      const isHol = holidayDates.includes(toDateStr(date));
+      const isHol = holidayDates.includes(dateStr);
+      const isWeather = weatherDelays && weatherDelays.some(wd => dateStr >= wd.startDate && dateStr <= wd.endDate);
       const colX = labelWidth + idx * colWidth;
-      const fillColor = isHol ? "#d8b4fe" : isWe ? "#a7f3d0" : "#ffffff";
-      const isWeekendOrHoliday = isWe || isHol;
+      
+      const fillColor = isHol ? "#f3e8ff" : isWeather ? "#e0f2fe" : isWe ? "#ecfdf5" : "#ffffff";
+      const opacityVal = isHol ? "0.85" : isWeather ? "0.85" : isWe ? "0.6" : "0.15";
+
+      gridColsMarkup += `
+        <rect x="${colX}" y="0" width="${colWidth}" height="${totalSvgHeight - 80}" fill="${fillColor}" opacity="${opacityVal}" stroke="#e2e8f0" stroke-width="0.5" />
+      `;
+
       const dayName = date.toLocaleDateString("da-DK", { weekday: "short" }).substring(0, 2);
       const dayNum = date.getDate();
 
-      gridColsMarkup += `
-        <rect x="${colX}" y="20" width="${colWidth}" height="${totalSvgHeight - 80}" fill="${fillColor}" opacity="${isWeekendOrHoliday ? 0.35 : 0.08}" stroke="#e2e8f0" stroke-width="0.5" />
-      `;
+      let indicatorMarkup = "";
+      if (isHol) {
+        indicatorMarkup = `<text text-anchor="middle" font-size="8" y="24" fill="#a855f7">🇩🇰</text>`;
+      } else if (isWeather) {
+        indicatorMarkup = `<text text-anchor="middle" font-size="8" y="24" fill="#0ea5e9">❄️</text>`;
+      }
 
       gridDatesMarkup += `
-        <g transform="translate(${colX + colWidth / 2}, 35)">
-          <text text-anchor="middle" font-size="8" font-family="sans-serif" font-weight="950" fill="#94a3b8" transform="uppercase">${dayName}</text>
-          <text text-anchor="middle" font-size="11" font-family="sans-serif" font-weight="950" y="14" fill="${isWeekendOrHoliday ? "#312e81" : "#1e293b"}">${dayNum}</text>
+        <g transform="translate(${colX + colWidth / 2}, 25)">
+          <text text-anchor="middle" font-size="8.5" font-family="sans-serif" font-weight="950" fill="#64748b">${dayName.toUpperCase()}</text>
+          <text text-anchor="middle" font-size="11.5" font-family="sans-serif" font-weight="950" y="12" fill="${isHol ? "#6b21a8" : isWeather ? "#0369a1" : isWe ? "#065f46" : "#0f172a"}">${dayNum}</text>
+          ${indicatorMarkup}
         </g>
       `;
     });
 
     let rowsMarkup = "";
-    scheduledTasks.forEach((task, tIdx) => {
-      const taskNum = tIdx + 1;
-      const rowY = headerHeight + tIdx * rowHeight;
-      const textX = 10;
-      const textY = rowY + 22;
+    let currentY = headerHeight;
 
-      // Draw horizontal separator lines
+    // Render Stage rows first (matches exactly looking)
+    activeStages.forEach((stage) => {
+      const sIdx = stage.startDate ? activeDates.findIndex((d) => toDateStr(d) === stage.startDate) : -1;
+      const eIdx = stage.endDate ? activeDates.findIndex((d) => toDateStr(d) === stage.endDate) : -1;
+
+      // Horizontal separator
       rowsMarkup += `
-        <line x1="0" y1="${rowY}" x2="${totalSvgWidth}" y2="${rowY}" stroke="#e2e8f0" stroke-width="0.75" />
+        <line x1="0" y1="${currentY}" x2="${totalSvgWidth}" y2="${currentY}" stroke="#e2e8f0" stroke-width="0.75" />
       `;
 
-      // Draw Sticky/Opaque Task numbers & Titles
+      rowsMarkup += `
+        <g transform="translate(10, ${currentY + 11})">
+          <circle cx="5" cy="5" r="4.5" fill="${stage.color}" />
+          <text x="14" y="8" font-size="10.5" font-family="sans-serif" font-weight="950" fill="#1e293b">${stage.name.replace(/[&<>'"]/g, "")}</text>
+          <text x="14" y="18" font-size="7.5" font-family="sans-serif" font-weight="950" fill="#94a3b8" letter-spacing="0.05em">ETAPE / FASE</text>
+        </g>
+      `;
+
+      const stageStart = createSafeDate(stage.startDate);
+      const stageEnd = createSafeDate(stage.endDate);
+      const viewMin = activeDates[0];
+      const viewMax = activeDates[activeDates.length - 1];
+
+      if (stageStart <= viewMax && stageEnd >= viewMin) {
+        const leftIdx = sIdx !== -1 ? sIdx : 0;
+        const rightIdx = eIdx !== -1 ? eIdx : activeDates.length - 1;
+        const leftPx = labelWidth + leftIdx * colWidth;
+        const widthPx = (rightIdx - leftIdx + 1) * colWidth;
+
+        rowsMarkup += `
+          <rect x="${leftPx}" y="${currentY + 5}" width="${widthPx}" height="${rowHeight - 10}" fill="${stage.color}15" stroke="${stage.color}40" stroke-width="1.5" stroke-dasharray="3,2" rx="4" />
+          <text x="${leftPx + 8}" y="${currentY + 20}" font-size="9.5" font-family="sans-serif" font-weight="900" fill="${stage.color}">${stage.name.replace(/[&<>'"]/g, "")}</text>
+        `;
+      }
+
+      currentY += rowHeight;
+    });
+
+    // Render active tasks rows
+    activeTasks.forEach((task) => {
+      const taskNum = tasks.findIndex((t) => t.id === task.id) + 1;
+      const textX = 10;
+      const textY = currentY + 22;
+
+      rowsMarkup += `
+        <line x1="0" y1="${currentY}" x2="${totalSvgWidth}" y2="${currentY}" stroke="#e2e8f0" stroke-width="0.75" />
+      `;
+
       rowsMarkup += `
         <text x="${textX}" y="${textY}" font-size="11" font-family="sans-serif" font-weight="bold" fill="${task.isCritical ? "#dc2626" : "#334155"}">
           ${taskNum}. ${task.title.replace(/[&<>'"]/g, "")} ${task.isCritical ? " (🔥)" : ""}
         </text>
       `;
 
-      // Draw progress or segments
       const segments = getTaskSegments(task);
-      const taskEndColumnIndex = task.calcEnd ? dateList.findIndex((d) => toDateStr(d) === task.calcEnd) : -1;
+      const taskEndColumnIndex = task.calcEnd ? activeDates.findIndex((d) => toDateStr(d) === task.calcEnd) : -1;
 
-      // Draw segments
       segments.forEach((seg) => {
         const leftPx = labelWidth + seg.startIndex * colWidth;
         const widthPx = (seg.endIndex - seg.startIndex + 1) * colWidth;
-        const centerY = rowY + rowHeight / 2;
+        const centerY = currentY + rowHeight / 2;
 
         if (seg.type === "work") {
           const colors = (task.tradeIds || []).map(tid => trades.find(tr => tr.id === tid)?.color || "#475569");
           const hexColor = colors[0] || "#475569";
           
           rowsMarkup += `
-            <rect x="${leftPx}" y="${rowY + 6}" width="${widthPx}" height="${rowHeight - 12}" fill="${hexColor}" rx="4" stroke="rgba(0,0,0,0.1)" stroke-width="1" />
+            <rect x="${leftPx}" y="${currentY + 6}" width="${widthPx}" height="${rowHeight - 12}" fill="${hexColor}" rx="4" stroke="rgba(0,0,0,0.1)" stroke-width="1" />
           `;
         } else {
           rowsMarkup += `
@@ -157,10 +215,9 @@ export function GanttChart({
         }
       });
 
-      // Task text (always to the right)
-      if (taskEndColumnIndex >= 0) {
+      if (taskEndColumnIndex >= 0 && taskEndColumnIndex < activeDates.length) {
         const textLabelX = labelWidth + (taskEndColumnIndex + 1) * colWidth + 8;
-        const textLabelY = rowY + 22;
+        const textLabelY = currentY + 22;
         rowsMarkup += `
           <g transform="translate(${textLabelX}, ${textLabelY})">
             <rect x="-4" y="-12" width="${(task.title.length * 6) + 50}" height="18" fill="rgba(255,255,255,0.92)" stroke="#e2e8f0" stroke-width="1" rx="4" />
@@ -168,30 +225,45 @@ export function GanttChart({
           </g>
         `;
       }
+
+      currentY += rowHeight;
     });
+
+    rowsMarkup += `
+      <line x1="0" y1="${currentY}" x2="${totalSvgWidth}" y2="${currentY}" stroke="#cbd5e1" stroke-width="1" />
+    `;
+
+    let scopeLabel = "Hele projektet";
+    if (filterScope === "stage") {
+      const stage = stages.find(s => s.id === selectedStageId);
+      scopeLabel = stage ? `Etape: ${stage.name}` : "Valgt Etape";
+    } else if (filterScope === "month" && selectedMonthStr) {
+      const foundM = availableMonths.find(m => m.val === selectedMonthStr);
+      scopeLabel = foundM ? `Måned: ${foundM.label}` : selectedMonthStr;
+    } else if (filterScope === "year") {
+      scopeLabel = `År: ${selectedYearVal}`;
+    }
 
     const svgOutput = `
       <svg width="${totalSvgWidth}" height="${totalSvgHeight}" viewBox="0 0 ${totalSvgWidth} ${totalSvgHeight}" fill="none" xmlns="http://www.w3.org/2000/svg">
         <rect width="100%" height="100%" fill="#f8fafc" />
         
-        <!-- Header background -->
-        <rect width="${totalSvgWidth}" height="${headerHeight}" fill="#0f172a" />
+        <rect width="${totalSvgWidth}" height="${headerHeight}" fill="#f8fafc" />
         
-        <!-- Opgave Sticky column header overlay -->
-        <rect x="0" y="20" width="${labelWidth}" height="${totalSvgHeight - 20}" fill="#ffffff" />
-        <rect x="0" y="0" width="${labelWidth}" height="${headerHeight}" fill="#0f172a" />
-        <text x="15" y="35" font-size="11" font-family="sans-serif" font-weight="black" fill="#ffffff">OPGAVE</text>
+        <rect x="0" y="0" width="${labelWidth}" height="${totalSvgHeight - 80}" fill="#ffffff" stroke="#cbd5e1" stroke-width="0.5" />
+        <rect x="0" y="0" width="${labelWidth}" height="${headerHeight}" fill="#f1f5f9" stroke="#cbd5e1" stroke-width="1" />
+        <text x="15" y="35" font-size="11" font-family="sans-serif" font-weight="950" fill="#475569" letter-spacing="0.05em">OPGAVE</text>
         
-        <line x1="0" y1="${headerHeight}" x2="${totalSvgWidth}" y2="${headerHeight}" stroke="#cbd5e1" stroke-width="2" />
+        <line x1="0" y1="${headerHeight}" x2="${totalSvgWidth}" y2="${headerHeight}" stroke="#cbd5e1" stroke-width="1.5" />
         
         ${gridColsMarkup}
         ${gridDatesMarkup}
         ${rowsMarkup}
         
-        <g transform="translate(15, ${totalSvgHeight - 60})">
+        <g transform="translate(15, ${totalSvgHeight - 65})">
           <rect width="${totalSvgWidth - 30}" height="45" fill="#f1f5f9" stroke="#cbd5e1" stroke-width="1" rx="6" />
-          <text x="15" y="26" font-size="11" font-family="sans-serif" font-weight="bold" fill="#334155">
-            Total Sagspris: ${totalCostStr}  |  Overenskomstmæssig Tidsplanlænding  |  🔥 Kritisk vej markeret
+          <text x="15" y="26" font-size="11" font-family="sans-serif" font-weight="950" fill="#334155">
+            Total Sagspris: ${totalCostStr}  |  Periode: ${scopeLabel}  |  Overenskomstmæssig Tidsplanlægning  |  🔥 Kritisk vej markeret
           </text>
         </g>
       </svg>
@@ -202,22 +274,36 @@ export function GanttChart({
       <html lang="da">
       <head>
         <meta charset="UTF-8">
-        <title>Tidsplan - Gantt Diagram</title>
+        <title>Tidsplan - Gantt-diagram (${scopeLabel})</title>
+        <style id="print-page-style">
+          @page {
+            size: landscape;
+            margin: 10mm;
+          }
+        </style>
         <style>
           body {
             margin: 0;
             padding: 24px;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            background-color: #f1f5f9;
+            background-color: #f8fafc;
             color: #1e293b;
+          }
+          .control-panel {
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 18px;
+            margin-bottom: 24px;
+            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05);
           }
           .card {
             background: white;
             padding: 24px;
             border-radius: 16px;
-            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+            border: 1px solid #e2e8f0;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
             max-width: 100%;
-            overflow-x: auto;
           }
           .header {
             display: flex;
@@ -226,52 +312,169 @@ export function GanttChart({
             margin-bottom: 20px;
           }
           h1 {
-            font-size: 20px;
-            font-weight: 800;
+            font-size: 22px;
+            font-weight: 950;
             margin: 0;
             color: #0f172a;
+            letter-spacing: -0.025em;
           }
           .btn {
-            background-color: #334155;
+            background-color: #0284c7;
             color: white;
             border: none;
-            padding: 8px 16px;
-            font-size: 12px;
-            font-weight: 700;
+            padding: 10px 20px;
+            font-size: 13px;
+            font-weight: 800;
             border-radius: 8px;
             cursor: pointer;
             display: inline-flex;
             align-items: center;
             gap: 6px;
+            transition: all 0.1s ease;
           }
           .btn:hover {
-            background-color: #1e293b;
+            background-color: #0369a1;
+            transform: translateY(-1px);
           }
           .svg-container {
-            min-width: ${totalSvgWidth}px;
+            width: 100%;
+            max-width: 100%;
+            border: 1px solid #cbd5e1;
+            border-radius: 12px;
+            background: #ffffff;
+            overflow-x: auto;
           }
-          @print {
-            body { background: white; padding: 0; }
-            .card { box-shadow: none; padding: 0; }
-            .no-print { display: none; }
+          .svg-container svg {
+            display: block;
+            width: 100%;
+            max-width: 100%;
+            height: auto;
+          }
+          .svg-container.full-size {
+            overflow-x: auto;
+          }
+          .svg-container.full-size svg {
+            width: ${totalSvgWidth}px !important;
+            max-width: none !important;
+          }
+          @media print {
+            body {
+              background: white !important;
+              padding: 0 !important;
+              margin: 0 !important;
+            }
+            .control-panel {
+              display: none !important;
+            }
+            .card {
+              box-shadow: none !important;
+              border: none !important;
+              padding: 0 !important;
+              margin: 0 !important;
+            }
+            .no-print {
+              display: none !important;
+            }
+            .svg-container {
+              border: none !important;
+              border-radius: 0 !important;
+              overflow: visible !important;
+              width: 100% !important;
+              max-width: 100% !important;
+            }
+            .svg-container svg {
+              width: 100% !important;
+              max-width: 100% !important;
+              height: auto !important;
+            }
           }
         </style>
       </head>
       <body>
+        <div class="control-panel no-print">
+          <div style="font-weight: 900; font-size: 15px; margin-bottom: 6px; color: #0f172a; display: flex; align-items: center; gap: 6px;">
+            <span>🛸</span> Print- og dokumentationsindstillinger
+          </div>
+          <div style="display: flex; flex-wrap: wrap; gap: 20px; align-items: center; margin-top: 10px;">
+            
+            <div>
+              <label style="display: block; font-size: 11px; font-weight: 700; color: #475569; margin-bottom: 4px;">Skalering til print / visning:</label>
+              <select id="scaleSelect" onchange="updateScale(this.value)" style="padding: 6px 12px; border-radius: 6px; border: 1px solid #cbd5e1; font-size: 12px; background: white; cursor: pointer; font-weight: 600;">
+                <option value="fit" selected>Tilpas til sidebredde (Auto-fit - Anbefales til print)</option>
+                <option value="100">Fuld størrelse (100% zoom)</option>
+                <option value="80">Kompakt (80% zoom)</option>
+                <option value="60">Ekstra Kompakt (60% zoom)</option>
+                <option value="50">Mini (50% zoom)</option>
+              </select>
+            </div>
+
+            <div>
+              <label style="display: block; font-size: 11px; font-weight: 700; color: #475569; margin-bottom: 4px;">Papirretning:</label>
+              <select id="orientSelect" onchange="updateOrientation(this.value)" style="padding: 6px 12px; border-radius: 6px; border: 1px solid #cbd5e1; font-size: 12px; background: white; cursor: pointer; font-weight: 600;">
+                <option value="landscape" selected>Liggende (Landscape - Anbefales)</option>
+                <option value="portrait">Stående (Portrait)</option>
+              </select>
+            </div>
+
+            <div style="flex-grow: 1;"></div>
+
+            <button class="btn" onclick="window.print()">
+              <span>🖨️ Udskriv eller Gem som PDF</span>
+            </button>
+          </div>
+          
+          <div style="background-color: #f0f9ff; border: 1px solid #bae6fd; border-radius: 8px; padding: 12px 14px; margin-top: 14px; font-size: 11px; color: #0369a1; line-height: 1.5;">
+            <strong>💡 Sådan får du det bedste printresultat:</strong>
+            <ul style="margin: 4px 0 0 0; padding-left: 20px;">
+              <li>Vælg <strong>"Tilpas til sidebredde"</strong> herover for at komprimere tidsplanen, så den kan rummes på én sidebredde.</li>
+              <li>I den printerdialog der åbner, skal du sætte Layout/Retning til <strong>Liggende (Landscape)</strong>.</li>
+              <li>Husk at slå <strong>"Baggrundsgrafik" (Background graphics)</strong> TIL under "Flere indstillinger" i din browsers print-dialog, så farverne på tidsplanen kommer med på printet!</li>
+            </ul>
+          </div>
+        </div>
+
         <div class="card">
           <div class="header">
             <div>
-              <h1>Tidsplan & Gantpt diagram</h1>
-              <p style="font-size:11px; color:#64748b; margin:4px 0 0 0;">Genereret: ${new Date().toLocaleDateString("da-DK")}</p>
+              <h1>Tidsplan & Gantt-diagram</h1>
+              <p style="font-size:11px; color:#64748b; margin:4px 0 0 0;">Genereret: ${new Date().toLocaleDateString("da-DK")} • Visning: <strong>${scopeLabel}</strong> • MD Project</p>
             </div>
             <button class="btn no-print" onclick="window.print()">
-              <span>Udskriv / Gem som PDF</span>
+              <span>🖨️ Udskriv</span>
             </button>
           </div>
           <div class="svg-container">
             ${svgOutput}
           </div>
         </div>
+
+        <script>
+          function updateScale(val) {
+            const container = document.querySelector('.svg-container');
+            const svg = document.querySelector('.svg-container svg');
+            if (!container || !svg) return;
+
+            if (val === 'fit') {
+              container.classList.remove('full-size');
+              svg.style.width = '100%';
+            } else {
+              container.classList.add('full-size');
+              const pct = parseInt(val) / 100;
+              const targetWidth = Math.round(${totalSvgWidth} * pct);
+              svg.style.width = targetWidth + 'px';
+            }
+          }
+
+          function updateOrientation(val) {
+            let styleEl = document.getElementById('print-page-style');
+            if (!styleEl) {
+              styleEl = document.createElement('style');
+              styleEl.id = 'print-page-style';
+              document.head.appendChild(styleEl);
+            }
+            styleEl.innerHTML = '@page { size: ' + val + '; margin: 10mm; }';
+          }
+        </script>
       </body>
       </html>
     `;
@@ -279,7 +482,7 @@ export function GanttChart({
     const blob = new Blob([htmlOutput], { type: "text/html;charset=utf-8;" });
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
-    link.setAttribute("download", `projekt-tidsplan-fuld.html`);
+    link.setAttribute("download", `projekt-tidsplan-${scopeLabel.toLowerCase().replace(/[^a-z0-9]/g, "_")}.html`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -306,6 +509,69 @@ export function GanttChart({
   // Filter tasks that have valid scheduled dates
   const scheduledTasks = tasks.filter((t) => t.calcStart && t.calcEnd);
 
+  // Compute absolute boundary range for the project
+  const getProjectDateBounds = () => {
+    let min = createSafeDate(projectStartDate || "2026-06-01");
+    scheduledTasks.forEach((t) => {
+       if (t.calcStart) {
+         const d = createSafeDate(t.calcStart);
+         if (d < min) min = d;
+       }
+    });
+    let max = createSafeDate(projectStartDate || "2026-06-15");
+    scheduledTasks.forEach((t) => {
+       if (t.calcEnd) {
+         const d = createSafeDate(t.calcEnd);
+         if (d > max) max = d;
+       }
+    });
+    return { min, max };
+  };
+
+  const { min: absMin, max: absMax } = getProjectDateBounds();
+
+  // Helper to generate dynamic continuous months list in the project range
+  const getMonthsList = (minDate: Date, maxDate: Date) => {
+    const list: { val: string; label: string }[] = [];
+    const temp = new Date(minDate.getFullYear(), minDate.getMonth(), 1);
+    const end = new Date(maxDate.getFullYear(), maxDate.getMonth(), 1);
+    while (temp <= end) {
+      const year = temp.getFullYear();
+      const monthNum = temp.getMonth() + 1;
+      const monthStr = monthNum < 10 ? `0${monthNum}` : `${monthNum}`;
+      const val = `${year}-${monthStr}`;
+      const labelName = temp.toLocaleDateString("da-DK", { month: "long", year: "numeric" });
+      const capitalizedLabel = labelName.charAt(0).toUpperCase() + labelName.slice(1);
+      list.push({ val, label: capitalizedLabel });
+      temp.setMonth(temp.getMonth() + 1);
+    }
+    return list;
+  };
+
+  const getYearsList = (minDate: Date, maxDate: Date) => {
+    const list: number[] = [];
+    for (let y = minDate.getFullYear(); y <= maxDate.getFullYear(); y++) {
+      list.push(y);
+    }
+    return list;
+  };
+
+  const availableMonths = getMonthsList(absMin, absMax);
+  const availableYears = getYearsList(absMin, absMax);
+
+  // Set default selected sub-filters after initialization
+  useEffect(() => {
+    if (availableMonths.length > 0 && !selectedMonthStr) {
+      setSelectedMonthStr(availableMonths[0].val);
+    }
+    if (availableYears.length > 0 && selectedYearVal === 0) {
+      setSelectedYearVal(availableYears[0]);
+    }
+    if (stages.length > 0 && !selectedStageId) {
+      setSelectedStageId(stages[0].id);
+    }
+  }, [availableMonths.length, availableYears.length, stages.length, selectedMonthStr, selectedYearVal, selectedStageId, stages]);
+
   if (scheduledTasks.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center p-12 text-center bg-white rounded-xl shadow-xs border border-slate-100">
@@ -318,30 +584,66 @@ export function GanttChart({
     );
   }
 
-  // Find overall start and end bounds of our timeline view
-  let minDateObj = createSafeDate(projectStartDate || "2026-06-01");
-  scheduledTasks.forEach((t) => {
-    if (t.calcStart) {
-      const d = createSafeDate(t.calcStart);
-      if (d < minDateObj) minDateObj = d;
+  // Compute boundaries depending on active filterScope
+  let minDateObj: Date;
+  let maxDateObj: Date;
+
+  if (filterScope === "stage") {
+    const stage = stages.find((s) => s.id === selectedStageId);
+    if (stage && stage.startDate && stage.endDate) {
+      minDateObj = createSafeDate(stage.startDate);
+      minDateObj.setDate(minDateObj.getDate() - 2); // 2 days buffer
+      maxDateObj = createSafeDate(stage.endDate);
+      maxDateObj.setDate(maxDateObj.getDate() + 4); // 4 days buffer
+    } else {
+      let min = createSafeDate(projectStartDate || "2026-06-01");
+      min.setDate(min.getDate() - 2);
+      minDateObj = min;
+      let max = createSafeDate(projectStartDate || "2026-06-15");
+      max.setDate(max.getDate() + 5);
+      maxDateObj = max;
     }
-  });
-
-  // Start timeline 2 days before the earliest task
-  minDateObj.setDate(minDateObj.getDate() - 2);
-
-  let maxDateObj = createSafeDate(projectStartDate || "2026-06-15");
-  scheduledTasks.forEach((t) => {
-    if (t.calcEnd) {
-      const d = createSafeDate(t.calcEnd);
-      if (d > maxDateObj) maxDateObj = d;
+  } else if (filterScope === "month") {
+    if (selectedMonthStr) {
+      const [y, m] = selectedMonthStr.split("-").map(Number);
+      minDateObj = new Date(y, m - 1, 1);
+      maxDateObj = new Date(y, m, 0); // last day of that month
+    } else {
+      let min = createSafeDate(projectStartDate || "2026-06-01");
+      min.setDate(min.getDate() - 2);
+      minDateObj = min;
+      let max = createSafeDate(projectStartDate || "2026-06-15");
+      max.setDate(max.getDate() + 5);
+      maxDateObj = max;
     }
-  });
+  } else if (filterScope === "year") {
+    const yr = selectedYearVal || new Date().getFullYear();
+    minDateObj = new Date(yr, 0, 1);
+    maxDateObj = new Date(yr, 11, 31);
+  } else {
+    // "all" - Hele projektet (original calculation)
+    let min = createSafeDate(projectStartDate || "2026-06-01");
+    scheduledTasks.forEach((t) => {
+      if (t.calcStart) {
+        const d = createSafeDate(t.calcStart);
+        if (d < min) min = d;
+      }
+    });
+    min.setDate(min.getDate() - 2);
+    minDateObj = min;
 
-  // End timeline 5 days after latest task for nice overflow
-  maxDateObj.setDate(maxDateObj.getDate() + 5);
+    let max = createSafeDate(projectStartDate || "2026-06-15");
+    scheduledTasks.forEach((t) => {
+      if (t.calcEnd) {
+        const d = createSafeDate(t.calcEnd);
+        if (d > max) max = d;
+      }
+    });
+    max.setDate(max.getDate() + 5);
+    maxDateObj = max;
+  }
 
-  // Generate date range
+  // Generate date list
   const dateList: Date[] = [];
   const startStamp = minDateObj.getTime();
   const endStamp = maxDateObj.getTime();
@@ -350,6 +652,21 @@ export function GanttChart({
   for (let currentMs = startStamp; currentMs <= endStamp; currentMs += stepMs) {
     dateList.push(new Date(currentMs));
   }
+
+  // Filter tasks and stages that overlap with the selected timeline view
+  const filteredTasks = scheduledTasks.filter((task) => {
+    if (!task.calcStart || !task.calcEnd) return false;
+    const taskStart = createSafeDate(task.calcStart);
+    const taskEnd = createSafeDate(task.calcEnd);
+    return taskStart <= maxDateObj && taskEnd >= minDateObj;
+  });
+
+  const filteredStages = stages.filter((stage) => {
+    if (!stage.startDate || !stage.endDate) return false;
+    const sStart = createSafeDate(stage.startDate);
+    const sEnd = createSafeDate(stage.endDate);
+    return sStart <= maxDateObj && sEnd >= minDateObj;
+  });
 
   const formatHeaderDayNum = (d: Date) => d.getDate();
   const formatHeaderMonth = (d: Date) => {
@@ -516,21 +833,123 @@ export function GanttChart({
 
   return (
     <div className="flex flex-col gap-4">
-      {/* Dynamic Instruction & Action notice */}
-      <div className="flex justify-between items-center bg-slate-50 p-3.5 rounded-xl border border-slate-200 flex-wrap gap-2.5 shadow-2xs">
-        <div className="flex items-center gap-2 text-[11px] md:text-xs font-semibold text-slate-500 leading-tight">
-          <Zap className="w-4 h-4 text-amber-500 animate-pulse shrink-0" />
-          <span>
-            <strong>Gestusstyring:</strong> Træk i en farverig bjælke for at <strong>rykke startdatoen</strong>. Træk i højre ende for at <strong>ændre varigheden</strong>. Rul skemaet med bunden.
-          </span>
+      {/* Visningsfilter og Printstyring Kontrolbar */}
+      <div className="flex flex-wrap items-center justify-between gap-4 bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
+        <div className="flex flex-wrap items-center gap-4">
+          <div className="flex items-center gap-1.5 text-xs font-black text-slate-700">
+            <SlidersHorizontal className="w-4 h-4 text-sky-500 shrink-0" />
+            <span>Fokusområde:</span>
+          </div>
+          
+          <div className="flex bg-slate-100 p-1 rounded-lg border border-slate-200">
+            <button
+              type="button"
+              onClick={() => setFilterScope("all")}
+              className={`px-3 py-1.5 text-xs font-extrabold rounded-md transition ${
+                filterScope === "all" ? "bg-white text-sky-700 shadow-xs" : "text-slate-500 hover:text-slate-800"
+              }`}
+            >
+              Hele projektet
+            </button>
+            <button
+              type="button"
+              onClick={() => setFilterScope("stage")}
+              className={`px-3 py-1.5 text-xs font-extrabold rounded-md transition ${
+                filterScope === "stage" ? "bg-white text-sky-700 shadow-xs" : "text-slate-500 hover:text-slate-800"
+              }`}
+            >
+              Etape
+            </button>
+            <button
+              type="button"
+              onClick={() => setFilterScope("month")}
+              className={`px-3 py-1.5 text-xs font-extrabold rounded-md transition ${
+                filterScope === "month" ? "bg-white text-sky-700 shadow-xs" : "text-slate-500 hover:text-slate-800"
+              }`}
+            >
+              Måned
+            </button>
+            <button
+              type="button"
+              onClick={() => setFilterScope("year")}
+              className={`px-3 py-1.5 text-xs font-extrabold rounded-md transition ${
+                filterScope === "year" ? "bg-white text-sky-700 shadow-xs" : "text-slate-500 hover:text-slate-800"
+              }`}
+            >
+              År
+            </button>
+          </div>
+
+          {/* Conditional Sub-selectors based on focusing choice */}
+          {filterScope === "stage" && stages && stages.length > 0 && (
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wide">Etape:</span>
+              <select
+                value={selectedStageId}
+                onChange={(e) => setSelectedStageId(e.target.value)}
+                className="p-1.5 px-3 rounded-lg border border-slate-200 text-xs font-black bg-slate-50 hover:bg-slate-100 text-slate-705 cursor-pointer focus:outline-sky-500 transition-all shadow-2xs"
+              >
+                {stages.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {filterScope === "month" && availableMonths.length > 0 && (
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wide">Måned:</span>
+              <select
+                value={selectedMonthStr}
+                onChange={(e) => setSelectedMonthStr(e.target.value)}
+                className="p-1.5 px-3 rounded-lg border border-slate-200 text-xs font-black bg-slate-50 hover:bg-slate-100 text-slate-705 cursor-pointer focus:outline-sky-500 transition-all shadow-2xs"
+              >
+                {availableMonths.map((m) => (
+                  <option key={m.val} value={m.val}>
+                    {m.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {filterScope === "year" && availableYears.length > 0 && (
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wide">År:</span>
+              <select
+                value={selectedYearVal}
+                onChange={(e) => setSelectedYearVal(Number(e.target.value))}
+                className="p-1.5 px-3 rounded-lg border border-slate-200 text-xs font-black bg-slate-50 hover:bg-slate-100 text-slate-705 cursor-pointer focus:outline-sky-500 transition-all shadow-2xs"
+              >
+                {availableYears.map((yr) => (
+                  <option key={yr} value={yr}>
+                    {yr}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
         </div>
+
         <button
           onClick={exportFullGantt}
-          className="px-3.5 py-1.5 bg-slate-700 hover:bg-slate-800 text-white font-extrabold text-xs rounded-lg shadow-sm border-0 transition active:scale-95 flex items-center gap-1.5 cursor-pointer leading-none"
+          className="px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white font-extrabold text-xs rounded-xl shadow-sm border-0 transition active:scale-95 flex items-center gap-2 cursor-pointer transition-all"
         >
-          <FolderDown className="w-3.5 h-3.5" />
+          <FolderDown className="w-4 h-4" />
           <span>Hent fuld tidsplan (HTML/PDF)</span>
         </button>
+      </div>
+
+      {/* Dynamic Instruction & Action notice */}
+      <div className="flex justify-between items-center bg-sky-50/50 p-3 px-4 rounded-xl border border-sky-100/70 shadow-2xs">
+        <div className="flex items-center gap-2 text-[11px] md:text-xs font-semibold text-sky-700/80 leading-tight">
+          <Zap className="w-4 h-4 text-sky-500 animate-pulse shrink-0" />
+          <span>
+            <strong>Gestus:</strong> Træk tidslinjen for at rykke opgaver eller forlænge varigheden. Visningsfilteret herover beskærer også din HTML/PDF-dokumentation automatisk!
+          </span>
+        </div>
       </div>
 
       {/* Main Gantt Scroll Wrapper */}
@@ -622,7 +1041,7 @@ export function GanttChart({
           {/* Scheduled Rows */}
           <div className="flex flex-col">
             {/* Render Etaper (Stages) first */}
-            {stages && stages.map((stage) => {
+            {filteredStages && filteredStages.map((stage) => {
               const sIdx = stage.startDate ? dateList.findIndex((d) => toDateStr(d) === stage.startDate) : -1;
               const eIdx = stage.endDate ? dateList.findIndex((d) => toDateStr(d) === stage.endDate) : -1;
 
@@ -694,7 +1113,7 @@ export function GanttChart({
               );
             })}
 
-            {scheduledTasks.map((task) => {
+            {filteredTasks.map((task) => {
               const segments = getTaskSegments(task);
               const maxSIdx = segments.length - 1;
               const lastWorkSegIdx = segments.map((s) => s.type).lastIndexOf("work");
