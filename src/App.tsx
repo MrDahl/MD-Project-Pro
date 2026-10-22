@@ -2,10 +2,13 @@ import React, { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useStat
 import { Task, Trade, Settings, ProjectInfo, Stage, Holiday } from "./types";
 import { calculateSchedule } from "./utils/scheduler";
 import { danishHolidays, projectYears } from "./utils/holidays";
+import { findWarnings } from "./utils/warnings";
+import { duplicateTask } from "./utils/taskFilter";
 import { indexBy } from "./components/gantt/model";
 import { GanttChart } from "./components/gantt/GanttChart";
-import { TaskCard } from "./components/TaskCard";
-import { TaskForm } from "./components/TaskForm";
+import { TaskList } from "./components/TaskList";
+import { TaskDrawer } from "./components/TaskDrawer";
+import { WarningsPanel } from "./components/WarningsPanel";
 import { TradeForm } from "./components/TradeForm";
 import { ProjectSettings } from "./components/ProjectSettings";
 import { AppHeader } from "./components/AppHeader";
@@ -33,6 +36,7 @@ import {
 
 // Rarely used views are loaded on demand to keep the first load small
 const Glossary = lazy(() => import("./components/Glossary").then((m) => ({ default: m.Glossary })));
+const TaskForm = lazy(() => import("./components/TaskForm").then((m) => ({ default: m.TaskForm })));
 const Wizard = lazy(() => import("./components/Wizard").then((m) => ({ default: m.Wizard })));
 
 type TabId = "tidsplan" | "resources" | "budget" | "settings" | "glossary";
@@ -74,7 +78,9 @@ export default function App() {
   const stateRef = useRef(appState);
   stateRef.current = appState;
 
-  const [editTaskId, setEditTaskId] = useState<string | null>(null);
+  // Side panel for creating/editing a task (taskId null = new task)
+  const [drawer, setDrawer] = useState<{ taskId: string | null } | null>(null);
+  const editTaskId = drawer?.taskId ?? null;
   const [editTradeId, setEditTradeId] = useState<string | null>(null);
 
   // --- Notifications (optionally with an "undo" button) ---
@@ -148,7 +154,7 @@ export default function App() {
     writeFlag(WIZARD_KEY, "true");
     setWizardOpen(false);
     setWizardCancelable(false);
-    setEditTaskId(null);
+    setDrawer(null);
     setEditTradeId(null);
     setActiveTab2("tidsplan");
     showToast(replacing ? "Nyt projekt oprettet." : "Velkommen! Dit nye projekt er konfigureret med lukkedage.", replacing);
@@ -197,13 +203,34 @@ export default function App() {
   const handleSaveTask = (taskPayload: Omit<Task, "calcStart" | "calcEnd" | "calcCost" | "isCritical" | "tradeCosts">) => {
     if (editTaskId) {
       update((p) => ({ ...p, tasks: p.tasks.map((t) => (t.id === editTaskId ? { ...t, ...taskPayload } : t)) }));
-      setEditTaskId(null);
       showToast("Opgaven er opdateret i tidsplanen.", true);
     } else {
       update((p) => ({ ...p, tasks: [...p.tasks, { ...taskPayload }] }));
       showToast("Ny opgave oprettet.", true);
     }
+    setDrawer(null);
   };
+
+  const handleDuplicateTask = useCallback(
+    (id: string) => {
+      const source = stateRef.current.tasks.find((t) => t.id === id);
+      if (!source) return;
+      const copy = duplicateTask(source, `task-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`);
+      update((p) => {
+        const idx = p.tasks.findIndex((t) => t.id === id);
+        const tasks = p.tasks.slice();
+        tasks.splice(idx + 1, 0, copy);
+        return { ...p, tasks };
+      });
+      showToast(`"${copy.title}" er oprettet.`, true);
+    },
+    [update, showToast]
+  );
+
+  const warnings = useMemo(
+    () => findWarnings(calculatedTasks, appState.trades, appState.stages || []),
+    [calculatedTasks, appState.trades, appState.stages]
+  );
 
   const handleDeleteTask = useCallback(
     (id: string) => {
@@ -327,7 +354,7 @@ export default function App() {
           return;
         }
         update(normalizeProject(parsed));
-        setEditTaskId(null);
+        setDrawer(null);
         setEditTradeId(null);
         showToast("Projektfilen er åbnet.", true);
       } catch {
@@ -531,6 +558,8 @@ export default function App() {
           {/* TAP 1: Combined Tidsplan & Gantt Chart Layout */}
           {activeTab === "tidsplan" && (
             <div className="flex flex-col gap-4">
+              <WarningsPanel warnings={warnings} onOpenTask={(id) => setDrawer({ taskId: id })} />
+
               {/* Inner Sub-navigation toggle */}
               <div className="flex bg-slate-100/80 p-1.5 rounded-xl self-start max-w-full border border-slate-200/50 shadow-3xs select-none">
                 <button
@@ -562,63 +591,17 @@ export default function App() {
               {/* View Rendering based on selected view mode */}
               <div className="w-full">
                 {tidsplanView === "list" ? (
-                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 md:gap-6">
-                    {/* Task Forms Component */}
-                    <div className="lg:col-span-5 flex flex-col gap-4">
-                      <TaskForm
-                        tasks={appState.tasks}
-                        trades={appState.trades}
-                        stages={appState.stages || []}
-                        editTaskId={editTaskId}
-                        onSave={(t) => {
-                          handleSaveTask(t);
-                        }}
-                        onCancel={() => setEditTaskId(null)}
-                      />
-                      
-                      {/* Visual info card inside task view */}
-                      <div className="bg-slate-100/60 border border-slate-200 rounded-xl p-4 flex gap-3 text-xs leading-relaxed select-none">
-                        <span className="text-lg shrink-0">💡</span>
-                        <div>
-                          <span className="font-extrabold text-slate-700 block mb-0.5">Automatisk beregning</span>
-                          <p className="text-slate-500 font-medium">
-                            Hver gang du opretter eller ændrer en dagsplan, justeres overenskomstmæssige weekendtillæg, ferielønninger og tidsbjælker øjeblikkeligt!
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Scheduled Tasks List Panel representing Opgaver */}
-                    <div className="lg:col-span-7 flex flex-col gap-3">
-                      <h3 className="text-[10px] md:text-xs font-bold text-slate-400 uppercase tracking-wider mb-1 px-1">
-                        Oprettede opgaver ({appState.tasks.length})
-                      </h3>
-
-                      {appState.tasks.length === 0 ? (
-                        <div className="bg-white border border-dashed border-slate-200 p-8 md:p-12 text-center rounded-xl text-xs text-slate-400 flex flex-col items-center justify-center">
-                          <ListChecks className="w-10 h-10 text-slate-200 mb-2" />
-                          <p className="font-semibold text-slate-500">Intet planlagt endnu</p>
-                          <p className="text-[10px] text-slate-400 mt-1 max-w-xs leading-relaxed">
-                            Brug formularen til venstre og giv opgaven faggrupper og varighed for at se dem her.
-                          </p>
-                        </div>
-                      ) : (
-                        <div className="flex flex-col gap-3">
-                          {calculatedTasks.map((t, tIdx) => (
-                            <TaskCard
-                              key={t.id}
-                              task={t}
-                              number={tIdx + 1}
-                              stageById={stageById}
-                              tradeById={tradeById}
-                              onEdit={setEditTaskId}
-                              onDelete={handleDeleteTask}
-                            />
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </div>
+                  <TaskList
+                    tasks={calculatedTasks}
+                    trades={appState.trades}
+                    stages={appState.stages || []}
+                    stageById={stageById}
+                    tradeById={tradeById}
+                    onNew={() => setDrawer({ taskId: null })}
+                    onEdit={(id) => setDrawer({ taskId: id })}
+                    onDelete={handleDeleteTask}
+                    onDuplicate={handleDuplicateTask}
+                  />
                 ) : (
                   <div className="bg-white border border-slate-200 p-3 md:p-5 rounded-2xl shadow-xs">
                     <div className="flex flex-wrap items-center justify-between gap-3 mb-4 px-1">
@@ -633,10 +616,7 @@ export default function App() {
                       </div>
                       <button
                         type="button"
-                        onClick={() => {
-                          setEditTaskId(null);
-                          setTidsplanView("list");
-                        }}
+                        onClick={() => setDrawer({ taskId: null })}
                         className="bg-slate-900 active:bg-black hover:bg-black text-white font-black text-[10px] md:text-xs py-2 px-3 rounded-lg cursor-pointer transition select-none flex items-center gap-1 shadow-xs min-h-[34px]"
                       >
                         <PlusCircle className="w-3.5 h-3.5" />
@@ -652,10 +632,7 @@ export default function App() {
                       stages={appState.stages || []}
                       weatherDelays={appState.weatherDelays || []}
                       onUpdateTasks={(ts, newGesture) => update((p) => ({ ...p, tasks: ts }), { history: newGesture })}
-                      onEditTask={(task) => {
-                        setEditTaskId(task.id);
-                        setTidsplanView("list");
-                      }}
+                      onEditTask={(task) => setDrawer({ taskId: task.id })}
                       onAddHoliday={handleAddHoliday}
                       onDeleteHoliday={handleDeleteHoliday}
                       onAddWeatherDelay={handleAddWeatherDelay}
@@ -909,6 +886,22 @@ export default function App() {
             onCancel={wizardCancelable ? () => { setWizardOpen(false); setWizardCancelable(false); } : undefined}
           />
         </Suspense>
+      )}
+
+      {drawer && (
+        <TaskDrawer title={editTaskId ? "Rediger opgave" : "Ny opgave"} onClose={() => setDrawer(null)}>
+          <Suspense fallback={<p className="text-xs text-slate-500">Indlæser…</p>}>
+            <TaskForm
+              tasks={appState.tasks}
+              trades={appState.trades}
+              stages={appState.stages || []}
+              editTaskId={editTaskId}
+              hideHeading
+              onSave={handleSaveTask}
+              onCancel={() => setDrawer(null)}
+            />
+          </Suspense>
+        </TaskDrawer>
       )}
 
       <NewProjectDialog

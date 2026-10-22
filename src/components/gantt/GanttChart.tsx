@@ -464,7 +464,7 @@ export function GanttChart({
         <Calendar className="w-12 h-12 text-slate-300 mb-3" />
         <h3 className="text-base font-semibold text-slate-700">Tidsplanen er tom</h3>
         <p className="text-slate-500 text-sm max-w-sm mt-1">
-          Opret opgaver i fanen 📋 <strong>Opgaver</strong> og angiv en startdato for at se Gantt-diagrammet her.
+          Tryk på <strong>Opret ny opgave</strong> for at se Gantt-diagrammet her.
         </p>
       </div>
     );

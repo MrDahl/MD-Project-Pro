@@ -23,6 +23,9 @@ Du kan tilgå og køre applikationen direkte i din browser:
 * **I dag-linje og hop-knapper**: En rød linje markerer dags dato, og knapperne *I dag*, *Projektstart* og *Projektslut* springer direkte derhen.
 * **Afhængighedspile**: Pile fra forgænger til efterfølger viser rækkefølgen (kritisk vej i rødt) og kan slås fra.
 * **Tastaturstyring**: Vælg en bjælke med Tab; piletaster flytter (Shift = 1 uge), +/− ændrer varigheden, Enter åbner detaljer, op/ned skifter opgave. Dialoger lukkes med Escape.
+* **Sidepanel til opgaver**: *Opret ny opgave* og *Rediger* åbner et panel til højre, så du ikke forlader Gantt-diagrammet. Escape lukker.
+* **Søg, filtrér og gruppér**: Opgavelisten kan søges (titel, noter, faggruppe), filtreres på etape, faggruppe og kritisk vej, grupperes efter etape, og opgaver kan duplikeres. Lange lister vises 100 ad gangen.
+* **Advarsler**: Et panel peger på opgaver der slutter efter (eller starter før) deres etape, opgaver uden faggruppe, mulig dobbeltbooking af samme faggruppe og opgaver der ikke kunne placeres. Klik på en advarsel for at åbne opgaven.
 
 ### 2. Intelligent Planlægningsmotor (Scheduler Engine) 🧠
 * **Finish-to-Start Afhængigheder**: Mulighed for at knytte opgaver sammen (forgængere), så efterfølgende opgaver automatisk skubbes eller trækkes i tidsplanen.

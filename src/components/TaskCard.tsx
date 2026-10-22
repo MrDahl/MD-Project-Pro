@@ -1,6 +1,6 @@
 import { memo } from "react";
 import type { Task, Trade, Stage } from "../types";
-import { Flame, Pencil, Trash2 } from "lucide-react";
+import { Copy, Flame, Pencil, Trash2 } from "lucide-react";
 
 interface TaskCardProps {
   task: Task;
@@ -9,10 +9,11 @@ interface TaskCardProps {
   tradeById: Map<string, Trade>;
   onEdit: (id: string) => void;
   onDelete: (id: string) => void;
+  onDuplicate: (id: string) => void;
 }
 
 /** One row in the task list. Memoised, and the browser skips layout/paint for cards that are off-screen. */
-export const TaskCard = memo(function TaskCard({ task: t, number, stageById, tradeById, onEdit, onDelete }: TaskCardProps) {
+export const TaskCard = memo(function TaskCard({ task: t, number, stageById, tradeById, onEdit, onDelete, onDuplicate }: TaskCardProps) {
   return (
     <div
       style={{ contentVisibility: "auto", containIntrinsicSize: "auto 170px" }}
@@ -71,13 +72,23 @@ export const TaskCard = memo(function TaskCard({ task: t, number, stageById, tra
             onClick={() => onEdit(t.id)}
             className="p-2 bg-slate-50 hover:bg-slate-100 text-slate-400 hover:text-slate-600 rounded-lg cursor-pointer border border-slate-100 transition active:scale-95 min-h-[36px] min-w-[36px] flex items-center justify-center"
             title="Rediger"
+            aria-label="Rediger opgave"
           >
             <Pencil className="w-3.5 h-3.5" />
+          </button>
+          <button
+            onClick={() => onDuplicate(t.id)}
+            className="p-2 bg-slate-50 hover:bg-slate-100 text-slate-400 hover:text-slate-600 rounded-lg cursor-pointer border border-slate-100 transition active:scale-95 min-h-[36px] min-w-[36px] flex items-center justify-center"
+            title="Dupliker"
+            aria-label="Dupliker opgave"
+          >
+            <Copy className="w-3.5 h-3.5" />
           </button>
           <button
             onClick={() => onDelete(t.id)}
             className="p-2 bg-red-50 hover:bg-red-100 text-red-400 hover:text-red-700 rounded-lg cursor-pointer border-0 transition active:scale-95 min-h-[36px] min-w-[36px] flex items-center justify-center"
             title="Slet"
+            aria-label="Slet opgave"
           >
             <Trash2 className="w-3.5 h-3.5" />
           </button>
