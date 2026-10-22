@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Book, HelpCircle, AlertTriangle, Clock, Percent, Network, Layers, RefreshCcw, Landmark } from "lucide-react";
+import { Book, AlertTriangle, Clock, Percent, Network, Layers, RefreshCcw, Landmark } from "lucide-react";
 
 interface Term {
   title: string;

@@ -1,21 +1,6 @@
-import React, { useState } from "react";
-import { AppData, Trade, Stage, ProjectInfo, Settings } from "../types";
-import { 
-  Building, 
-  Calendar, 
-  Layers, 
-  Users, 
-  Check, 
-  ArrowRight, 
-  ArrowLeft, 
-  Play, 
-  Info, 
-  Sparkles, 
-  Clock, 
-  HelpCircle,
-  MapPin,
-  Briefcase
-} from "lucide-react";
+import { useState } from "react";
+import { Trade, Stage, ProjectInfo, Settings } from "../types";
+import { Building, Check, ArrowRight, ArrowLeft, Clock, MapPin, Briefcase } from "lucide-react";
 
 interface WizardProps {
   onComplete: (completedData: {
@@ -27,11 +12,10 @@ interface WizardProps {
     trades: Trade[];
     includeDanishHolidays?: boolean;
   }) => void;
-  onClose?: () => void;
   isOpen: boolean;
 }
 
-export function Wizard({ onComplete, onClose, isOpen }: WizardProps) {
+export function Wizard({ onComplete, isOpen }: WizardProps) {
   const [step, setStep] = useState(1);
   const totalSteps = 5;
 

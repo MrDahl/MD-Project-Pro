@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Settings, ProjectInfo, Stage, WeatherDelay, Holiday } from "../types";
-import { Calendar, Clock, Plus, Trash2, CalendarX, Info, FileText, MapPin, User, Building, Palmtree, Layers, CloudSnow } from "lucide-react";
+import { Calendar, Clock, Plus, Trash2, CalendarX, Info, FileText, MapPin, User, Building, Layers, CloudSnow } from "lucide-react";
 
 interface ProjectSettingsProps {
   startDate: string;

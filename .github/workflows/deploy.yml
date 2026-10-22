@@ -22,7 +22,7 @@ jobs:
           node-version: 24
 
       - name: Installer afhængigheder 📦
-        run: npm install
+        run: npm ci
 
       - name: Byg applikation 🏗️
         run: npm run build

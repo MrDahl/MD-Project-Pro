@@ -23,7 +23,7 @@ Du kan tilgå og køre applikationen direkte i din browser:
 ### 2. Intelligent Planlægningsmotor (Scheduler Engine) 🧠
 * **Finish-to-Start Afhængigheder**: Mulighed for at knytte opgaver sammen (forgængere), så efterfølgende opgaver automatisk skubbes eller trækkes i tidsplanen.
 * **Smarte Arbejdsdelsregler**: Systemet fravælger automatisk weekender og helligdage ved beregning af opgaveforløb. Disse begrænsninger kan slås fra pr. opgave (*Tillad weekendarbejde* eller *Arbejde på helligdage*).
-* **Flerårig Helligdagsintegration**: Henter automatisk officielle helligdage for alle involverede projektår (både startår, slutår og mellemliggende år).
+* **Flerårig Helligdagsintegration**: Beregner automatisk de officielle danske helligdage for alle involverede projektår (både startår, slutår og mellemliggende år) – direkte i browseren, uden eksterne opslag.
 * **Store Bededag-Logik**: Systemet tager højde for, at Store Bededag blev afskaffet som officiel helligdag i Danmark fra og med 2024. For år før 2024 medregnes den korrekt som lukkedag, mens den fra 2024 og frem udelades automatisk.
 
 ### 3. Kritisk Vej (Critical Path Method) 🔥
@@ -45,10 +45,8 @@ Du kan tilgå og køre applikationen direkte i din browser:
 
 ### 7. Resurser, Fagområder & Økonomi (Budgetstyring) 👷💰
 * **Faggrupper**: Opret og tilpas faglige teams (Tømrer, Murer, Elektriker etc.) med koder, faste timelønninger, overarbejdstakster og dagsnormer.
-* **Avanceret Budgetoversigt**: Omfattende økonomisk instrumentbræt tids- og omkostningsfordelt via interaktive diagrammer (**Recharts**):
-  * Akkumulerede udgifter over tid.
-  * Fordeling af omkostninger på etaper og særskilte faggrupper.
-  * Opdeling mellem løn-, materiale-, kørsels- og etapeudgifter samt faste abonnementsomkostninger (fra tilbagevendende ydelser).
+* **Budgetoversigt**: Samlet sagspris og planlagt deadline, udgifter fordelt pr. faggruppe og pr. opgave (løn inkl. weekend-/helligdagstillæg, faste priser og gentagende serviceydelser).
+* **PDF-rapport**: Udskriv eller gem økonomioversigten som PDF direkte fra browseren.
 
 ### 8. Nem Import & Eksport (Backup) 💾
 * **JSON-Eksport**: Gem hele din projektopsætning lokalt som en `.json`-fil med ét klik.
@@ -68,15 +66,35 @@ Applikationen er inddelt i 6 funktionelle sider, der nemt tilgås via hovedmenue
 
 ---
 
+## ⚡ Ydeevne
+
+Appen er bygget til at kunne håndtere store projekter med tusindvis af opgaver og afhængigheder:
+
+* **Gantt-diagrammet tegner kun det synlige**: Rækker og dagskolonner uden for skærmen oprettes ikke i DOM'en, og baggrunden (weekender, helligdage, uvejr) er ét fælles lag. Antal DOM-elementer er dermed uafhængigt af projektets størrelse.
+* **Hurtig planlægningsmotor**: Opgaverne beregnes i afhængighedsrækkefølge i ét gennemløb (5.000 sammenkædede opgaver på ca. 50 ms).
+* **Gem sker forsinket**: Projektet gemmes i browserens lager kort efter, du er holdt op med at ændre, og altid når fanen lukkes eller skjules.
+
+---
+
 ## 🛠️ Teknisk Stak
 
-* **Framework & Sprog**: React 18+ med fuld TypeScript type-sikkerhed.
-* **Build System**: Vite (lynhurtigt og strømlinet udviklingsmiljø).
-* **Styling**: Tailwind CSS (fuldt responsivt, moderne og detaljeret design).
-* **Animationer**: `motion/react` (bløde og flydende overgange ved skift af sider, modals og tidsplaner).
-* **Interaktive Grafer**: Recharts (velegnet til økonomisk data og akkumulerede kurver).
+* **Framework & Sprog**: React 19 med TypeScript i `strict`-tilstand.
+* **Build System**: Vite.
+* **Styling**: Tailwind CSS 4.
 * **Ikoner**: Lucide React.
-* **Server-Modul (Valgfri)**: Express-backend forberedt til sikker håndtering af eksterne API-opslag (f.eks. mod Kalendarium API eller vejr-tjenester) uden at eksponere nøgler til klienten.
+* **Test**: Node's indbyggede testløber (`node:test`) til planlægningsmotor og helligdagsregler.
+
+## 💻 Udvikling
+
+```bash
+npm ci          # installer afhængigheder
+npm run dev     # start udviklingsserver
+npm test        # kør tests
+npm run lint    # typecheck (tsc)
+npm run build   # produktionsbuild til dist/
+```
+
+Ved push til `main` bygger GitHub Actions appen og udgiver den på GitHub Pages.
 
 ---
 

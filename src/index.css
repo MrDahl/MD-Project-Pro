@@ -1,4 +1,3 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
 @import "tailwindcss";
 
 @theme {
@@ -30,3 +29,16 @@
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
+
+/* Small CSS animations for the toast and the mobile menu */
+@keyframes toast-in {
+  from { opacity: 0; transform: translate(-50%, 50px); }
+  to   { opacity: 1; transform: translate(-50%, 0); }
+}
+.animate-toast-in { animation: toast-in 0.2s ease-out; }
+
+@keyframes menu-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-menu-in { animation: menu-in 0.15s ease-out; }
