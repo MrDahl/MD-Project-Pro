@@ -2,7 +2,7 @@ import React, { memo } from "react";
 import type { Task, Trade, Stage } from "../../types";
 import { dayNumber, type Calendar } from "../../utils/scheduler";
 import { Flame, Layers } from "lucide-react";
-import { COL_W, ROW_H, getTaskSegments, multiColorGradient } from "./model";
+import { ROW_H, getTaskSegments, multiColorGradient } from "./model";
 
 interface RowBase {
   top: number;
@@ -11,6 +11,8 @@ interface RowBase {
   /** Width of the day columns only. */
   timelineWidth: number;
   columnCollapsed: boolean;
+  /** Width of one day column in px (depends on the zoom level). */
+  colW: number;
 }
 
 /* ------------------------------------------------------------------ stage row */
@@ -27,6 +29,7 @@ export const GanttStageRow = memo(function GanttStageRow({
   totalWidth,
   timelineWidth,
   columnCollapsed,
+  colW,
   minDay,
   maxDay,
 }: GanttStageRowProps) {
@@ -66,8 +69,8 @@ export const GanttStageRow = memo(function GanttStageRow({
         {showBar && (
           <div
             style={{
-              left: `${from * COL_W}px`,
-              width: `${(to - from + 1) * COL_W}px`,
+              left: `${from * colW}px`,
+              width: `${(to - from + 1) * colW}px`,
               backgroundColor: `${stage.color}15`,
               color: stage.color,
               borderColor: `${stage.color}40`,
@@ -101,6 +104,7 @@ interface GanttTaskRowProps extends RowBase {
   onPointerDown: (e: React.PointerEvent<HTMLDivElement>, task: Task, type: "move" | "resize-right") => void;
   onPointerMove: (e: React.PointerEvent<HTMLDivElement>) => void;
   onPointerUp: (e: React.PointerEvent<HTMLDivElement>, task: Task) => void;
+  onBarKeyDown: (e: React.KeyboardEvent<HTMLDivElement>, task: Task) => void;
 }
 
 export const GanttTaskRow = memo(function GanttTaskRow({
@@ -110,6 +114,7 @@ export const GanttTaskRow = memo(function GanttTaskRow({
   totalWidth,
   timelineWidth,
   columnCollapsed,
+  colW,
   minDay,
   maxDay,
   cal,
@@ -121,10 +126,13 @@ export const GanttTaskRow = memo(function GanttTaskRow({
   onPointerDown,
   onPointerMove,
   onPointerUp,
+  onBarKeyDown,
 }: GanttTaskRowProps) {
   const segments = !task.isRecurring && !task.isMilestone ? getTaskSegments(task, minDay, maxDay, cal) : [];
   const lastIdx = segments.length - 1;
   const lastWorkIdx = segments.map((s) => s.type).lastIndexOf("work");
+  const firstWorkIdx = segments.findIndex((s) => s.type === "work");
+  const barLabel = `${task.title}: ${task.calcStart} til ${task.calcEnd}, ${task.duration} ${task.duration === 1 ? "dag" : "dage"}${task.isCritical ? ", kritisk vej" : ""}`;
 
   const endDay = dayNumber(task.calcEnd);
   const endCol = endDay !== null && endDay >= minDay && endDay <= maxDay ? endDay - minDay : -1;
@@ -188,8 +196,8 @@ export const GanttTaskRow = memo(function GanttTaskRow({
       {/* Timeline cell with the task's bars */}
       <div style={{ width: timelineWidth }} className="shrink-0 h-full relative flex items-center">
         {segments.map((seg, sIdx) => {
-          const leftPx = seg.startIndex * COL_W;
-          const widthPx = (seg.endIndex - seg.startIndex + 1) * COL_W;
+          const leftPx = seg.startIndex * colW;
+          const widthPx = (seg.endIndex - seg.startIndex + 1) * colW;
 
           if (seg.type === "rest") {
             // weekend / holiday inside the task span: thin dashed line
@@ -215,7 +223,16 @@ export const GanttTaskRow = memo(function GanttTaskRow({
               onPointerDown={(e) => onPointerDown(e, task, "move")}
               onPointerMove={onPointerMove}
               onPointerUp={(e) => onPointerUp(e, task)}
-              className={`absolute h-9 flex items-center justify-between text-white z-10 select-none overflow-hidden cursor-grab active:cursor-grabbing border border-black/10 shadow-sm touch-none ${
+              {...(sIdx === firstWorkIdx
+                ? {
+                    "data-bar": task.id,
+                    tabIndex: 0,
+                    role: "button",
+                    "aria-label": `${barLabel}. Pil venstre/højre flytter, plus/minus ændrer varighed, Enter åbner detaljer.`,
+                    onKeyDown: (e: React.KeyboardEvent<HTMLDivElement>) => onBarKeyDown(e, task),
+                  }
+                : {})}
+              className={`absolute h-9 flex items-center justify-between text-white z-10 select-none overflow-hidden outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-1 cursor-grab active:cursor-grabbing border border-black/10 shadow-sm touch-none ${
                 isFirstSeg && isLastSeg
                   ? "rounded-lg"
                   : isFirstSeg
@@ -257,7 +274,7 @@ export const GanttTaskRow = memo(function GanttTaskRow({
           (() => {
             const startDay = dayNumber(task.calcStart);
             if (startDay === null || startDay < minDay || startDay > maxDay) return null;
-            const leftPx = (startDay - minDay) * COL_W + 24 - 10; // centered in the column
+            const leftPx = (startDay - minDay) * colW + colW / 2 - 10; // centered in the column
             return (
               <div
                 style={{ left: `${leftPx}px`, width: "20px", height: "20px" }}
@@ -278,13 +295,14 @@ export const GanttTaskRow = memo(function GanttTaskRow({
             const day = dayNumber(occDate);
             if (day === null || day < minDay || day > maxDay) return null;
             const colorHex = tradeById.get((task.tradeIds || [])[0])?.color || "#475569";
+            const size = Math.min(24, Math.max(8, colW - 2));
             return (
               <div
                 key={oIdx}
                 style={{
-                  left: `${(day - minDay) * COL_W + 12}px`,
-                  width: "24px",
-                  height: "24px",
+                  left: `${(day - minDay) * colW + (colW - size) / 2}px`,
+                  width: `${size}px`,
+                  height: `${size}px`,
                   backgroundColor: colorHex,
                   borderColor: `${colorHex}30`,
                 }}
@@ -292,7 +310,7 @@ export const GanttTaskRow = memo(function GanttTaskRow({
                 className="absolute rounded-full flex items-center justify-center text-white z-10 border shadow-xs cursor-pointer select-none active:scale-95 transition-all text-[11px] font-semibold"
                 title={`${task.title} - Gentagelse d. ${new Date(`${occDate}T12:00:00`).toLocaleDateString("da-DK")}`}
               >
-                ↻
+                {size >= 16 ? "↻" : null}
               </div>
             );
           })}
@@ -300,7 +318,7 @@ export const GanttTaskRow = memo(function GanttTaskRow({
         {/* Title to the right of the task's end */}
         {endCol >= 0 && (
           <div
-            style={{ left: `${(endCol + 1) * COL_W + 8}px` }}
+            style={{ left: `${(endCol + 1) * colW + 8}px` }}
             className="absolute text-[10px] font-black text-slate-700 whitespace-nowrap z-15 pointer-events-none drop-shadow-xs flex items-center gap-1.5 bg-white/90 border border-slate-200/50 py-1 px-2.5 rounded-full shadow-2xs"
           >
             <span className={`font-black ${task.isCritical ? "text-red-650" : "text-slate-800"}`}>{task.title}</span>

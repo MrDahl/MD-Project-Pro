@@ -2,8 +2,12 @@ import type { Task, Stage, Trade } from "../../types.ts";
 import { dayNumber, type Calendar } from "../../utils/scheduler.ts";
 export { stripCalculated } from "../../utils/tasks.ts";
 
-/** Layout constants (px). Every day column is COL_W wide, every row ROW_H tall. */
-export const COL_W = 48;
+export type Zoom = "day" | "week" | "month";
+
+/** Width of one day column per zoom level (px). */
+export const ZOOM_COL_W: Record<Zoom, number> = { day: 48, week: 24, month: 10 };
+
+/** Layout constants (px). Every row is ROW_H tall. */
 export const ROW_H = 56;
 export const HEADER_H = 56;
 export const LABEL_W = 208;

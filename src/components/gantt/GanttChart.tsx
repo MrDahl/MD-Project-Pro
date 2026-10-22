@@ -1,9 +1,10 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { Task, Trade, Stage, WeatherDelay, Holiday } from "../../types";
 import { buildCalendar, dayNumber, dayToStr, isWeekendDay, weekdayOf } from "../../utils/scheduler";
-import { Calendar, Zap, ChevronLeft, ChevronRight, FolderDown, Flame, SlidersHorizontal } from "lucide-react";
+import { Calendar, Zap, ChevronLeft, ChevronRight, FolderDown, Flame, SlidersHorizontal, ZoomIn, Link2 } from "lucide-react";
+import { todayStr } from "../../utils/dates";
 import {
-  COL_W,
+  ZOOM_COL_W,
   ROW_H,
   HEADER_H,
   LABEL_W,
@@ -16,6 +17,7 @@ import {
   stripCalculated,
   yearsBetween,
   type FilterState,
+  type Zoom,
   type ScopeType,
 } from "./model";
 import { applyMove, applyResize } from "./drag";
@@ -58,6 +60,7 @@ interface DragState {
 const EMPTY_STAGES: Stage[] = [];
 const EMPTY_DELAYS: WeatherDelay[] = [];
 
+const dayTitleFmt = new Intl.DateTimeFormat("da-DK", { weekday: "long", day: "numeric", month: "long", timeZone: "UTC" });
 const MONTHS_SHORT = ["jan", "feb", "mar", "apr", "maj", "jun", "jul", "aug", "sep", "okt", "nov", "dec"];
 
 /** Only rows/columns near the viewport are rendered, so cost no longer grows with project size. */
@@ -85,6 +88,11 @@ export function GanttChart({
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
   const [detailTask, setDetailTask] = useState<Task | null>(null);
   const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [zoom, setZoom] = useState<Zoom>("day");
+  const [showArrows, setShowArrows] = useState(true);
+  const [jumpTo, setJumpTo] = useState<number | null>(null);
+  const zoomAnchor = useRef<number | null>(null);
+  const colW = ZOOM_COL_W[zoom];
 
   // --- Focus area filter ---
   const [filter, setFilter] = useState<FilterState>({ scope: "all", stageId: "", monthStr: "", yearVal: 0 });
@@ -147,24 +155,64 @@ export function GanttChart({
   );
   const rowCount = visibleStages.length + visibleTasks.length;
 
+  // Dependency arrows (finish -> start). Built once per layout; only the ones near the viewport are drawn.
+  const arrows = useMemo(() => {
+    const rowOf = new Map<string, number>();
+    const taskById = new Map<string, Task>();
+    visibleTasks.forEach((t, i) => {
+      rowOf.set(t.id, visibleStages.length + i);
+      taskById.set(t.id, t);
+    });
+    const list: { key: string; d: string; head: string; lo: number; hi: number; xLo: number; xHi: number; critical: boolean }[] = [];
+    for (const t of visibleTasks) {
+      if (!t.dependencyId || t.isRecurring) continue;
+      const pred = taskById.get(t.dependencyId);
+      if (!pred || pred.isRecurring) continue;
+      const predEnd = dayNumber(pred.calcEnd);
+      const succStart = dayNumber(t.calcStart);
+      if (predEnd === null || succStart === null) continue;
+      const rp = rowOf.get(pred.id)!;
+      const rs = rowOf.get(t.id)!;
+      const x1 = pred.isMilestone ? (predEnd - minDay) * colW + colW / 2 + 10 : (predEnd - minDay + 1) * colW;
+      const x2 = t.isMilestone ? (succStart - minDay) * colW + colW / 2 - 10 : (succStart - minDay) * colW;
+      const y1 = rp * ROW_H + ROW_H / 2;
+      const y2 = rs * ROW_H + ROW_H / 2;
+      const d =
+        x2 >= x1 + 16
+          ? `M${x1} ${y1}H${x1 + 8}V${y2}H${x2}`
+          : `M${x1} ${y1}H${x1 + 8}V${y2 > y1 ? y2 - ROW_H / 2 : y2 + ROW_H / 2}H${x2 - 8}V${y2}H${x2}`;
+      list.push({
+        key: `${pred.id}>${t.id}`,
+        d,
+        head: `${x2},${y2} ${x2 - 6},${y2 - 3.5} ${x2 - 6},${y2 + 3.5}`,
+        lo: Math.min(rp, rs),
+        hi: Math.max(rp, rs),
+        xLo: Math.min(x1, x2) - 10,
+        xHi: Math.max(x1, x2) + 10,
+        critical: !!pred.isCritical && !!t.isCritical,
+      });
+    }
+    return list;
+  }, [visibleTasks, visibleStages.length, minDay, colW]);
+
   const labelW = columnCollapsed ? LABEL_W_COLLAPSED : LABEL_W;
-  const timelineWidth = days * COL_W;
+  const timelineWidth = days * colW;
   const totalWidth = labelW + timelineWidth;
 
   // --- Windowing: which rows/columns are near the viewport ---
   const [win, setWin] = useState({ firstCol: 0, lastCol: 60, firstRow: 0, lastRow: 24 });
-  const dims = useRef({ days, rowCount, labelW });
-  dims.current = { days, rowCount, labelW };
+  const dims = useRef({ days, rowCount, labelW, colW });
+  dims.current = { days, rowCount, labelW, colW };
   const frame = useRef(0);
 
   const measure = useCallback(() => {
     const el = scrollRef.current;
     if (!el) return;
-    const { days: d, rowCount: r, labelW: lw } = dims.current;
+    const { days: d, rowCount: r, labelW: lw, colW: cw } = dims.current;
 
     const left = el.scrollLeft - lw;
-    const firstCol = Math.max(0, Math.floor((Math.floor(left / COL_W) - COL_OVERSCAN) / COL_SNAP) * COL_SNAP);
-    const lastCol = Math.min(d - 1, Math.ceil((Math.ceil((left + el.clientWidth) / COL_W) + COL_OVERSCAN) / COL_SNAP) * COL_SNAP);
+    const firstCol = Math.max(0, Math.floor((Math.floor(left / cw) - COL_OVERSCAN) / COL_SNAP) * COL_SNAP);
+    const lastCol = Math.min(d - 1, Math.ceil((Math.ceil((left + el.clientWidth) / cw) + COL_OVERSCAN) / COL_SNAP) * COL_SNAP);
 
     const top = el.scrollTop - HEADER_H;
     const firstRow = Math.max(0, Math.floor((Math.floor(top / ROW_H) - ROW_OVERSCAN) / ROW_SNAP) * ROW_SNAP);
@@ -187,7 +235,7 @@ export function GanttChart({
 
   useLayoutEffect(() => {
     measure();
-  }, [measure, days, rowCount, columnCollapsed, scheduled.length]);
+  }, [measure, days, rowCount, columnCollapsed, scheduled.length, colW]);
 
   useEffect(() => {
     const el = scrollRef.current;
@@ -202,8 +250,8 @@ export function GanttChart({
 
   // --- Drag & resize (computed from a baseline; state updates only when the column delta changes) ---
   const dragRef = useRef<DragState | null>(null);
-  const live = useRef({ tasks, minDay, maxDay, onUpdateTasks });
-  live.current = { tasks, minDay, maxDay, onUpdateTasks };
+  const live = useRef({ tasks, minDay, maxDay, onUpdateTasks, colW, visibleTasks, stageCount: visibleStages.length });
+  live.current = { tasks, minDay, maxDay, onUpdateTasks, colW, visibleTasks, stageCount: visibleStages.length };
 
   const handlePointerDown = useCallback(
     (e: React.PointerEvent<HTMLDivElement>, task: Task, type: "move" | "resize-right") => {
@@ -242,7 +290,7 @@ export function GanttChart({
 
     if (Math.abs(e.clientX - drag.startX) >= 3) drag.moved = true;
 
-    const delta = Math.round((e.clientX - drag.startX) / COL_W);
+    const delta = Math.round((e.clientX - drag.startX) / live.current.colW);
     if (delta === drag.lastDelta) return;
     drag.lastDelta = delta;
 
@@ -292,21 +340,108 @@ export function GanttChart({
     for (const [a, b] of cal.weatherRanges) {
       const from = Math.max(a, minDay);
       const to = Math.min(b, maxDay);
-      if (from <= to) weather.push({ left: (from - minDay) * COL_W, width: (to - from + 1) * COL_W });
+      if (from <= to) weather.push({ left: (from - minDay) * colW, width: (to - from + 1) * colW });
     }
     return { holidayCols, weather };
-  }, [cal, minDay, maxDay]);
+  }, [cal, minDay, maxDay, colW]);
 
   const weekendColor = "rgba(236,253,245,0.55)";
   const gridBackground: React.CSSProperties = {
     backgroundImage: [
-      `linear-gradient(to right, transparent ${COL_W - 1}px, rgba(226,232,240,0.6) ${COL_W - 1}px)`,
-      `linear-gradient(to right, ${weekendColor} 0, ${weekendColor} ${COL_W}px, transparent ${COL_W}px, transparent ${COL_W * 6}px, ${weekendColor} ${COL_W * 6}px)`,
+      colW >= 24 ? `linear-gradient(to right, transparent ${colW - 1}px, rgba(226,232,240,0.6) ${colW - 1}px)` : "none",
+      `linear-gradient(to right, ${weekendColor} 0, ${weekendColor} ${colW}px, transparent ${colW}px, transparent ${colW * 6}px, ${weekendColor} ${colW * 6}px)`,
     ].join(", "),
-    backgroundSize: `${COL_W}px 100%, ${COL_W * 7}px 100%`,
-    backgroundPosition: `0 0, ${-weekdayOf(minDay) * COL_W}px 0`,
+    backgroundSize: `${colW}px 100%, ${colW * 7}px 100%`,
+    backgroundPosition: `0 0, ${-weekdayOf(minDay) * colW}px 0`,
     backgroundRepeat: "repeat-x",
   };
+
+  // --- Zoom (keeps the centre of the view where it is) ---
+  const changeZoom = (next: Zoom) => {
+    if (next === zoom) return;
+    const el = scrollRef.current;
+    if (el) zoomAnchor.current = minDay + (el.scrollLeft + (el.clientWidth - labelW) / 2) / colW;
+    setZoom(next);
+  };
+  useLayoutEffect(() => {
+    const el = scrollRef.current;
+    if (zoomAnchor.current === null || !el) return;
+    el.scrollLeft = Math.max(0, (zoomAnchor.current - minDay) * colW - (el.clientWidth - labelW) / 2);
+    zoomAnchor.current = null;
+    measure();
+  }, [colW, minDay, labelW, measure]);
+
+  // --- Jump to a date (today / project start / project end) ---
+  const today = dayNumber(todayStr()) ?? 0;
+  const todayInRange = today >= bounds.min - 2 && today <= bounds.max + 5;
+  useLayoutEffect(() => {
+    if (jumpTo === null) return;
+    if (jumpTo < minDay || jumpTo > maxDay) {
+      // the chosen date is outside the current focus area: show the whole project first
+      if (filterScope !== "all") setFilterScope("all");
+      else setJumpTo(null);
+      return;
+    }
+    const el = scrollRef.current;
+    if (el) el.scrollTo({ left: Math.max(0, (jumpTo - minDay) * colW - (el.clientWidth - labelW) / 2), behavior: "smooth" });
+    setJumpTo(null);
+  }, [jumpTo, minDay, maxDay, colW, labelW, filterScope]);
+
+  // --- Keyboard control of a bar: arrows move, +/- change duration, Enter opens details ---
+  const focusNeighbour = useCallback((taskId: string, dir: -1 | 1) => {
+    const { visibleTasks: list, stageCount } = live.current;
+    const idx = list.findIndex((t) => t.id === taskId);
+    const target = list[idx + dir];
+    const el = scrollRef.current;
+    if (!target || !el) return;
+    const find = () => el.querySelector<HTMLElement>(`[data-bar="${target.id}"]`);
+    const now = find();
+    if (now) {
+      now.focus();
+      return;
+    }
+    el.scrollTop = HEADER_H + (stageCount + idx + dir) * ROW_H - el.clientHeight / 2;
+    requestAnimationFrame(() => requestAnimationFrame(() => find()?.focus()));
+  }, []);
+
+  const handleBarKey = useCallback(
+    (e: React.KeyboardEvent<HTMLDivElement>, task: Task) => {
+      const { tasks: all, onUpdateTasks: update } = live.current;
+      const apply = (next: Task[]) => {
+        e.preventDefault();
+        update(next, true);
+      };
+      const startDay = dayNumber(task.calcStart);
+      switch (e.key) {
+        case "ArrowLeft":
+        case "ArrowRight": {
+          if (startDay === null) return;
+          const delta = (e.key === "ArrowLeft" ? -1 : 1) * (e.shiftKey ? 7 : 1);
+          apply(applyMove(all.map(stripCalculated), task.id, dayToStr(startDay + delta), delta));
+          return;
+        }
+        case "+":
+        case "=":
+          apply(applyResize(all.map(stripCalculated), task.id, task.duration + 1));
+          return;
+        case "-":
+        case "_":
+          if (task.duration > 1) apply(applyResize(all.map(stripCalculated), task.id, task.duration - 1));
+          return;
+        case "Enter":
+        case " ":
+          e.preventDefault();
+          setDetailTask(task);
+          return;
+        case "ArrowUp":
+        case "ArrowDown":
+          e.preventDefault();
+          focusNeighbour(task.id, e.key === "ArrowUp" ? -1 : 1);
+          return;
+      }
+    },
+    [focusNeighbour]
+  );
 
   // --- Export ---
   const handleExport = () => {
@@ -340,6 +475,7 @@ export function GanttChart({
   const firstRow = Math.min(win.firstRow, Math.max(0, rowCount - 1));
   const lastRow = Math.min(win.lastRow, rowCount - 1);
 
+  const compact = zoom !== "day";
   const headerCells: React.ReactNode[] = [];
   for (let idx = firstCol; idx <= lastCol; idx++) {
     const day = minDay + idx;
@@ -350,15 +486,35 @@ export function GanttChart({
     const holidayName = cal.holidays.get(day);
     const isWeather = cal.isWeatherDay(day);
     const foundWeather = isWeather ? weatherDelays.find((wd) => dateStr >= wd.startDate && dateStr <= wd.endDate) : undefined;
+    const tip = `${dayTitleFmt.format(date)}${isHol && holidayName ? `\nLukkedag: ${holidayName}` : ""}${
+      foundWeather ? `\nUvejr/Arbejdsstop: ${foundWeather.label}` : ""
+    }\n\nKlik for at tilføje/fjerne helligdag eller uvejr!`;
+
+    if (compact) {
+      headerCells.push(
+        <div
+          key={day}
+          onClick={() => setSelectedDay(dateStr)}
+          title={tip}
+          style={{ width: `${colW}px` }}
+          className={`relative shrink-0 h-full cursor-pointer hover:brightness-90 ${colW >= 24 ? "border-r border-slate-250" : ""} ${
+            isHol ? "bg-purple-200" : isWeather ? "bg-sky-200" : isWe ? "bg-emerald-100" : "bg-slate-50"
+          }`}
+        >
+          {zoom === "week" && weekdayOf(day) === 1 && (
+            <span className="absolute bottom-1 left-0.5 text-[9px] font-black text-slate-600 select-none">{date.getUTCDate()}</span>
+          )}
+        </div>
+      );
+      continue;
+    }
 
     headerCells.push(
       <div
         key={day}
         onClick={() => setSelectedDay(dateStr)}
-        title={`${new Date(`${dateStr}T12:00:00`).toLocaleDateString("da-DK", { weekday: "long", day: "numeric", month: "long" })}${
-          isHol && holidayName ? `\nLukkedag: ${holidayName}` : ""
-        }${foundWeather ? `\nUvejr/Arbejdsstop: ${foundWeather.label}` : ""}\n\nKlik for at tilføje/fjerne helligdag eller uvejr!`}
-        style={{ width: `${COL_W}px` }}
+        title={tip}
+        style={{ width: `${colW}px` }}
         className={`relative shrink-0 h-full border-r border-slate-250 text-center flex flex-col items-center justify-center py-2 cursor-pointer transition hover:bg-slate-200 hover:brightness-105 active:scale-95 ${
           isHol ? "bg-purple-100/95 font-extrabold text-purple-950" : isWeather ? "bg-sky-100/95 font-extrabold text-sky-950" : isWe ? "bg-emerald-50/70" : "bg-slate-50"
         }`}
@@ -379,6 +535,33 @@ export function GanttChart({
     );
   }
 
+  // Month labels for the compact zoom levels (the day cells are too narrow to carry text)
+  const monthLabels: React.ReactNode[] = [];
+  if (compact && days > 0) {
+    const first = new Date((minDay + firstCol) * 86_400_000);
+    let y = first.getUTCFullYear();
+    let m = first.getUTCMonth();
+    for (;;) {
+      const startDay = Math.floor(Date.UTC(y, m, 1) / 86_400_000);
+      if (startDay > minDay + lastCol) break;
+      const left = (Math.max(startDay, minDay) - minDay) * colW;
+      monthLabels.push(
+        <div key={`${y}-${m}`} style={{ left }} className="absolute top-0 h-full pointer-events-none">
+          {startDay >= minDay && <div className="absolute inset-y-0 left-0 w-px bg-slate-400/60" />}
+          <span className="absolute top-1 left-1 text-[10px] font-black uppercase text-slate-600 whitespace-nowrap select-none">
+            {MONTHS_SHORT[m]} {y}
+          </span>
+        </div>
+      );
+      if (++m > 11) {
+        m = 0;
+        y++;
+      }
+    }
+  }
+
+  const todayX = today >= minDay && today <= maxDay ? (today - minDay) * colW + colW / 2 : null;
+
   const rows: React.ReactNode[] = [];
   for (let r = firstRow; r <= lastRow; r++) {
     const top = r * ROW_H;
@@ -392,6 +575,7 @@ export function GanttChart({
           totalWidth={totalWidth}
           timelineWidth={timelineWidth}
           columnCollapsed={columnCollapsed}
+          colW={colW}
           minDay={minDay}
           maxDay={maxDay}
         />
@@ -407,6 +591,7 @@ export function GanttChart({
           totalWidth={totalWidth}
           timelineWidth={timelineWidth}
           columnCollapsed={columnCollapsed}
+          colW={colW}
           minDay={minDay}
           maxDay={maxDay}
           cal={cal}
@@ -418,6 +603,7 @@ export function GanttChart({
           onPointerDown={handlePointerDown}
           onPointerMove={handlePointerMove}
           onPointerUp={handlePointerUp}
+          onBarKeyDown={handleBarKey}
         />
       );
     }
@@ -534,12 +720,63 @@ export function GanttChart({
         </button>
       </div>
 
-      {/* Dynamic Instruction & Action notice */}
-      <div className="flex justify-between items-center bg-sky-50/50 p-3 px-4 rounded-xl border border-sky-100/70 shadow-2xs">
-        <div className="flex items-center gap-2 text-[11px] md:text-xs font-semibold text-sky-700/80 leading-tight">
-          <Zap className="w-4 h-4 text-sky-500 animate-pulse shrink-0" />
+      {/* View toolbar: zoom, jump buttons, dependency arrows */}
+      <div className="flex flex-wrap items-center gap-x-5 gap-y-2 bg-sky-50/50 p-2.5 px-4 rounded-xl border border-sky-100/70 shadow-2xs">
+        <div className="flex items-center gap-2" role="group" aria-label="Zoom">
+          <ZoomIn className="w-4 h-4 text-sky-600 shrink-0" />
+          <div className="flex bg-white p-0.5 rounded-lg border border-slate-200">
+            {([["day", "Dag"], ["week", "Uge"], ["month", "Måned"]] as [Zoom, string][]).map(([z, label]) => (
+              <button
+                key={z}
+                type="button"
+                aria-pressed={zoom === z}
+                onClick={() => changeZoom(z)}
+                className={`px-2.5 py-1 text-[11px] font-extrabold rounded-md transition cursor-pointer ${
+                  zoom === z ? "bg-sky-600 text-white shadow-xs" : "text-slate-500 hover:text-slate-800"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="flex items-center gap-1.5" role="group" aria-label="Spring til">
+          <button
+            type="button"
+            onClick={() => setJumpTo(today)}
+            disabled={!todayInRange}
+            title={todayInRange ? "Gå til dags dato" : "I dag ligger uden for tidsplanen"}
+            className="px-2.5 py-1 text-[11px] font-extrabold rounded-lg bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 cursor-pointer disabled:opacity-40 disabled:cursor-default"
+          >
+            I dag
+          </button>
+          <button
+            type="button"
+            onClick={() => setJumpTo(bounds.min)}
+            className="px-2.5 py-1 text-[11px] font-extrabold rounded-lg bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 cursor-pointer"
+          >
+            Projektstart
+          </button>
+          <button
+            type="button"
+            onClick={() => setJumpTo(bounds.max)}
+            className="px-2.5 py-1 text-[11px] font-extrabold rounded-lg bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 cursor-pointer"
+          >
+            Projektslut
+          </button>
+        </div>
+
+        <label className="flex items-center gap-1.5 text-[11px] font-extrabold text-slate-600 cursor-pointer">
+          <input type="checkbox" checked={showArrows} onChange={(e) => setShowArrows(e.target.checked)} className="accent-sky-600" />
+          <Link2 className="w-3.5 h-3.5 text-slate-500" />
+          <span>Vis afhængigheder</span>
+        </label>
+
+        <div className="flex items-center gap-2 text-[11px] font-semibold text-sky-700/80 leading-tight min-w-0">
+          <Zap className="w-4 h-4 text-sky-500 shrink-0" />
           <span>
-            <strong>Gestus:</strong> Træk tidslinjen for at rykke opgaver eller forlænge varigheden. Visningsfilteret herover beskærer også din HTML/PDF-dokumentation automatisk!
+            Træk bjælker med musen, eller vælg en bjælke (Tab) og brug piletaster, + / − og Enter.
           </span>
         </div>
       </div>
@@ -577,10 +814,18 @@ export function GanttChart({
               </div>
             )}
 
-            <div style={{ width: timelineWidth }} className="shrink-0 bg-slate-50 overflow-hidden">
-              <div className="flex h-full" style={{ marginLeft: firstCol * COL_W }}>
+            <div style={{ width: timelineWidth }} className="shrink-0 bg-slate-50 overflow-hidden relative">
+              <div className={`flex h-full ${compact ? "pt-5" : ""}`} style={{ marginLeft: firstCol * colW }}>
                 {headerCells}
               </div>
+              {compact && <div className="absolute inset-0 pointer-events-none">{monthLabels}</div>}
+              {todayX !== null && (
+                <div
+                  style={{ left: todayX - 4 }}
+                  className="absolute bottom-0 w-2 h-2 bg-rose-500 rotate-45 pointer-events-none"
+                  title="I dag"
+                />
+              )}
             </div>
           </div>
 
@@ -590,7 +835,7 @@ export function GanttChart({
               {overlays.holidayCols.map((col) => (
                 <div
                   key={`h${col}`}
-                  style={{ left: col * COL_W, width: COL_W }}
+                  style={{ left: col * colW, width: colW }}
                   className="absolute inset-y-0 bg-purple-50/90 border-l border-l-purple-200/40"
                 />
               ))}
@@ -598,7 +843,31 @@ export function GanttChart({
                 <div key={`w${w.left}`} style={{ left: w.left, width: w.width }} className="absolute inset-y-0 bg-sky-100/40" />
               ))}
             </div>
+            {showArrows && arrows.length > 0 && (
+              <svg
+                data-testid="dependency-arrows"
+                style={{ left: labelW, top: 0, width: timelineWidth, height: rowCount * ROW_H }}
+                className="absolute pointer-events-none z-[5] overflow-hidden"
+                aria-hidden="true"
+              >
+                {arrows
+                  .filter((a) => a.hi >= firstRow && a.lo <= lastRow && a.xHi >= firstCol * colW && a.xLo <= (lastCol + 1) * colW)
+                  .map((a) => (
+                    <g key={a.key} stroke={a.critical ? "#ef4444" : "#94a3b8"} fill="none" strokeWidth="1.5">
+                      <path d={a.d} />
+                      <polygon points={a.head} fill={a.critical ? "#ef4444" : "#94a3b8"} stroke="none" />
+                    </g>
+                  ))}
+              </svg>
+            )}
             {rows}
+            {todayX !== null && (
+              <div
+                data-testid="today-line"
+                style={{ left: labelW + todayX - 1, width: 2 }}
+                className="absolute inset-y-0 bg-rose-500/70 pointer-events-none z-[15]"
+              />
+            )}
           </div>
         </div>
       </div>
@@ -608,6 +877,14 @@ export function GanttChart({
         <div className="flex items-center gap-1.5">
           <span className="w-3.5 h-3.5 rounded bg-amber-500/10 border border-amber-300 flex items-center justify-center text-[9px] shrink-0">💡</span>
           <span>Tip: Træk bjælken for at rykke startdato. Træk i højre kant for at forlænge varigheden.</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="w-0.5 h-3.5 bg-rose-500 shrink-0" />
+          <span>I dag</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="text-slate-400 font-black leading-none shrink-0">⤷</span>
+          <span>Afhængighed (pil fra forgænger til opgave)</span>
         </div>
         <div className="flex items-center gap-1.5">
           <span className="w-3 h-3 rounded bg-emerald-50 border border-emerald-100 shrink-0" />

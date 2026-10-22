@@ -19,6 +19,10 @@ Du kan tilgå og køre applikationen direkte i din browser:
 * **Kalendermarkering**: Weekender (grøn skravering), helligdage (lilla skravering med 🇩🇰-flag) samt uvejrs-/vejrspildsdage (blå skravering med ❄️-symbol) markeres tydeligt i baggrundsgitteret.
 * **Interaktive Dage (Genvej)**: Klik direkte på en kolonne eller en dag i diagrammets overskrift for hurtigt at fjerne/tilføje en helligdag eller oprette en vejrspildsperiode for den specifikke dato.
 * **Drag-and-Drop & Resizing**: Træk i midten af en opgaveblok for at forskyde startdatoen, eller træk i højre kant for at justere varigheden.
+* **Zoom**: Skift mellem dag-, uge- og månedsvisning, så store projekter kan overskues på ét blik.
+* **I dag-linje og hop-knapper**: En rød linje markerer dags dato, og knapperne *I dag*, *Projektstart* og *Projektslut* springer direkte derhen.
+* **Afhængighedspile**: Pile fra forgænger til efterfølger viser rækkefølgen (kritisk vej i rødt) og kan slås fra.
+* **Tastaturstyring**: Vælg en bjælke med Tab; piletaster flytter (Shift = 1 uge), +/− ændrer varigheden, Enter åbner detaljer, op/ned skifter opgave. Dialoger lukkes med Escape.
 
 ### 2. Intelligent Planlægningsmotor (Scheduler Engine) 🧠
 * **Finish-to-Start Afhængigheder**: Mulighed for at knytte opgaver sammen (forgængere), så efterfølgende opgaver automatisk skubbes eller trækkes i tidsplanen.

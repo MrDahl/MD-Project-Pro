@@ -1,5 +1,6 @@
 import type { Task, Trade } from "../../types";
 import { multiColorGradient } from "./model";
+import { useEscapeKey } from "../useEscapeKey";
 import { X, Flame, ExternalLink, CloudLightning, Sun } from "lucide-react";
 
 interface TaskDetailModalProps {
@@ -10,9 +11,10 @@ interface TaskDetailModalProps {
 }
 
 export function TaskDetailModal({ task, tradeById, onEdit, onClose }: TaskDetailModalProps) {
+  useEscapeKey(onClose);
   return (
-          <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center z-50 p-4" id="task-detail-modal">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md border border-slate-100 overflow-hidden flex flex-col">
+          <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center z-50 p-4" id="task-detail-modal" onClick={onClose}>
+            <div role="dialog" aria-modal="true" aria-label={`Opgave: ${task.title}`} onClick={(e) => e.stopPropagation()} className="bg-white rounded-2xl shadow-2xl w-full max-w-md border border-slate-100 overflow-hidden flex flex-col">
               {/* Header with trade color borders */}
               <div 
                 className="h-2.5 w-full shrink-0" 

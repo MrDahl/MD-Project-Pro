@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useEscapeKey } from "../useEscapeKey";
 import type { Holiday, WeatherDelay } from "../../types";
 import { Calendar, X, ShieldCheck, Trash2, PlusCircle, CloudLightning } from "lucide-react";
 
@@ -24,6 +25,7 @@ export function DayActionModal({
   onDeleteWeatherDelay,
   onClose,
 }: DayActionModalProps) {
+  useEscapeKey(onClose);
   const foundHoliday = holidays.find((h) => h.date === date);
   const foundWeather = weatherDelays.find((wd) => date >= wd.startDate && date <= wd.endDate);
 
@@ -33,8 +35,8 @@ export function DayActionModal({
   const [dayActionType, setDayActionType] = useState<"holiday" | "weather">(foundWeather ? "weather" : "holiday");
 
   return (
-          <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center z-50 p-4" id="day-action-modal">
-            <div className="bg-white rounded-xl shadow-xl w-full max-w-sm border border-slate-100 overflow-hidden flex flex-col">
+          <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center z-50 p-4" id="day-action-modal" onClick={onClose}>
+            <div role="dialog" aria-modal="true" aria-label="Valg for dagen" onClick={(e) => e.stopPropagation()} className="bg-white rounded-xl shadow-xl w-full max-w-sm border border-slate-100 overflow-hidden flex flex-col">
               {/* Modal Header */}
               <div className="bg-slate-900 px-4 py-3 flex justify-between items-center text-white">
                 <div className="flex items-center gap-2">
@@ -45,6 +47,7 @@ export function DayActionModal({
                 </div>
                 <button
                   onClick={() => onClose()}
+                  aria-label="Luk"
                   className="p-1 hover:bg-white/10 rounded-lg text-white/70 hover:text-white cursor-pointer"
                 >
                   <X className="w-4 h-4" />

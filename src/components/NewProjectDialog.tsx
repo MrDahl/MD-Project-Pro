@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEscapeKey } from "./useEscapeKey";
 
 interface Props {
   open: boolean;
@@ -10,12 +10,7 @@ interface Props {
 
 /** Confirms starting over, so the current project is never lost by accident. */
 export function NewProjectDialog({ open, hasContent, onSaveFirst, onConfirm, onCancel }: Props) {
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onCancel();
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [open, onCancel]);
+  useEscapeKey(onCancel);
 
   if (!open) return null;
   return (
