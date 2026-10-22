@@ -99,6 +99,10 @@ interface GanttTaskRowProps extends RowBase {
   tradeById: Map<string, Trade>;
   stageById: Map<string, Stage>;
   isDragging: boolean;
+  /** Baseline span (day numbers) to show as a thin shadow bar, if any. */
+  base?: { start: number; end: number };
+  /** Calendar days the end has moved against the baseline (positive = later). */
+  deviation?: number | null;
   onOpenDetail: (task: Task) => void;
   onExpandColumn: () => void;
   onPointerDown: (e: React.PointerEvent<HTMLDivElement>, task: Task, type: "move" | "resize-right") => void;
@@ -121,6 +125,8 @@ export const GanttTaskRow = memo(function GanttTaskRow({
   tradeById,
   stageById,
   isDragging,
+  base,
+  deviation,
   onOpenDetail,
   onExpandColumn,
   onPointerDown,
@@ -268,6 +274,20 @@ export const GanttTaskRow = memo(function GanttTaskRow({
           );
         })}
 
+        {/* Baseline shadow bar */}
+        {base && base.end >= minDay && base.start <= maxDay && (
+          <div
+            data-testid="baseline-bar"
+            style={{
+              left: `${(Math.max(base.start, minDay) - minDay) * colW}px`,
+              width: `${(Math.min(base.end, maxDay) - Math.max(base.start, minDay) + 1) * colW}px`,
+              top: ROW_H - 9,
+            }}
+            className="absolute h-1.5 rounded bg-slate-400/70 pointer-events-none z-[5]"
+            title="Baseline (oprindelig plan)"
+          />
+        )}
+
         {/* Milestone diamond */}
         {!task.isRecurring &&
           task.isMilestone &&
@@ -323,6 +343,11 @@ export const GanttTaskRow = memo(function GanttTaskRow({
           >
             <span className={`font-black ${task.isCritical ? "text-red-650" : "text-slate-800"}`}>{task.title}</span>
             <span className="text-slate-400 font-bold">({task.duration}d)</span>
+            {deviation !== null && deviation !== undefined && deviation !== 0 && (
+              <span className={`font-black ${deviation > 0 ? "text-red-600" : "text-emerald-600"}`} title="Afvigelse fra baseline (kalenderdage)">
+                {deviation > 0 ? `+${deviation}` : deviation}d
+              </span>
+            )}
           </div>
         )}
       </div>

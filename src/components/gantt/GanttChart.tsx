@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import type { Task, Trade, Stage, WeatherDelay, Holiday } from "../../types";
+import type { Task, Trade, Stage, WeatherDelay, Holiday, Baseline } from "../../types";
+import { baselineById, endDeviationDays } from "../../utils/baseline";
 import { buildCalendar, dayNumber, dayToStr, isWeekendDay, weekdayOf } from "../../utils/scheduler";
 import { Calendar, Zap, ChevronLeft, ChevronRight, FolderDown, Flame, SlidersHorizontal, ZoomIn, Link2 } from "lucide-react";
 import { todayStr } from "../../utils/dates";
@@ -34,6 +35,9 @@ interface GanttChartProps {
   projectStartDate: string;
   stages?: Stage[];
   weatherDelays?: WeatherDelay[];
+  baseline?: Baseline | null;
+  onSaveBaseline: () => void;
+  onClearBaseline: () => void;
   /** `newGesture` is true for the first change of a drag, so the whole drag becomes one undo step. */
   onUpdateTasks: (updatedTasks: Task[], newGesture: boolean) => void;
   onEditTask: (task: Task) => void;
@@ -77,6 +81,9 @@ export function GanttChart({
   projectStartDate,
   stages = EMPTY_STAGES,
   weatherDelays = EMPTY_DELAYS,
+  baseline = null,
+  onSaveBaseline,
+  onClearBaseline,
   onUpdateTasks,
   onEditTask,
   onAddHoliday,
@@ -91,6 +98,7 @@ export function GanttChart({
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [zoom, setZoom] = useState<Zoom>("day");
   const [showArrows, setShowArrows] = useState(true);
+  const [showBaseline, setShowBaseline] = useState(true);
   const [jumpTo, setJumpTo] = useState<number | null>(null);
   const zoomAnchor = useRef<number | null>(null);
   const colW = ZOOM_COL_W[zoom];
@@ -115,6 +123,16 @@ export function GanttChart({
   }, [tasks]);
 
   const scheduled = useMemo(() => tasks.filter(isScheduled), [tasks]);
+  const baseTasks = useMemo(() => baselineById(baseline), [baseline]);
+  const baseSpans = useMemo(() => {
+    const m = new Map<string, { start: number; end: number }>();
+    for (const [id, b] of baseTasks) {
+      const start = dayNumber(b.start);
+      const end = dayNumber(b.end);
+      if (start !== null && end !== null) m.set(id, { start, end });
+    }
+    return m;
+  }, [baseTasks]);
   const bounds = useMemo(() => projectBounds(scheduled, projectStartDate), [scheduled, projectStartDate]);
   const availableMonths = useMemo(() => monthsBetween(bounds.min, bounds.max), [bounds.min, bounds.max]);
   const availableYears = useMemo(() => yearsBetween(bounds.min, bounds.max), [bounds.min, bounds.max]);
@@ -613,6 +631,8 @@ export function GanttChart({
           tradeById={tradeById}
           stageById={stageById}
           isDragging={draggingId === task.id}
+          base={showBaseline ? baseSpans.get(task.id) : undefined}
+          deviation={showBaseline ? endDeviationDays(task, baseTasks.get(task.id)) : null}
           onOpenDetail={openDetail}
           onExpandColumn={expandColumn}
           onPointerDown={handlePointerDown}
@@ -787,6 +807,28 @@ export function GanttChart({
           <Link2 className="w-3.5 h-3.5 text-slate-500" />
           <span>Vis afhængigheder</span>
         </label>
+
+        <div className="flex items-center gap-2 flex-wrap" role="group" aria-label="Baseline">
+          <button
+            type="button"
+            onClick={onSaveBaseline}
+            title="Gem den nuværende plan som baseline, så du senere kan se afvigelser"
+            className="px-2.5 py-1 text-[11px] font-extrabold rounded-lg bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 cursor-pointer"
+          >
+            {baseline ? "Opdatér baseline" : "Gem baseline"}
+          </button>
+          {baseline && (
+            <>
+              <label className="flex items-center gap-1.5 text-[11px] font-extrabold text-slate-600 cursor-pointer">
+                <input type="checkbox" checked={showBaseline} onChange={(e) => setShowBaseline(e.target.checked)} className="accent-sky-600" />
+                <span>Vis baseline ({new Date(baseline.savedAt).toLocaleDateString("da-DK")})</span>
+              </label>
+              <button type="button" onClick={onClearBaseline} className="text-[11px] font-extrabold text-red-600 hover:underline cursor-pointer">
+                Fjern
+              </button>
+            </>
+          )}
+        </div>
 
         <div className="flex items-center gap-2 text-[11px] font-semibold text-sky-700/80 leading-tight min-w-0">
           <Zap className="w-4 h-4 text-sky-500 shrink-0" />

@@ -23,6 +23,7 @@ Du kan tilgå og køre applikationen direkte i din browser:
 * **I dag-linje og hop-knapper**: En rød linje markerer dags dato, og knapperne *I dag*, *Projektstart* og *Projektslut* springer direkte derhen.
 * **Afhængighedspile**: Pile fra forgænger til efterfølger viser rækkefølgen (kritisk vej i rødt) og kan slås fra.
 * **Tastaturstyring**: Vælg en bjælke med Tab; piletaster flytter (Shift = 1 uge), +/− ændrer varigheden, Enter åbner detaljer, op/ned skifter opgave. Dialoger lukkes med Escape.
+* **Baseline**: Gem den nuværende plan som baseline. Gantt viser den oprindelige plan som tynde skyggebjælker og afvigelsen i dage ved hver opgave, og Økonomi viser afvigelsen i slutdato og sagspris.
 * **Sidepanel til opgaver**: *Opret ny opgave* og *Rediger* åbner et panel til højre, så du ikke forlader Gantt-diagrammet. Escape lukker.
 * **Søg, filtrér og gruppér**: Opgavelisten kan søges (titel, noter, faggruppe), filtreres på etape, faggruppe og kritisk vej, grupperes efter etape, og opgaver kan duplikeres. Lange lister vises 100 ad gangen.
 * **Advarsler**: Et panel peger på opgaver der slutter efter (eller starter før) deres etape, opgaver uden faggruppe, mulig dobbeltbooking af samme faggruppe og opgaver der ikke kunne placeres. Klik på en advarsel for at åbne opgaven.
@@ -54,6 +55,8 @@ Du kan tilgå og køre applikationen direkte i din browser:
 * **Faggrupper**: Opret og tilpas faglige teams (Tømrer, Murer, Elektriker etc.) med koder, faste timelønninger, overarbejdstakster og dagsnormer.
 * **Budgetoversigt**: Samlet sagspris og planlagt deadline, udgifter fordelt pr. faggruppe og pr. opgave (løn inkl. weekend-/helligdagstillæg, faste priser og gentagende serviceydelser).
 * **PDF-rapport**: Udskriv eller gem økonomioversigten som PDF direkte fra browseren.
+* **S-kurve**: De akkumulerede omkostninger over tid vises som kurve (og baseline som stiplet linje).
+* **Skabeloner**: Under *Nyt* kan du starte fra en færdig skabelon (nyt parcelhus, renovering af badeværelse eller tilbygning) med faggrupper, etaper, forgængere og milepæle, som du derefter tilpasser.
 
 ### 8. Nem Import & Eksport (Backup) 💾
 * **JSON-Eksport**: Gem hele din projektopsætning lokalt som en `.json`-fil med ét klik.

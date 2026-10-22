@@ -3,6 +3,7 @@ import { dayNumber } from "../utils/scheduler.ts";
 import { nextMonday } from "../utils/dates.ts";
 import { stripCalculated } from "../utils/tasks.ts";
 import { taskLinks, withLinks } from "../utils/links.ts";
+import { normalizeBaseline } from "../utils/baseline.ts";
 
 export const STORAGE_KEY = "msProjectMobileData";
 export const WIZARD_KEY = "msProjectWizardCompleted";
@@ -18,6 +19,7 @@ export function blankProject(): AppData {
     tasks: [],
     stages: [],
     weatherDelays: [],
+    baseline: null,
     scheduleError: null,
     startDateWarning: null,
   };
@@ -75,6 +77,7 @@ export function normalizeProject(raw: unknown): AppData {
     tasks,
     stages: asArray(raw.stages),
     weatherDelays: asArray(raw.weatherDelays),
+    baseline: normalizeBaseline(raw.baseline),
   } as AppData;
 }
 

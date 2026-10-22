@@ -5,6 +5,10 @@ import { danishHolidays, projectYears } from "./utils/holidays";
 import { findWarnings } from "./utils/warnings";
 import { duplicateTask } from "./utils/taskFilter";
 import { hasLinkTo, removeLinksTo } from "./utils/links";
+import { daysBetween, makeBaseline } from "./utils/baseline";
+import { buildTemplate } from "./data/templates";
+import { nextMonday } from "./utils/dates";
+import { CostCurve } from "./components/CostCurve";
 import { indexBy } from "./components/gantt/model";
 import { GanttChart } from "./components/gantt/GanttChart";
 import { TaskList } from "./components/TaskList";
@@ -365,6 +369,32 @@ export default function App() {
     reader.readAsText(file);
   };
 
+  const handleSaveBaseline = () => {
+    const hadBaseline = !!stateRef.current.baseline;
+    update((p) => ({ ...p, baseline: makeBaseline(calculatedTasks, projectEndDate, projectTotalCost) }));
+    showToast(hadBaseline ? "Baseline er opdateret til den nuværende plan." : "Baseline gemt - afvigelser vises nu i Gantt og Økonomi.", true);
+  };
+
+  const handleClearBaseline = () => {
+    update((p) => ({ ...p, baseline: null }));
+    showToast("Baseline er fjernet.", true);
+  };
+
+  const startFromTemplate = (id: string) => {
+    const data = buildTemplate(id, nextMonday());
+    if (!data) return;
+    const replacing = stateRef.current.tasks.length > 0 || stateRef.current.trades.length > 0;
+    update(data);
+    writeFlag(WIZARD_KEY, "true");
+    setNewProjectOpen(false);
+    setWizardOpen(false);
+    setWizardCancelable(false);
+    setDrawer(null);
+    setEditTradeId(null);
+    setActiveTab2("tidsplan");
+    showToast(`Skabelonen "${data.projectInfo?.projectName}" er indlæst - tilpas den til dit projekt.`, replacing);
+  };
+
   const startNewProject = () => {
     setNewProjectOpen(false);
     setWizardCancelable(true);
@@ -632,6 +662,9 @@ export default function App() {
                       projectStartDate={appState.startDate}
                       stages={appState.stages || []}
                       weatherDelays={appState.weatherDelays || []}
+                      baseline={appState.baseline}
+                      onSaveBaseline={handleSaveBaseline}
+                      onClearBaseline={handleClearBaseline}
                       onUpdateTasks={(ts, newGesture) => update((p) => ({ ...p, tasks: ts }), { history: newGesture })}
                       onEditTask={(task) => setDrawer({ taskId: task.id })}
                       onAddHoliday={handleAddHoliday}
@@ -778,6 +811,39 @@ export default function App() {
                 </div>
               </div>
 
+              {/* Baseline comparison */}
+              {appState.baseline && (
+                <div data-testid="baseline-summary" className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                  {(() => {
+                    const dDays = daysBetween(appState.baseline.endDate, projectEndDate);
+                    const dCost = projectTotalCost - appState.baseline.totalCost;
+                    const tone = (n: number) => (n > 0 ? "text-red-600" : n < 0 ? "text-emerald-600" : "text-slate-600");
+                    return (
+                      <>
+                        <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl">
+                          <span className="text-[9px] uppercase font-black text-slate-400 tracking-widest block mb-1">Slutdato mod baseline</span>
+                          <span className={`font-black ${tone(dDays ?? 0)}`}>
+                            {dDays === null ? "Ingen data" : dDays === 0 ? "Uændret" : `${dDays > 0 ? "+" : ""}${dDays} kalenderdage`}
+                          </span>
+                        </div>
+                        <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl">
+                          <span className="text-[9px] uppercase font-black text-slate-400 tracking-widest block mb-1">Sagspris mod baseline</span>
+                          <span className={`font-black font-mono ${tone(dCost)}`}>
+                            {dCost === 0 ? "Uændret" : `${dCost > 0 ? "+" : ""}${Math.round(dCost).toLocaleString("da-DK")} kr.`}
+                          </span>
+                        </div>
+                      </>
+                    );
+                  })()}
+                </div>
+              )}
+
+              {/* Accumulated cost over time */}
+              <div className="flex flex-col gap-2">
+                <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider border-b border-slate-100 pb-1">Omkostninger over tid (S-kurve)</h4>
+                <CostCurve tasks={calculatedTasks} baseline={appState.baseline} />
+              </div>
+
               {/* Breakdown lists split */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5 md:gap-6 mt-1">
                 {/* 1. Cost per trade */}
@@ -913,6 +979,7 @@ export default function App() {
           startNewProject();
         }}
         onConfirm={startNewProject}
+        onTemplate={startFromTemplate}
         onCancel={() => setNewProjectOpen(false)}
       />
 

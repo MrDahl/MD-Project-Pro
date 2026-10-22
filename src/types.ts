@@ -87,6 +87,14 @@ export interface ProjectInfo {
   manager: string;
 }
 
+/** A saved copy of the plan, used to show how the current plan deviates from it. */
+export interface Baseline {
+  savedAt: string; // ISO timestamp
+  endDate: string | null;
+  totalCost: number;
+  tasks: { id: string; start: string; end: string; cost: number }[];
+}
+
 export interface AppData {
   startDate: string;
   settings: Settings;
@@ -96,6 +104,7 @@ export interface AppData {
   tasks: Task[];
   stages?: Stage[]; // List of stages
   weatherDelays?: WeatherDelay[]; // Force Majeure / weather stoppages
+  baseline?: Baseline | null;
   scheduleError: string | null;
   startDateWarning: string | null;
 }
