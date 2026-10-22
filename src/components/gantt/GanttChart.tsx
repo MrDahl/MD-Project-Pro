@@ -3,6 +3,7 @@ import type { Task, Trade, Stage, WeatherDelay, Holiday } from "../../types";
 import { buildCalendar, dayNumber, dayToStr, isWeekendDay, weekdayOf } from "../../utils/scheduler";
 import { Calendar, Zap, ChevronLeft, ChevronRight, FolderDown, Flame, SlidersHorizontal, ZoomIn, Link2 } from "lucide-react";
 import { todayStr } from "../../utils/dates";
+import { taskLinks } from "../../utils/links";
 import {
   ZOOM_COL_W,
   ROW_H,
@@ -163,34 +164,48 @@ export function GanttChart({
       rowOf.set(t.id, visibleStages.length + i);
       taskById.set(t.id, t);
     });
-    const list: { key: string; d: string; head: string; lo: number; hi: number; xLo: number; xHi: number; critical: boolean }[] = [];
+    const list: { key: string; d: string; head: string; lo: number; hi: number; xLo: number; xHi: number; critical: boolean; dashed: boolean }[] = [];
     for (const t of visibleTasks) {
-      if (!t.dependencyId || t.isRecurring) continue;
-      const pred = taskById.get(t.dependencyId);
-      if (!pred || pred.isRecurring) continue;
-      const predEnd = dayNumber(pred.calcEnd);
+      if (t.isRecurring) continue;
       const succStart = dayNumber(t.calcStart);
-      if (predEnd === null || succStart === null) continue;
-      const rp = rowOf.get(pred.id)!;
-      const rs = rowOf.get(t.id)!;
-      const x1 = pred.isMilestone ? (predEnd - minDay) * colW + colW / 2 + 10 : (predEnd - minDay + 1) * colW;
-      const x2 = t.isMilestone ? (succStart - minDay) * colW + colW / 2 - 10 : (succStart - minDay) * colW;
-      const y1 = rp * ROW_H + ROW_H / 2;
-      const y2 = rs * ROW_H + ROW_H / 2;
-      const d =
-        x2 >= x1 + 16
+      if (succStart === null) continue;
+      for (const link of taskLinks(t)) {
+        const pred = taskById.get(link.taskId);
+        if (!pred || pred.isRecurring) continue;
+        const predEnd = dayNumber(pred.calcEnd);
+        const predStart = dayNumber(pred.calcStart);
+        if (predEnd === null || predStart === null) continue;
+        const rp = rowOf.get(pred.id)!;
+        const rs = rowOf.get(t.id)!;
+        const ss = link.type === "SS";
+        const x1 = ss
+          ? (pred.isMilestone ? (predStart - minDay) * colW + colW / 2 - 10 : (predStart - minDay) * colW)
+          : pred.isMilestone
+          ? (predEnd - minDay) * colW + colW / 2 + 10
+          : (predEnd - minDay + 1) * colW;
+        const x2 = t.isMilestone ? (succStart - minDay) * colW + colW / 2 - 10 : (succStart - minDay) * colW;
+        const y1 = rp * ROW_H + ROW_H / 2;
+        const y2 = rs * ROW_H + ROW_H / 2;
+        const midY = y2 > y1 ? y2 - ROW_H / 2 : y2 + ROW_H / 2;
+        const d = ss
+          ? x2 >= x1 - 8
+            ? `M${x1} ${y1}H${x1 - 8}V${midY}H${x2 - 8}V${y2}H${x2}`
+            : `M${x1} ${y1}H${x1 - 8}V${y2}H${x2}`
+          : x2 >= x1 + 16
           ? `M${x1} ${y1}H${x1 + 8}V${y2}H${x2}`
-          : `M${x1} ${y1}H${x1 + 8}V${y2 > y1 ? y2 - ROW_H / 2 : y2 + ROW_H / 2}H${x2 - 8}V${y2}H${x2}`;
-      list.push({
-        key: `${pred.id}>${t.id}`,
-        d,
-        head: `${x2},${y2} ${x2 - 6},${y2 - 3.5} ${x2 - 6},${y2 + 3.5}`,
-        lo: Math.min(rp, rs),
-        hi: Math.max(rp, rs),
-        xLo: Math.min(x1, x2) - 10,
-        xHi: Math.max(x1, x2) + 10,
-        critical: !!pred.isCritical && !!t.isCritical,
-      });
+          : `M${x1} ${y1}H${x1 + 8}V${midY}H${x2 - 8}V${y2}H${x2}`;
+        list.push({
+          key: `${pred.id}>${t.id}`,
+          d,
+          head: `${x2},${y2} ${x2 - 6},${y2 - 3.5} ${x2 - 6},${y2 + 3.5}`,
+          lo: Math.min(rp, rs),
+          hi: Math.max(rp, rs),
+          xLo: Math.min(x1, x2) - 10,
+          xHi: Math.max(x1, x2) + 10,
+          critical: !!pred.isCritical && !!t.isCritical,
+          dashed: ss,
+        });
+      }
     }
     return list;
   }, [visibleTasks, visibleStages.length, minDay, colW]);
@@ -854,7 +869,7 @@ export function GanttChart({
                   .filter((a) => a.hi >= firstRow && a.lo <= lastRow && a.xHi >= firstCol * colW && a.xLo <= (lastCol + 1) * colW)
                   .map((a) => (
                     <g key={a.key} stroke={a.critical ? "#ef4444" : "#94a3b8"} fill="none" strokeWidth="1.5">
-                      <path d={a.d} />
+                      <path d={a.d} strokeDasharray={a.dashed ? "4 3" : undefined} />
                       <polygon points={a.head} fill={a.critical ? "#ef4444" : "#94a3b8"} stroke="none" />
                     </g>
                   ))}

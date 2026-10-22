@@ -23,6 +23,13 @@ export interface WeatherDelay {
   endDate: string; // "YYYY-MM-DD"
 }
 
+/** A link to a predecessor: Finish-to-Start (FS) or Start-to-Start (SS), with a lag (or lead, if negative) in calendar days. */
+export interface Dependency {
+  taskId: string;
+  type: "FS" | "SS";
+  lag: number;
+}
+
 export interface Task {
   id: string;
   title: string;
@@ -30,7 +37,10 @@ export interface Task {
   duration: number; // working days
   manualStart: string | null; // "YYYY-MM-DD" style or null
   tradeIds: string[]; // multi-resource support
-  dependencyId: string | null; // Finish-to-Start predecessor
+  /** Primary predecessor (Finish-to-Start). Kept in sync with `dependencies` for older files and versions. */
+  dependencyId: string | null;
+  /** All predecessors. When present it is the source of truth; see utils/links.ts. */
+  dependencies?: Dependency[];
   allowWeekend: boolean;
   allowHoliday: boolean;
   

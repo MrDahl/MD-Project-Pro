@@ -1,4 +1,5 @@
 import type { Task, Trade, Settings, Stage, WeatherDelay, Holiday } from "../types.ts";
+import { taskLinks } from "./links.ts";
 
 /*
  * Dates are handled internally as "day numbers" (whole days since 1970-01-01, UTC).
@@ -92,26 +93,40 @@ export function buildCalendar(holidays: Holiday[] = [], weatherDelays: WeatherDe
   };
 }
 
-/** True if the dependency chain contains a loop (iterative, safe for very long chains). */
+/** True if the predecessor links contain a loop (Kahn's algorithm: iterative, safe for very long chains). */
 export function detectCycle(tasks: Task[]): boolean {
-  const parentOf = new Map<string, string | null>();
-  for (const t of tasks) parentOf.set(t.id, t.dependencyId);
+  const byId = new Map<string, Task>();
+  for (const t of tasks) if (!byId.has(t.id)) byId.set(t.id, t);
 
-  // 0/undefined = unvisited, 1 = on the current path, 2 = fully checked
-  const state = new Map<string, 1 | 2>();
-
+  const indegree = new Map<Task, number>();
+  const children = new Map<Task, Task[]>();
+  for (const t of tasks) indegree.set(t, 0);
   for (const t of tasks) {
-    const path: string[] = [];
-    let cur: string | null | undefined = t.id;
-    while (cur && !state.has(cur)) {
-      state.set(cur, 1);
-      path.push(cur);
-      cur = parentOf.get(cur) || null;
+    const seen = new Set<Task>();
+    for (const l of taskLinks(t)) {
+      const pred = byId.get(l.taskId);
+      if (!pred || seen.has(pred)) continue; // unknown predecessors are ignored
+      seen.add(pred);
+      indegree.set(t, indegree.get(t)! + 1);
+      const list = children.get(pred);
+      if (list) list.push(t);
+      else children.set(pred, [t]);
     }
-    if (cur && state.get(cur) === 1) return true;
-    for (const id of path) state.set(id, 2);
   }
-  return false;
+
+  const ready: Task[] = [];
+  for (const [t, n] of indegree) if (n === 0) ready.push(t);
+  let done = 0;
+  while (ready.length > 0) {
+    const t = ready.pop()!;
+    done++;
+    for (const c of children.get(t) || []) {
+      const left = indegree.get(c)! - 1;
+      indegree.set(c, left);
+      if (left === 0) ready.push(c);
+    }
+  }
+  return done < tasks.length;
 }
 
 export interface ScheduleResult {
@@ -195,32 +210,67 @@ export function calculateSchedule(
   const taskById = new Map<string, Task>();
   for (const t of nonRecurringTasks) if (!taskById.has(t.id)) taskById.set(t.id, t);
 
-  // Predecessor must be a regular task; links to recurring/unknown tasks are ignored
-  const predecessorOf = (t: Task): Task | undefined => (t.dependencyId ? taskById.get(t.dependencyId) : undefined);
-
-  // End day per task (aligned with the task objects)
-  const endDay = new Map<Task, number>();
-
-  // Process predecessors before successors (no cycles at this point)
-  const processed = new Set<Task>();
-  const order: Task[] = [];
+  // Predecessors must be regular tasks; links to recurring/unknown tasks are ignored
+  const linksOf = new Map<Task, { pred: Task; type: "FS" | "SS"; lag: number }[]>();
   for (const t of nonRecurringTasks) {
-    const chain: Task[] = [];
-    let cur: Task | undefined = t;
-    while (cur && !processed.has(cur)) {
-      processed.add(cur);
-      chain.push(cur);
-      cur = predecessorOf(cur);
+    const list: { pred: Task; type: "FS" | "SS"; lag: number }[] = [];
+    const seen = new Set<Task>();
+    for (const l of taskLinks(t)) {
+      const pred = taskById.get(l.taskId);
+      if (pred && !seen.has(pred)) {
+        seen.add(pred);
+        list.push({ pred, type: l.type, lag: l.lag });
+      }
     }
-    for (let i = chain.length - 1; i >= 0; i--) order.push(chain[i]);
+    linksOf.set(t, list);
+  }
+
+  // Start/end day per task, and the predecessors that decided each task's start (for the critical path)
+  const startDayOf = new Map<Task, number>();
+  const endDay = new Map<Task, number>();
+  const drivers = new Map<Task, Task[]>();
+
+  // Process predecessors before successors (topological order; no cycles at this point)
+  const waiting = new Map<Task, number>();
+  const successors = new Map<Task, Task[]>();
+  for (const t of nonRecurringTasks) {
+    const list = linksOf.get(t)!;
+    waiting.set(t, list.length);
+    for (const { pred } of list) {
+      const s = successors.get(pred);
+      if (s) s.push(t);
+      else successors.set(pred, [t]);
+    }
+  }
+  const order: Task[] = [];
+  const ready = nonRecurringTasks.filter((t) => waiting.get(t) === 0).reverse();
+  while (ready.length > 0) {
+    const t = ready.pop()!;
+    order.push(t);
+    for (const c of successors.get(t) || []) {
+      const left = waiting.get(c)! - 1;
+      waiting.set(c, left);
+      if (left === 0) ready.push(c);
+    }
   }
 
   const hours = settings.workHoursPerDay;
 
   for (const task of order) {
+    // Earliest start allowed by the predecessors: FS = day after the predecessor ends, SS = the day it starts, plus lag
     let depStart: number | null = null;
-    const pred = predecessorOf(task);
-    if (pred && endDay.has(pred)) depStart = endDay.get(pred)! + 1; // next calendar day
+    let driving: Task[] = [];
+    for (const { pred, type, lag } of linksOf.get(task)!) {
+      if (!endDay.has(pred)) continue;
+      const limit = type === "SS" ? startDayOf.get(pred)! + lag : endDay.get(pred)! + 1 + lag;
+      if (depStart === null || limit > depStart) {
+        depStart = limit;
+        driving = [pred];
+      } else if (limit === depStart) {
+        driving.push(pred);
+      }
+    }
+    drivers.set(task, driving);
 
     const manStart = task.manualStart ? dayNumber(task.manualStart) : null;
 
@@ -268,6 +318,7 @@ export function calculateSchedule(
       for (const tid in tradeCosts) taskCost += tradeCosts[tid];
     }
 
+    startDayOf.set(task, start);
     endDay.set(task, end);
     task.calcStart = dayToStr(start);
     task.calcEnd = dayToStr(end);
@@ -335,8 +386,7 @@ export function calculateSchedule(
     while (queue.length > 0) {
       const current = queue.pop()!;
       current.isCritical = true;
-      const pred = predecessorOf(current);
-      if (pred && !pred.isCritical) queue.push(pred);
+      for (const pred of drivers.get(current) || []) if (!pred.isCritical) queue.push(pred);
     }
   }
 

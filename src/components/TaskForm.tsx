@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
-import { Task, Trade, Stage } from "../types";
-import { Save, Ban, Calendar, Clock, Link, Check, Plus, RefreshCw, Layers, DollarSign } from "lucide-react";
+import { Task, Trade, Stage, Dependency } from "../types";
+import { descendantsOf, taskLinks } from "../utils/links";
+import { Save, Ban, Calendar, Clock, Link, Check, Plus, RefreshCw, Layers, DollarSign, Trash2 } from "lucide-react";
 
 interface TaskFormProps {
   tasks: Task[];
@@ -19,7 +20,7 @@ export function TaskForm({ tasks, trades, stages, editTaskId, onSave, onCancel, 
   const [manualStart, setManualStart] = useState("");
   const [duration, setDuration] = useState<number>(3);
   const [selectedTradeIds, setSelectedTradeIds] = useState<string[]>([]);
-  const [dependencyId, setDependencyId] = useState("");
+  const [links, setLinks] = useState<Dependency[]>([]);
   const [allowWeekend, setAllowWeekend] = useState(false);
   const [allowHoliday, setAllowHoliday] = useState(false);
   const [weatherIndependent, setWeatherIndependent] = useState(false);
@@ -43,7 +44,7 @@ export function TaskForm({ tasks, trades, stages, editTaskId, onSave, onCancel, 
         setManualStart(task.manualStart || "");
         setDuration(task.duration || 3);
         setSelectedTradeIds(task.tradeIds || []);
-        setDependencyId(task.dependencyId || "");
+        setLinks(taskLinks(task));
         setAllowWeekend(task.allowWeekend);
         setAllowHoliday(task.allowHoliday);
         setWeatherIndependent(task.weatherIndependent || false);
@@ -67,7 +68,7 @@ export function TaskForm({ tasks, trades, stages, editTaskId, onSave, onCancel, 
     setManualStart("");
     setDuration(3);
     setSelectedTradeIds([]);
-    setDependencyId("");
+    setLinks([]);
     setAllowWeekend(false);
     setAllowHoliday(false);
     setWeatherIndependent(false);
@@ -81,23 +82,11 @@ export function TaskForm({ tasks, trades, stages, editTaskId, onSave, onCancel, 
     setSelectedRecurringStageIds([]);
   };
 
-  // Help trace child descendants to prevent loops in predecessor selector
-  const getDescendants = (tId: string): Set<string> => {
-    const result = new Set<string>();
-    let changed = true;
-    while (changed) {
-      changed = false;
-      tasks.forEach((t) => {
-        if (t.dependencyId && (t.dependencyId === tId || result.has(t.dependencyId)) && !result.has(t.id)) {
-          result.add(t.id);
-          changed = true;
-        }
-      });
-    }
-    return result;
-  };
+  // Tasks that depend on this one cannot be chosen as predecessors (that would create a loop)
+  const descendants = editTaskId ? descendantsOf(tasks, editTaskId) : new Set<string>();
 
-  const descendants = editTaskId ? getDescendants(editTaskId) : new Set<string>();
+  const updateLink = (idx: number, patch: Partial<Dependency>) =>
+    setLinks(links.map((l, i) => (i === idx ? { ...l, ...patch } : l)));
 
   const toggleTradeSelection = (trId: string) => {
     if (selectedTradeIds.includes(trId)) {
@@ -119,6 +108,7 @@ export function TaskForm({ tasks, trades, stages, editTaskId, onSave, onCancel, 
     e.preventDefault();
     if (!title.trim()) return;
 
+    const cleanLinks = links.filter((l) => l.taskId);
     onSave({
       id: editTaskId || "task-" + Date.now(),
       title,
@@ -126,7 +116,8 @@ export function TaskForm({ tasks, trades, stages, editTaskId, onSave, onCancel, 
       manualStart: isRecurring ? null : (manualStart || null),
       duration: isRecurring ? 0 : (isMilestone ? 0 : Math.max(1, duration)),
       tradeIds: selectedTradeIds,
-      dependencyId: isRecurring ? null : (dependencyId || null),
+      dependencyId: isRecurring ? null : cleanLinks[0]?.taskId ?? null,
+      dependencies: isRecurring ? [] : cleanLinks,
       allowWeekend,
       allowHoliday,
       weatherIndependent,
@@ -297,31 +288,72 @@ export function TaskForm({ tasks, trades, stages, editTaskId, onSave, onCancel, 
             </select>
           </div>
 
-          {/* Predecessor Dependency Selection */}
-          <div className="flex flex-col gap-1">
+          {/* Predecessors: any number, Finish-to-Start or Start-to-Start, with lag/lead */}
+          <div className="flex flex-col gap-2" data-testid="predecessors">
             <label className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
               <Link className="w-3.5 h-3.5 text-slate-400" />
-              <span>Afhænger af (Finish-to-Start forgænger)</span>
+              <span>Afhænger af (forgængere)</span>
             </label>
-            <select
-              value={dependencyId}
-              onChange={(e) => setDependencyId(e.target.value)}
-              className="bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs font-bold text-slate-700 outline-none focus:border-slate-500"
+            {links.length === 0 && (
+              <p className="text-[11px] text-slate-500 font-medium">Ingen: opgaven starter med projektet eller på sin manuelle startdato.</p>
+            )}
+            {links.map((l, idx) => (
+              <div key={idx} className="flex flex-wrap items-center gap-2 bg-slate-50 border border-slate-200 rounded-lg p-2">
+                <select
+                  aria-label="Forgænger"
+                  value={l.taskId}
+                  onChange={(e) => updateLink(idx, { taskId: e.target.value })}
+                  className="flex-1 min-w-[140px] bg-white border border-slate-200 rounded-lg p-2 text-xs font-bold text-slate-700 outline-none focus:border-slate-500"
+                >
+                  <option value="">Vælg opgave…</option>
+                  {tasks.map((t) => {
+                    if (t.isRecurring || t.id === editTaskId || descendants.has(t.id)) return null;
+                    if (t.id !== l.taskId && links.some((o) => o.taskId === t.id)) return null;
+                    return (
+                      <option key={t.id} value={t.id}>
+                        {t.title}
+                      </option>
+                    );
+                  })}
+                </select>
+                <select
+                  aria-label="Type af afhængighed"
+                  value={l.type}
+                  onChange={(e) => updateLink(idx, { type: e.target.value === "SS" ? "SS" : "FS" })}
+                  className="bg-white border border-slate-200 rounded-lg p-2 text-xs font-bold text-slate-700 outline-none focus:border-slate-500"
+                >
+                  <option value="FS">Slut → Start</option>
+                  <option value="SS">Start → Start</option>
+                </select>
+                <label className="flex items-center gap-1 text-[11px] font-bold text-slate-500" title="Positivt tal = ventetid, negativt = forspring (kalenderdage)">
+                  <span>Forskydning</span>
+                  <input
+                    type="number"
+                    aria-label="Forskydning i dage"
+                    value={l.lag}
+                    onChange={(e) => updateLink(idx, { lag: Math.trunc(Number(e.target.value)) || 0 })}
+                    className="w-16 bg-white border border-slate-200 rounded-lg p-2 text-xs font-bold text-slate-700 outline-none focus:border-slate-500"
+                  />
+                  <span>dage</span>
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setLinks(links.filter((_, i) => i !== idx))}
+                  aria-label="Fjern forgænger"
+                  className="p-2 text-red-400 hover:text-red-700 hover:bg-red-50 rounded-lg cursor-pointer"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            ))}
+            <button
+              type="button"
+              onClick={() => setLinks([...links, { taskId: "", type: "FS", lag: 0 }])}
+              className="self-start text-xs font-extrabold text-sky-700 hover:underline cursor-pointer flex items-center gap-1"
             >
-              <option value="">Starter med projektet eller manuel startdato</option>
-              {tasks.map((t) => {
-                if (t.isRecurring) return null; // No dependencies on recurring tasks
-                const isInvalidSelf = t.id === editTaskId;
-                const isDescendant = descendants.has(t.id);
-                if (isInvalidSelf || isDescendant) return null;
-
-                return (
-                  <option key={t.id} value={t.id}>
-                    {t.title}
-                  </option>
-                );
-              })}
-            </select>
+              <Plus className="w-3.5 h-3.5" />
+              <span>Tilføj forgænger</span>
+            </button>
           </div>
         </>
       )}

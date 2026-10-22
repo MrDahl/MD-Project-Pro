@@ -28,7 +28,7 @@ Du kan tilgå og køre applikationen direkte i din browser:
 * **Advarsler**: Et panel peger på opgaver der slutter efter (eller starter før) deres etape, opgaver uden faggruppe, mulig dobbeltbooking af samme faggruppe og opgaver der ikke kunne placeres. Klik på en advarsel for at åbne opgaven.
 
 ### 2. Intelligent Planlægningsmotor (Scheduler Engine) 🧠
-* **Finish-to-Start Afhængigheder**: Mulighed for at knytte opgaver sammen (forgængere), så efterfølgende opgaver automatisk skubbes eller trækkes i tidsplanen.
+* **Flere forgængere**: En opgave kan have flere forgængere af typen *Slut → Start* eller *Start → Start*, hver med forsinkelse (ventetid) eller forspring (negativt tal) i kalenderdage. Opgaven starter, når den seneste betingelse er opfyldt, og den kritiske vej følger de forgængere, der afgør starten. Ældre projektfiler med én forgænger virker uændret.
 * **Smarte Arbejdsdelsregler**: Systemet fravælger automatisk weekender og helligdage ved beregning af opgaveforløb. Disse begrænsninger kan slås fra pr. opgave (*Tillad weekendarbejde* eller *Arbejde på helligdage*).
 * **Flerårig Helligdagsintegration**: Beregner automatisk de officielle danske helligdage for alle involverede projektår (både startår, slutår og mellemliggende år) – direkte i browseren, uden eksterne opslag.
 * **Store Bededag-Logik**: Systemet tager højde for, at Store Bededag blev afskaffet som officiel helligdag i Danmark fra og med 2024. For år før 2024 medregnes den korrekt som lukkedag, mens den fra 2024 og frem udelades automatisk.

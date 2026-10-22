@@ -1,5 +1,6 @@
 import type { Task } from "../../types.ts";
 import { dayNumber, dayToStr } from "../../utils/scheduler.ts";
+import { taskLinks } from "../../utils/links.ts";
 
 /**
  * Result of dragging a bar `deltaDays` columns: the dragged task gets a new manual start,
@@ -20,10 +21,10 @@ export function applyMove(baseline: Task[], taskId: string, newStartDate: string
   if (deltaDays > 0) {
     const children = new Map<string, number[]>();
     baseline.forEach((t, i) => {
-      if (t.dependencyId) {
-        const list = children.get(t.dependencyId);
+      for (const l of taskLinks(t)) {
+        const list = children.get(l.taskId);
         if (list) list.push(i);
-        else children.set(t.dependencyId, [i]);
+        else children.set(l.taskId, [i]);
       }
     });
 

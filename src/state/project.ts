@@ -2,6 +2,7 @@ import type { AppData, Holiday, Task } from "../types.ts";
 import { dayNumber } from "../utils/scheduler.ts";
 import { nextMonday } from "../utils/dates.ts";
 import { stripCalculated } from "../utils/tasks.ts";
+import { taskLinks, withLinks } from "../utils/links.ts";
 
 export const STORAGE_KEY = "msProjectMobileData";
 export const WIZARD_KEY = "msProjectWizardCompleted";
@@ -47,7 +48,8 @@ export function normalizeProject(raw: unknown): AppData {
 
   const tasks: Task[] = asArray<Task>(raw.tasks)
     .filter(isRecord)
-    .map((t, idx) => ({
+    .map((t, idx) => {
+      const base: Task = {
       ...stripCalculated(t as unknown as Task),
       id: typeof t.id === "string" && t.id ? t.id : `task-imp-${idx}`,
       title: typeof t.title === "string" ? t.title : "Opgave",
@@ -55,7 +57,10 @@ export function normalizeProject(raw: unknown): AppData {
       tradeIds: asArray<string>(t.tradeIds),
       allowWeekend: !!t.allowWeekend,
       allowHoliday: !!t.allowHoliday,
-    }));
+      };
+      // Sanitise predecessor links and keep dependencyId in sync (files from older versions only have dependencyId)
+      return Array.isArray(base.dependencies) ? withLinks(base, taskLinks(base)) : base;
+    });
 
   const hours = isRecord(raw.settings) ? Number(raw.settings.workHoursPerDay) : NaN;
   const startDate = typeof raw.startDate === "string" && dayNumber(raw.startDate) !== null ? raw.startDate : base.startDate;

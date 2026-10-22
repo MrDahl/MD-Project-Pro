@@ -4,6 +4,7 @@ import { calculateSchedule } from "./utils/scheduler";
 import { danishHolidays, projectYears } from "./utils/holidays";
 import { findWarnings } from "./utils/warnings";
 import { duplicateTask } from "./utils/taskFilter";
+import { hasLinkTo, removeLinksTo } from "./utils/links";
 import { indexBy } from "./components/gantt/model";
 import { GanttChart } from "./components/gantt/GanttChart";
 import { TaskList } from "./components/TaskList";
@@ -234,10 +235,10 @@ export default function App() {
 
   const handleDeleteTask = useCallback(
     (id: string) => {
-      const hasSuccessors = stateRef.current.tasks.some((t) => t.dependencyId === id);
+      const hasSuccessors = stateRef.current.tasks.some((t) => hasLinkTo(t, id));
       update((p) => ({
         ...p,
-        tasks: p.tasks.filter((t) => t.id !== id).map((t) => (t.dependencyId === id ? { ...t, dependencyId: null } : t)),
+        tasks: p.tasks.filter((t) => t.id !== id).map((t) => removeLinksTo(t, id)),
       }));
       showToast(hasSuccessors ? "Opgaven er slettet - afhængige opgaver er gjort uafhængige." : "Opgaven er slettet.", true);
     },

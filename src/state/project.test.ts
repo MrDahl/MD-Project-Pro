@@ -51,3 +51,14 @@ test("looksLikeProject needs tasks and trades arrays", () => {
   assert.equal(looksLikeProject({ tasks: [] }), false);
   assert.equal(looksLikeProject(null), false);
 });
+
+test("normalize sanitises predecessor links and keeps dependencyId in sync", () => {
+  const p = normalizeProject({
+    tasks: [{ id: "a", title: "A" }, { id: "b", title: "B", dependencyId: "zzz", dependencies: [{ taskId: "a", type: "SS", lag: 2 }, { taskId: "a", type: "FS", lag: 0 }, { taskId: "", type: "FS", lag: 0 }] }, { id: "c", title: "C", dependencyId: "a" }],
+    trades: [],
+  });
+  assert.deepEqual(p.tasks[1].dependencies, [{ taskId: "a", type: "SS", lag: 2 }]);
+  assert.equal(p.tasks[1].dependencyId, "a");
+  assert.equal(p.tasks[2].dependencies, undefined); // legacy tasks keep working through dependencyId
+  assert.equal(p.tasks[2].dependencyId, "a");
+});
