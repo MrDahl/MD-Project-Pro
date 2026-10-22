@@ -1,0 +1,653 @@
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import type { Task, Trade, Stage, WeatherDelay, Holiday } from "../../types";
+import { buildCalendar, dayNumber, dayToStr, isWeekendDay, weekdayOf } from "../../utils/scheduler";
+import { Calendar, Zap, ChevronLeft, ChevronRight, FolderDown, Flame, SlidersHorizontal } from "lucide-react";
+import {
+  COL_W,
+  ROW_H,
+  HEADER_H,
+  LABEL_W,
+  LABEL_W_COLLAPSED,
+  computeViewRange,
+  indexBy,
+  isScheduled,
+  monthsBetween,
+  projectBounds,
+  stripCalculated,
+  yearsBetween,
+  type FilterState,
+  type ScopeType,
+} from "./model";
+import { applyMove, applyResize } from "./drag";
+import { exportFullGantt } from "./exportGantt";
+import { GanttStageRow, GanttTaskRow } from "./GanttRows";
+import { DayActionModal } from "./DayActionModal";
+import { TaskDetailModal } from "./TaskDetailModal";
+
+interface GanttChartProps {
+  tasks: Task[];
+  trades: Trade[];
+  holidays: Holiday[];
+  projectStartDate: string;
+  stages?: Stage[];
+  weatherDelays?: WeatherDelay[];
+  onUpdateTasks: (updatedTasks: Task[]) => void;
+  onEditTask: (task: Task) => void;
+  onAddHoliday: (date: string, name: string) => void;
+  onDeleteHoliday: (idx: number) => void;
+  onAddWeatherDelay: (label: string, start: string, end: string) => void;
+  onDeleteWeatherDelay: (id: string) => void;
+}
+
+interface DragState {
+  taskId: string;
+  type: "move" | "resize-right";
+  startX: number;
+  /** Start column (move) or duration (resize) when the drag began. */
+  startValue: number;
+  /** Untouched tasks from when the drag began - every step is computed from these. */
+  baseline: Task[];
+  lastDelta: number;
+  /** True once the pointer has travelled far enough to count as a drag instead of a click. */
+  moved: boolean;
+}
+
+const EMPTY_STAGES: Stage[] = [];
+const EMPTY_DELAYS: WeatherDelay[] = [];
+
+const MONTHS_SHORT = ["jan", "feb", "mar", "apr", "maj", "jun", "jul", "aug", "sep", "okt", "nov", "dec"];
+
+/** Only rows/columns near the viewport are rendered, so cost no longer grows with project size. */
+const COL_OVERSCAN = 12;
+const ROW_OVERSCAN = 6;
+const COL_SNAP = 8;
+const ROW_SNAP = 4;
+
+export function GanttChart({
+  tasks,
+  trades,
+  holidays,
+  projectStartDate,
+  stages = EMPTY_STAGES,
+  weatherDelays = EMPTY_DELAYS,
+  onUpdateTasks,
+  onEditTask,
+  onAddHoliday,
+  onDeleteHoliday,
+  onAddWeatherDelay,
+  onDeleteWeatherDelay,
+}: GanttChartProps) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [columnCollapsed, setColumnCollapsed] = useState(false);
+  const [selectedDay, setSelectedDay] = useState<string | null>(null);
+  const [detailTask, setDetailTask] = useState<Task | null>(null);
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+
+  // --- Focus area filter ---
+  const [filter, setFilter] = useState<FilterState>({ scope: "all", stageId: "", monthStr: "", yearVal: 0 });
+  const setFilterScope = (scope: ScopeType) => setFilter((f) => ({ ...f, scope }));
+  const setSelectedStageId = (stageId: string) => setFilter((f) => ({ ...f, stageId }));
+  const setSelectedMonthStr = (monthStr: string) => setFilter((f) => ({ ...f, monthStr }));
+  const setSelectedYearVal = (yearVal: number) => setFilter((f) => ({ ...f, yearVal }));
+
+  // --- Derived, memoised data ---
+  const cal = useMemo(() => buildCalendar(holidays, weatherDelays), [holidays, weatherDelays]);
+  const tradeById = useMemo(() => indexBy(trades), [trades]);
+  const stageById = useMemo(() => indexBy(stages), [stages]);
+  const taskNumber = useMemo(() => {
+    const m = new Map<string, number>();
+    tasks.forEach((t, i) => {
+      if (!m.has(t.id)) m.set(t.id, i + 1);
+    });
+    return m;
+  }, [tasks]);
+
+  const scheduled = useMemo(() => tasks.filter(isScheduled), [tasks]);
+  const bounds = useMemo(() => projectBounds(scheduled, projectStartDate), [scheduled, projectStartDate]);
+  const availableMonths = useMemo(() => monthsBetween(bounds.min, bounds.max), [bounds.min, bounds.max]);
+  const availableYears = useMemo(() => yearsBetween(bounds.min, bounds.max), [bounds.min, bounds.max]);
+
+  const filterScope = filter.scope;
+  const selectedStageId = filter.stageId || stages[0]?.id || "";
+  const selectedMonthStr = filter.monthStr || availableMonths[0]?.val || "";
+  const selectedYearVal = filter.yearVal || availableYears[0] || 0;
+
+  const { minDay, maxDay } = useMemo(
+    () =>
+      computeViewRange(scheduled, projectStartDate, stages, {
+        scope: filterScope,
+        stageId: selectedStageId,
+        monthStr: selectedMonthStr,
+        yearVal: selectedYearVal,
+      }),
+    [scheduled, projectStartDate, stages, filterScope, selectedStageId, selectedMonthStr, selectedYearVal]
+  );
+  const days = Math.max(0, maxDay - minDay + 1);
+
+  const visibleStages = useMemo(
+    () =>
+      stages.filter((s) => {
+        const a = dayNumber(s.startDate);
+        const b = dayNumber(s.endDate);
+        return a !== null && b !== null && a <= maxDay && b >= minDay;
+      }),
+    [stages, minDay, maxDay]
+  );
+  const visibleTasks = useMemo(
+    () =>
+      scheduled.filter((t) => {
+        const a = dayNumber(t.calcStart);
+        const b = dayNumber(t.calcEnd);
+        return a !== null && b !== null && a <= maxDay && b >= minDay;
+      }),
+    [scheduled, minDay, maxDay]
+  );
+  const rowCount = visibleStages.length + visibleTasks.length;
+
+  const labelW = columnCollapsed ? LABEL_W_COLLAPSED : LABEL_W;
+  const timelineWidth = days * COL_W;
+  const totalWidth = labelW + timelineWidth;
+
+  // --- Windowing: which rows/columns are near the viewport ---
+  const [win, setWin] = useState({ firstCol: 0, lastCol: 60, firstRow: 0, lastRow: 24 });
+  const dims = useRef({ days, rowCount, labelW });
+  dims.current = { days, rowCount, labelW };
+  const frame = useRef(0);
+
+  const measure = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const { days: d, rowCount: r, labelW: lw } = dims.current;
+
+    const left = el.scrollLeft - lw;
+    const firstCol = Math.max(0, Math.floor((Math.floor(left / COL_W) - COL_OVERSCAN) / COL_SNAP) * COL_SNAP);
+    const lastCol = Math.min(d - 1, Math.ceil((Math.ceil((left + el.clientWidth) / COL_W) + COL_OVERSCAN) / COL_SNAP) * COL_SNAP);
+
+    const top = el.scrollTop - HEADER_H;
+    const firstRow = Math.max(0, Math.floor((Math.floor(top / ROW_H) - ROW_OVERSCAN) / ROW_SNAP) * ROW_SNAP);
+    const lastRow = Math.min(r - 1, Math.ceil((Math.ceil((top + el.clientHeight) / ROW_H) + ROW_OVERSCAN) / ROW_SNAP) * ROW_SNAP);
+
+    setWin((p) =>
+      p.firstCol === firstCol && p.lastCol === lastCol && p.firstRow === firstRow && p.lastRow === lastRow
+        ? p
+        : { firstCol, lastCol, firstRow, lastRow }
+    );
+  }, []);
+
+  const handleScroll = useCallback(() => {
+    if (frame.current) return;
+    frame.current = requestAnimationFrame(() => {
+      frame.current = 0;
+      measure();
+    });
+  }, [measure]);
+
+  useLayoutEffect(() => {
+    measure();
+  }, [measure, days, rowCount, columnCollapsed, scheduled.length]);
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(() => measure());
+    ro.observe(el);
+    return () => {
+      ro.disconnect();
+      if (frame.current) cancelAnimationFrame(frame.current);
+    };
+  }, [measure, scheduled.length]);
+
+  // --- Drag & resize (computed from a baseline; state updates only when the column delta changes) ---
+  const dragRef = useRef<DragState | null>(null);
+  const live = useRef({ tasks, minDay, maxDay, onUpdateTasks });
+  live.current = { tasks, minDay, maxDay, onUpdateTasks };
+
+  const handlePointerDown = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>, task: Task, type: "move" | "resize-right") => {
+      e.preventDefault();
+      e.stopPropagation();
+      e.currentTarget.setPointerCapture(e.pointerId);
+
+      const startDay = dayNumber(task.calcStart);
+      dragRef.current = {
+        taskId: task.id,
+        type,
+        startX: e.clientX,
+        startValue: type === "move" ? (startDay !== null ? startDay - live.current.minDay : 0) : task.duration,
+        baseline: live.current.tasks.map(stripCalculated),
+        lastDelta: 0,
+        moved: false,
+      };
+      setDraggingId(task.id);
+    },
+    []
+  );
+
+  const handlePointerMove = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    const drag = dragRef.current;
+    if (!drag) return;
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (e.buttons === 0) {
+      // pointer was released/cancelled elsewhere
+      dragRef.current = null;
+      setDraggingId(null);
+      return;
+    }
+
+    if (Math.abs(e.clientX - drag.startX) >= 3) drag.moved = true;
+
+    const delta = Math.round((e.clientX - drag.startX) / COL_W);
+    if (delta === drag.lastDelta) return;
+    drag.lastDelta = delta;
+
+    const { minDay: lo, maxDay: hi, onUpdateTasks: update } = live.current;
+    if (delta === 0) {
+      update(drag.baseline); // back at the starting column: restore the original plan exactly
+    } else if (drag.type === "move") {
+      const index = Math.max(0, Math.min(hi - lo, drag.startValue + delta));
+      update(applyMove(drag.baseline, drag.taskId, dayToStr(lo + index), delta));
+    } else {
+      update(applyResize(drag.baseline, drag.taskId, drag.startValue + delta));
+    }
+  }, []);
+
+  const handlePointerUp = useCallback((e: React.PointerEvent<HTMLDivElement>, task: Task) => {
+    const drag = dragRef.current;
+    if (!drag) return;
+    e.preventDefault();
+    e.stopPropagation();
+
+    try {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+    } catch {
+      /* capture already released */
+    }
+
+    const wasClick = !drag.moved;
+    dragRef.current = null;
+    setDraggingId(null);
+
+    // A short click opens the details, a drag changes the schedule
+    if (wasClick) setDetailTask(task);
+  }, []);
+
+  const expandColumn = useCallback(() => setColumnCollapsed(false), []);
+  const openDetail = useCallback((t: Task) => setDetailTask(t), []);
+
+  // --- Background: weekend stripes via CSS, holidays/weather as a few overlay blocks ---
+  const overlays = useMemo(() => {
+    const holidayCols: number[] = [];
+    for (const day of cal.holidays.keys()) if (day >= minDay && day <= maxDay) holidayCols.push(day - minDay);
+    const weather: { left: number; width: number }[] = [];
+    for (const [a, b] of cal.weatherRanges) {
+      const from = Math.max(a, minDay);
+      const to = Math.min(b, maxDay);
+      if (from <= to) weather.push({ left: (from - minDay) * COL_W, width: (to - from + 1) * COL_W });
+    }
+    return { holidayCols, weather };
+  }, [cal, minDay, maxDay]);
+
+  const weekendColor = "rgba(236,253,245,0.55)";
+  const gridBackground: React.CSSProperties = {
+    backgroundImage: [
+      `linear-gradient(to right, transparent ${COL_W - 1}px, rgba(226,232,240,0.6) ${COL_W - 1}px)`,
+      `linear-gradient(to right, ${weekendColor} 0, ${weekendColor} ${COL_W}px, transparent ${COL_W}px, transparent ${COL_W * 6}px, ${weekendColor} ${COL_W * 6}px)`,
+    ].join(", "),
+    backgroundSize: `${COL_W}px 100%, ${COL_W * 7}px 100%`,
+    backgroundPosition: `0 0, ${-weekdayOf(minDay) * COL_W}px 0`,
+    backgroundRepeat: "repeat-x",
+  };
+
+  // --- Export ---
+  const handleExport = () => {
+    let scopeLabel = "Hele projektet";
+    if (filterScope === "stage") {
+      const stage = stageById.get(selectedStageId);
+      scopeLabel = stage ? `Etape: ${stage.name}` : "Valgt Etape";
+    } else if (filterScope === "month" && selectedMonthStr) {
+      const found = availableMonths.find((m) => m.val === selectedMonthStr);
+      scopeLabel = found ? `Måned: ${found.label}` : selectedMonthStr;
+    } else if (filterScope === "year") {
+      scopeLabel = `År: ${selectedYearVal}`;
+    }
+    exportFullGantt({ allTasks: tasks, tasks: visibleTasks, stages: visibleStages, trades, cal, minDay, maxDay, scopeLabel });
+  };
+
+  if (scheduled.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center p-12 text-center bg-white rounded-xl shadow-xs border border-slate-100">
+        <Calendar className="w-12 h-12 text-slate-300 mb-3" />
+        <h3 className="text-base font-semibold text-slate-700">Tidsplanen er tom</h3>
+        <p className="text-slate-500 text-sm max-w-sm mt-1">
+          Opret opgaver i fanen 📋 <strong>Opgaver</strong> og angiv en startdato for at se Gantt-diagrammet her.
+        </p>
+      </div>
+    );
+  }
+
+  const firstCol = Math.min(win.firstCol, Math.max(0, days - 1));
+  const lastCol = Math.min(win.lastCol, days - 1);
+  const firstRow = Math.min(win.firstRow, Math.max(0, rowCount - 1));
+  const lastRow = Math.min(win.lastRow, rowCount - 1);
+
+  const headerCells: React.ReactNode[] = [];
+  for (let idx = firstCol; idx <= lastCol; idx++) {
+    const day = minDay + idx;
+    const date = new Date(day * 86_400_000); // UTC-based, read with getUTC*
+    const dateStr = dayToStr(day);
+    const isWe = isWeekendDay(day);
+    const isHol = cal.isHoliday(day);
+    const holidayName = cal.holidays.get(day);
+    const isWeather = cal.isWeatherDay(day);
+    const foundWeather = isWeather ? weatherDelays.find((wd) => dateStr >= wd.startDate && dateStr <= wd.endDate) : undefined;
+
+    headerCells.push(
+      <div
+        key={day}
+        onClick={() => setSelectedDay(dateStr)}
+        title={`${new Date(`${dateStr}T12:00:00`).toLocaleDateString("da-DK", { weekday: "long", day: "numeric", month: "long" })}${
+          isHol && holidayName ? `\nLukkedag: ${holidayName}` : ""
+        }${foundWeather ? `\nUvejr/Arbejdsstop: ${foundWeather.label}` : ""}\n\nKlik for at tilføje/fjerne helligdag eller uvejr!`}
+        style={{ width: `${COL_W}px` }}
+        className={`relative shrink-0 h-full border-r border-slate-250 text-center flex flex-col items-center justify-center py-2 cursor-pointer transition hover:bg-slate-200 hover:brightness-105 active:scale-95 ${
+          isHol ? "bg-purple-100/95 font-extrabold text-purple-950" : isWeather ? "bg-sky-100/95 font-extrabold text-sky-950" : isWe ? "bg-emerald-50/70" : "bg-slate-50"
+        }`}
+      >
+        {isHol && <div className="absolute top-0 inset-x-0 h-1 bg-purple-500" />}
+        {isWeather && <div className="absolute top-0 inset-x-0 h-1 bg-sky-500" />}
+        {isWe && !isHol && !isWeather && <div className="absolute top-0 inset-x-0 h-1 bg-emerald-400" />}
+
+        <span className="text-[8.5px] uppercase font-black text-slate-400 select-none">{MONTHS_SHORT[date.getUTCMonth()]}</span>
+        <div className="flex items-center gap-0.5 mt-0.5 select-none font-black">
+          <span className={`text-[12px] font-black ${isWe || isHol || isWeather ? "text-slate-900" : "text-slate-800"}`}>
+            {date.getUTCDate()}
+          </span>
+          {isHol && <span className="text-[10px]" title={holidayName || "Lukkedag"}>🇩🇰</span>}
+          {isWeather && <span className="text-[10px]" title={foundWeather?.label}>❄️</span>}
+        </div>
+      </div>
+    );
+  }
+
+  const rows: React.ReactNode[] = [];
+  for (let r = firstRow; r <= lastRow; r++) {
+    const top = r * ROW_H;
+    if (r < visibleStages.length) {
+      const stage = visibleStages[r];
+      rows.push(
+        <GanttStageRow
+          key={`s-${stage.id}`}
+          stage={stage}
+          top={top}
+          totalWidth={totalWidth}
+          timelineWidth={timelineWidth}
+          columnCollapsed={columnCollapsed}
+          minDay={minDay}
+          maxDay={maxDay}
+        />
+      );
+    } else {
+      const task = visibleTasks[r - visibleStages.length];
+      rows.push(
+        <GanttTaskRow
+          key={task.id}
+          task={task}
+          number={taskNumber.get(task.id) ?? 0}
+          top={top}
+          totalWidth={totalWidth}
+          timelineWidth={timelineWidth}
+          columnCollapsed={columnCollapsed}
+          minDay={minDay}
+          maxDay={maxDay}
+          cal={cal}
+          tradeById={tradeById}
+          stageById={stageById}
+          isDragging={draggingId === task.id}
+          onOpenDetail={openDetail}
+          onExpandColumn={expandColumn}
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={handlePointerUp}
+        />
+      );
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-4">
+      {/* Visningsfilter og Printstyring Kontrolbar */}
+      <div className="flex flex-wrap items-center justify-between gap-4 bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
+        <div className="flex flex-wrap items-center gap-4">
+          <div className="flex items-center gap-1.5 text-xs font-black text-slate-700">
+            <SlidersHorizontal className="w-4 h-4 text-sky-500 shrink-0" />
+            <span>Fokusområde:</span>
+          </div>
+          
+          <div className="flex bg-slate-100 p-1 rounded-lg border border-slate-200">
+            <button
+              type="button"
+              onClick={() => setFilterScope("all")}
+              className={`px-3 py-1.5 text-xs font-extrabold rounded-md transition ${
+                filterScope === "all" ? "bg-white text-sky-700 shadow-xs" : "text-slate-500 hover:text-slate-800"
+              }`}
+            >
+              Hele projektet
+            </button>
+            <button
+              type="button"
+              onClick={() => setFilterScope("stage")}
+              className={`px-3 py-1.5 text-xs font-extrabold rounded-md transition ${
+                filterScope === "stage" ? "bg-white text-sky-700 shadow-xs" : "text-slate-500 hover:text-slate-800"
+              }`}
+            >
+              Etape
+            </button>
+            <button
+              type="button"
+              onClick={() => setFilterScope("month")}
+              className={`px-3 py-1.5 text-xs font-extrabold rounded-md transition ${
+                filterScope === "month" ? "bg-white text-sky-700 shadow-xs" : "text-slate-500 hover:text-slate-800"
+              }`}
+            >
+              Måned
+            </button>
+            <button
+              type="button"
+              onClick={() => setFilterScope("year")}
+              className={`px-3 py-1.5 text-xs font-extrabold rounded-md transition ${
+                filterScope === "year" ? "bg-white text-sky-700 shadow-xs" : "text-slate-500 hover:text-slate-800"
+              }`}
+            >
+              År
+            </button>
+          </div>
+
+          {/* Conditional Sub-selectors based on focusing choice */}
+          {filterScope === "stage" && stages && stages.length > 0 && (
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wide">Etape:</span>
+              <select
+                value={selectedStageId}
+                onChange={(e) => setSelectedStageId(e.target.value)}
+                className="p-1.5 px-3 rounded-lg border border-slate-200 text-xs font-black bg-slate-50 hover:bg-slate-100 text-slate-705 cursor-pointer focus:outline-sky-500 transition-all shadow-2xs"
+              >
+                {stages.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {filterScope === "month" && availableMonths.length > 0 && (
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wide">Måned:</span>
+              <select
+                value={selectedMonthStr}
+                onChange={(e) => setSelectedMonthStr(e.target.value)}
+                className="p-1.5 px-3 rounded-lg border border-slate-200 text-xs font-black bg-slate-50 hover:bg-slate-100 text-slate-705 cursor-pointer focus:outline-sky-500 transition-all shadow-2xs"
+              >
+                {availableMonths.map((m) => (
+                  <option key={m.val} value={m.val}>
+                    {m.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {filterScope === "year" && availableYears.length > 0 && (
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wide">År:</span>
+              <select
+                value={selectedYearVal}
+                onChange={(e) => setSelectedYearVal(Number(e.target.value))}
+                className="p-1.5 px-3 rounded-lg border border-slate-200 text-xs font-black bg-slate-50 hover:bg-slate-100 text-slate-705 cursor-pointer focus:outline-sky-500 transition-all shadow-2xs"
+              >
+                {availableYears.map((yr) => (
+                  <option key={yr} value={yr}>
+                    {yr}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+        </div>
+
+        <button
+          onClick={handleExport}
+          className="px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white font-extrabold text-xs rounded-xl shadow-sm border-0 transition active:scale-95 flex items-center gap-2 cursor-pointer transition-all"
+        >
+          <FolderDown className="w-4 h-4" />
+          <span>Hent fuld tidsplan (HTML/PDF)</span>
+        </button>
+      </div>
+
+      {/* Dynamic Instruction & Action notice */}
+      <div className="flex justify-between items-center bg-sky-50/50 p-3 px-4 rounded-xl border border-sky-100/70 shadow-2xs">
+        <div className="flex items-center gap-2 text-[11px] md:text-xs font-semibold text-sky-700/80 leading-tight">
+          <Zap className="w-4 h-4 text-sky-500 animate-pulse shrink-0" />
+          <span>
+            <strong>Gestus:</strong> Træk tidslinjen for at rykke opgaver eller forlænge varigheden. Visningsfilteret herover beskærer også din HTML/PDF-dokumentation automatisk!
+          </span>
+        </div>
+      </div>
+
+      {/* Main Gantt scroll wrapper (scrolls in both directions; only nearby rows/columns are rendered) */}
+      <div
+        ref={scrollRef}
+        onScroll={handleScroll}
+        style={{ maxHeight: "72vh" }}
+        className="w-full overflow-auto border border-slate-200 rounded-xl bg-slate-50 shadow-xs relative"
+      >
+        <div style={{ width: `${totalWidth}px` }} className="flex flex-col select-none bg-white relative">
+          {/* Header row */}
+          <div style={{ height: HEADER_H }} className="flex border-b border-slate-200 bg-slate-100 sticky top-0 z-30">
+            {columnCollapsed ? (
+              <div className="w-11 shrink-0 sticky left-0 z-40 bg-slate-100 border-r border-slate-250 text-slate-650 p-1 flex items-center justify-center shadow-xs">
+                <button
+                  onClick={() => setColumnCollapsed(false)}
+                  className="p-1 text-slate-500 hover:text-slate-800 rounded hover:bg-slate-200 transition cursor-pointer"
+                  title="Vis opgavekolonne"
+                >
+                  <ChevronRight className="w-4 h-4 shrink-0" />
+                </button>
+              </div>
+            ) : (
+              <div className="w-52 shrink-0 sticky left-0 z-40 bg-slate-100 border-r border-slate-250 text-slate-800 px-3.5 py-3 text-xs font-black uppercase tracking-wider flex items-center justify-between shadow-xs">
+                <span>Opgave</span>
+                <button
+                  onClick={() => setColumnCollapsed(true)}
+                  className="p-1 text-slate-500 hover:text-slate-800 rounded hover:bg-slate-200 transition cursor-pointer"
+                  title="Skjul opgavekolonne"
+                >
+                  <ChevronLeft className="w-4 h-4 shrink-0" />
+                </button>
+              </div>
+            )}
+
+            <div style={{ width: timelineWidth }} className="shrink-0 bg-slate-50 overflow-hidden">
+              <div className="flex h-full" style={{ marginLeft: firstCol * COL_W }}>
+                {headerCells}
+              </div>
+            </div>
+          </div>
+
+          {/* Body: one shared background layer + absolutely positioned visible rows */}
+          <div style={{ height: rowCount * ROW_H }} className="relative">
+            <div style={{ left: labelW, width: timelineWidth, ...gridBackground }} className="absolute inset-y-0 pointer-events-none">
+              {overlays.holidayCols.map((col) => (
+                <div
+                  key={`h${col}`}
+                  style={{ left: col * COL_W, width: COL_W }}
+                  className="absolute inset-y-0 bg-purple-50/90 border-l border-l-purple-200/40"
+                />
+              ))}
+              {overlays.weather.map((w) => (
+                <div key={`w${w.left}`} style={{ left: w.left, width: w.width }} className="absolute inset-y-0 bg-sky-100/40" />
+              ))}
+            </div>
+            {rows}
+          </div>
+        </div>
+      </div>
+
+      {/* Visual Color Codes Footer Legend */}
+      <div className="flex flex-wrap gap-x-5 gap-y-2.5 text-[11px] font-bold text-slate-500 mt-2 p-3 bg-slate-50 rounded-lg border border-slate-200/55 select-none md:items-center">
+        <div className="flex items-center gap-1.5">
+          <span className="w-3.5 h-3.5 rounded bg-amber-500/10 border border-amber-300 flex items-center justify-center text-[9px] shrink-0">💡</span>
+          <span>Tip: Træk bjælken for at rykke startdato. Træk i højre kant for at forlænge varigheden.</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="w-3 h-3 rounded bg-emerald-50 border border-emerald-100 shrink-0" />
+          <span>Weekend (lør-søn)</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="w-3 h-3 rounded bg-purple-100 border border-purple-200 shrink-0" />
+          <span>Helligdag</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="w-3.5 h-3.5 bg-sky-100 border border-sky-200/60 rounded flex items-center justify-center text-[8px] tracking-none shrink-0">❄️</span>
+          <span>Vejrspildsdag (Arbejdsstop)</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <div className="w-3 h-3 rotate-45 bg-amber-500 border border-white shadow-2xs shrink-0" />
+          <span>Milepæl (Vigtigt kontrolpunkt)</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <div className="w-5 h-3.5 bg-slate-400 border border-slate-500 relative rounded overflow-hidden shrink-0">
+            <div className="absolute inset-y-0 left-0 w-1/2 bg-black/25" />
+          </div>
+          <span>Færdiggørelsesgrad (mørk skygge)</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="w-3.5 h-3.5 rounded border border-red-200 bg-red-50 flex items-center justify-center shadow-3xs text-red-500 shrink-0">
+            <Flame className="w-2.5 h-2.5 text-red-500 fill-red-500" />
+          </span>
+          <span className="font-extrabold text-red-650">Kritisk Vej (Forsinkelse her skubber hele projektets slutdato)</span>
+        </div>
+      </div>
+
+      {selectedDay && (
+        <DayActionModal
+          key={selectedDay}
+          date={selectedDay}
+          holidays={holidays}
+          weatherDelays={weatherDelays}
+          onAddHoliday={onAddHoliday}
+          onDeleteHoliday={onDeleteHoliday}
+          onAddWeatherDelay={onAddWeatherDelay}
+          onDeleteWeatherDelay={onDeleteWeatherDelay}
+          onClose={() => setSelectedDay(null)}
+        />
+      )}
+
+      {detailTask && (
+        <TaskDetailModal task={detailTask} tradeById={tradeById} onEdit={onEditTask} onClose={() => setDetailTask(null)} />
+      )}
+    </div>
+  );
+}

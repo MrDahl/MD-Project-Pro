@@ -1,60 +1,125 @@
-import { Task, Trade, Settings, Stage, WeatherDelay, Holiday } from "../types";
+import type { Task, Trade, Settings, Stage, WeatherDelay, Holiday } from "../types.ts";
 
-// Helper to construct dates at 12:00 to avoid daylight savings drift
-export function createSafeDate(dateStr: string): Date {
-  return new Date(`${dateStr}T12:00:00`);
+/*
+ * Dates are handled internally as "day numbers" (whole days since 1970-01-01, UTC).
+ * That avoids Date allocation and daylight-saving drift in the hot loops.
+ */
+const MS_PER_DAY = 86_400_000;
+
+/** "YYYY-MM-DD" -> day number, or null if the string is not a valid calendar date. */
+export function dayNumber(dateStr: string | null | undefined): number | null {
+  if (!dateStr || dateStr.length < 10) return null;
+  const y = Number(dateStr.slice(0, 4));
+  const m = Number(dateStr.slice(5, 7));
+  const d = Number(dateStr.slice(8, 10));
+  if (!Number.isInteger(y) || !Number.isInteger(m) || !Number.isInteger(d)) return null;
+  const n = Math.floor(Date.UTC(y, m - 1, d) / MS_PER_DAY);
+  return Number.isNaN(n) || dayToStr(n) !== dateStr.slice(0, 10) ? null : n;
 }
 
-export function toDateStr(dateObj: Date): string {
-  const y = dateObj.getFullYear();
-  const m = String(dateObj.getMonth() + 1).padStart(2, "0");
-  const d = String(dateObj.getDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
+/** Day number -> "YYYY-MM-DD". */
+export function dayToStr(day: number): string {
+  return new Date(day * MS_PER_DAY).toISOString().slice(0, 10);
 }
 
-export function isWorkingDay(dateObj: Date, allowWeekend: boolean, allowHoliday: boolean, holidays: string[]): boolean {
-  const dateStr = toDateStr(dateObj);
-  const dayOfWeek = dateObj.getDay(); // 0 = Sunday, 6 = Saturday
-  const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
-  const isHoliday = holidays.includes(dateStr);
-
-  if (isHoliday && !allowHoliday) return false;
-  if (isWeekend && !allowWeekend) return false;
-
-  return true;
+/** 0 = Sunday ... 6 = Saturday. */
+export function weekdayOf(day: number): number {
+  return (((day + 4) % 7) + 7) % 7;
 }
 
-export function isWeatherDelayDay(dateObj: Date, weatherDelays: WeatherDelay[] = []): boolean {
-  const dateStr = toDateStr(dateObj);
-  return weatherDelays.some(delay => dateStr >= delay.startDate && dateStr <= delay.endDate);
+export function isWeekendDay(day: number): boolean {
+  const w = weekdayOf(day);
+  return w === 0 || w === 6;
 }
 
-export function detectCycle(tasks: Task[]): boolean {
-  const adjMap = new Map<string, string | null>();
-  tasks.forEach((t) => adjMap.set(t.id, t.dependencyId));
+/** Fast day lookups for holidays and weather delays. Build once per calculation/render. */
+export interface Calendar {
+  holidays: Map<number, string>;
+  /** Merged, sorted [firstDay, lastDay] intervals of weather delays. */
+  weatherRanges: [number, number][];
+  isHoliday(day: number): boolean;
+  isWeatherDay(day: number): boolean;
+  /** Weekend/holiday rules only (weather is handled by the caller). */
+  isWorkingDay(day: number, allowWeekend: boolean, allowHoliday: boolean): boolean;
+}
 
-  const visited = new Set<string>();
-  const recStack = new Set<string>();
-
-  function isCyclic(taskId: string | null): boolean {
-    if (!taskId) return false;
-    if (recStack.has(taskId)) return true;
-    if (visited.has(taskId)) return false;
-
-    visited.add(taskId);
-    recStack.add(taskId);
-
-    const parentId = adjMap.get(taskId) || null;
-    if (parentId && isCyclic(parentId)) return true;
-
-    recStack.delete(taskId);
-    return false;
+export function buildCalendar(holidays: Holiday[] = [], weatherDelays: WeatherDelay[] = []): Calendar {
+  const holidayMap = new Map<number, string>();
+  for (const h of holidays) {
+    if (!h) continue;
+    const date = typeof h === "string" ? (h as string) : h.date;
+    const day = dayNumber(date);
+    if (day !== null && !holidayMap.has(day)) holidayMap.set(day, typeof h === "string" ? "" : h.name);
   }
 
-  for (const task of tasks) {
-    if (isCyclic(task.id)) return true;
+  // Merge weather delay ranges into sorted, non-overlapping intervals for binary search.
+  const ranges: [number, number][] = [];
+  for (const w of weatherDelays) {
+    const s = dayNumber(w.startDate);
+    const e = dayNumber(w.endDate);
+    if (s !== null && e !== null && s <= e) ranges.push([s, e]);
+  }
+  ranges.sort((a, b) => a[0] - b[0]);
+  const merged: [number, number][] = [];
+  for (const r of ranges) {
+    const last = merged[merged.length - 1];
+    if (last && r[0] <= last[1] + 1) last[1] = Math.max(last[1], r[1]);
+    else merged.push([r[0], r[1]]);
+  }
+
+  const isWeatherDay = (day: number): boolean => {
+    let lo = 0;
+    let hi = merged.length - 1;
+    while (lo <= hi) {
+      const mid = (lo + hi) >> 1;
+      if (day < merged[mid][0]) hi = mid - 1;
+      else if (day > merged[mid][1]) lo = mid + 1;
+      else return true;
+    }
+    return false;
+  };
+
+  return {
+    holidays: holidayMap,
+    weatherRanges: merged,
+    isHoliday: (day) => holidayMap.has(day),
+    isWeatherDay,
+    isWorkingDay: (day, allowWeekend, allowHoliday) => {
+      if (!allowHoliday && holidayMap.has(day)) return false;
+      if (!allowWeekend && isWeekendDay(day)) return false;
+      return true;
+    },
+  };
+}
+
+/** True if the dependency chain contains a loop (iterative, safe for very long chains). */
+export function detectCycle(tasks: Task[]): boolean {
+  const parentOf = new Map<string, string | null>();
+  for (const t of tasks) parentOf.set(t.id, t.dependencyId);
+
+  // 0/undefined = unvisited, 1 = on the current path, 2 = fully checked
+  const state = new Map<string, 1 | 2>();
+
+  for (const t of tasks) {
+    const path: string[] = [];
+    let cur: string | null | undefined = t.id;
+    while (cur && !state.has(cur)) {
+      state.set(cur, 1);
+      path.push(cur);
+      cur = parentOf.get(cur) || null;
+    }
+    if (cur && state.get(cur) === 1) return true;
+    for (const id of path) state.set(id, 2);
   }
   return false;
+}
+
+export interface ScheduleResult {
+  tasks: Task[];
+  projectEndDate: string | null;
+  projectTotalCost: number;
+  scheduleError: string | null;
+  startDateWarning: string | null;
 }
 
 export function calculateSchedule(
@@ -65,23 +130,11 @@ export function calculateSchedule(
   projectStartDate: string,
   stagesInput: Stage[] = [],
   weatherDelays: WeatherDelay[] = []
-): {
-  tasks: Task[];
-  projectEndDate: string | null;
-  projectTotalCost: number;
-  scheduleError: string | null;
-  startDateWarning: string | null;
-} {
-  let scheduleError: string | null = null;
+): ScheduleResult {
   let startDateWarning: string | null = null;
 
-  // Convert named Holiday array to simple string date array for back-compatibility
-  const holidayDates = (holidays || [])
-    .map((h) => h ? (typeof h === "string" ? h : h.date) : "")
-    .filter(Boolean);
-
-  // Clear previous metrics
-  const tasks = tasksInput.map((t) => ({
+  // Fresh copies with cleared metrics
+  const tasks: Task[] = tasksInput.map((t) => ({
     ...t,
     calcStart: null,
     calcEnd: null,
@@ -92,36 +145,31 @@ export function calculateSchedule(
   }));
 
   if (tasks.length === 0) {
-    return {
-      tasks,
-      projectEndDate: null,
-      projectTotalCost: 0,
-      scheduleError,
-      startDateWarning,
-    };
+    return { tasks, projectEndDate: null, projectTotalCost: 0, scheduleError: null, startDateWarning };
   }
 
-  // Detect circular dependency loops
   if (detectCycle(tasks)) {
     return {
       tasks,
       projectEndDate: null,
       projectTotalCost: 0,
-      scheduleError: "Rundgang / Cyklus opdaget: Nogle opgaver afhænger af hinanden i en lukket cirkel. Fjern afhængighederne for at beregne.",
+      scheduleError:
+        "Rundgang / Cyklus opdaget: Nogle opgaver afhænger af hinanden i en lukket cirkel. Fjern afhængighederne for at beregne.",
       startDateWarning,
     };
   }
 
-  // Find the earliest start date specified among tasks or fallback to global settings
-  const manualStarts = tasks
-    .filter((t) => !t.isRecurring)
-    .map((t) => t.manualStart)
-    .filter((ms): ms is string => !!ms)
-    .sort();
-  const earliestTaskStart = manualStarts.length > 0 ? manualStarts[0] : null;
+  const nonRecurringTasks = tasks.filter((t) => !t.isRecurring);
+
+  // Earliest manual start among regular tasks, or fall back to the project start date
+  let earliestTaskStart: string | null = null;
+  for (const t of nonRecurringTasks) {
+    if (t.manualStart && (earliestTaskStart === null || t.manualStart < earliestTaskStart)) {
+      earliestTaskStart = t.manualStart;
+    }
+  }
 
   let effectiveStartDate = projectStartDate;
-
   if (effectiveStartDate) {
     if (earliestTaskStart && earliestTaskStart < effectiveStartDate) {
       startDateWarning = `Bemærk: Mindst én opgave har en startdato (${earliestTaskStart}), der ligger før projektets startdato (${effectiveStartDate}).`;
@@ -129,7 +177,6 @@ export function calculateSchedule(
   } else if (earliestTaskStart) {
     effectiveStartDate = earliestTaskStart;
   } else {
-    // No start date found anywhere => return uncalculated tasks
     return {
       tasks,
       projectEndDate: null,
@@ -139,187 +186,137 @@ export function calculateSchedule(
     };
   }
 
-  // Filter tasks: non-recurring scheduled with normal dependencies
-  const nonRecurringTasks = tasks.filter((t) => !t.isRecurring);
+  const cal = buildCalendar(holidays, weatherDelays);
+  const effectiveStartDay = dayNumber(effectiveStartDate);
 
-  // Iterative push-right algorithm
-  let iterations = 0;
-  const maxIterations = Math.max(1, nonRecurringTasks.length * 2);
-  let changed = true;
+  // Lookups (first match wins, like Array.find)
+  const tradeById = new Map<string, Trade>();
+  for (const tr of trades) if (!tradeById.has(tr.id)) tradeById.set(tr.id, tr);
+  const taskById = new Map<string, Task>();
+  for (const t of nonRecurringTasks) if (!taskById.has(t.id)) taskById.set(t.id, t);
 
-  while (changed && iterations < maxIterations) {
-    changed = false;
+  // Predecessor must be a regular task; links to recurring/unknown tasks are ignored
+  const predecessorOf = (t: Task): Task | undefined => (t.dependencyId ? taskById.get(t.dependencyId) : undefined);
 
-    for (const task of nonRecurringTasks) {
-      let expectedStart = createSafeDate(effectiveStartDate);
-      let depStart: Date | null = null;
-      let manStart: Date | null = null;
+  // End day per task (aligned with the task objects)
+  const endDay = new Map<Task, number>();
 
-      if (task.dependencyId) {
-        const depTask = nonRecurringTasks.find((t) => t.id === task.dependencyId);
-        if (depTask && depTask.calcEnd) {
-          depStart = createSafeDate(depTask.calcEnd);
-          depStart.setDate(depStart.getDate() + 1); // Starts the next solar day
-        }
-      }
+  // Process predecessors before successors (no cycles at this point)
+  const processed = new Set<Task>();
+  const order: Task[] = [];
+  for (const t of nonRecurringTasks) {
+    const chain: Task[] = [];
+    let cur: Task | undefined = t;
+    while (cur && !processed.has(cur)) {
+      processed.add(cur);
+      chain.push(cur);
+      cur = predecessorOf(cur);
+    }
+    for (let i = chain.length - 1; i >= 0; i--) order.push(chain[i]);
+  }
 
-      if (task.manualStart) {
-        manStart = createSafeDate(task.manualStart);
-      }
+  const hours = settings.workHoursPerDay;
 
-      // Schedulers priority logic
-      if (depStart && manStart) {
-        expectedStart = new Date(Math.max(depStart.getTime(), manStart.getTime()));
-      } else if (manStart) {
-        expectedStart = manStart;
-      } else if (depStart) {
-        expectedStart = depStart;
-      }
+  for (const task of order) {
+    let depStart: number | null = null;
+    const pred = predecessorOf(task);
+    if (pred && endDay.has(pred)) depStart = endDay.get(pred)! + 1; // next calendar day
 
-      // Skip non-working days & weather delays for start date
-      while (
-        !isWorkingDay(expectedStart, task.allowWeekend, task.allowHoliday, holidayDates) ||
-        (!task.weatherIndependent && isWeatherDelayDay(expectedStart, weatherDelays))
-      ) {
-        expectedStart.setDate(expectedStart.getDate() + 1);
-      }
+    const manStart = task.manualStart ? dayNumber(task.manualStart) : null;
 
-      let expectedEnd = createSafeDate(toDateStr(expectedStart));
-      let taskCost = 0;
-      const tradeCostsTracker: { [tid: string]: number } = {};
+    let start = effectiveStartDay ?? 0;
+    if (depStart !== null && manStart !== null) start = Math.max(depStart, manStart);
+    else if (manStart !== null) start = manStart;
+    else if (depStart !== null) start = depStart;
 
+    const weatherSensitive = !task.weatherIndependent;
+    const canWork = (day: number) =>
+      cal.isWorkingDay(day, task.allowWeekend, task.allowHoliday) && (!weatherSensitive || !cal.isWeatherDay(day));
+
+    while (!canWork(start)) start++;
+
+    let end = start;
+    let taskCost = 0;
+    const tradeCosts: { [tid: string]: number } = {};
+
+    if (!task.isMilestone) {
       const activeTrades = (task.tradeIds || [])
-        .map((tid) => trades.find((tr) => tr.id === tid))
+        .map((tid) => tradeById.get(tid))
         .filter((tr): tr is Trade => !!tr);
 
-      const getDayCost = (dObj: Date, tr: Trade): number => {
-        if (tr.isFixedPrice) return 0; // Handled separately
-        let cost = settings.workHoursPerDay * tr.rate;
-        const dayOfWeek = dObj.getDay();
-        const isWe = dayOfWeek === 0 || dayOfWeek === 6;
-        const isHol = holidayDates.includes(toDateStr(dObj));
-
-        if (isHol) {
-          cost += cost * (tr.holidaySupplement / 100);
-        } else if (isWe) {
-          cost += cost * (tr.weekendSupplement / 100);
-        }
+      const dayCost = (day: number, tr: Trade): number => {
+        let cost = hours * tr.rate;
+        if (cal.isHoliday(day)) cost += cost * (tr.holidaySupplement / 100);
+        else if (isWeekendDay(day)) cost += cost * (tr.weekendSupplement / 100);
         return cost;
       };
 
-      if (task.isMilestone) {
-        // Milestones take 0 active working days and incur 0 cost
-        expectedEnd = createSafeDate(toDateStr(expectedStart));
-        taskCost = 0;
-      } else {
-        // Set baseline day costs for first day
-        activeTrades.forEach((tr) => {
-          tradeCostsTracker[tr.id] = tr.isFixedPrice ? tr.rate : getDayCost(expectedStart, tr);
-        });
+      for (const tr of activeTrades) tradeCosts[tr.id] = tr.isFixedPrice ? tr.rate : dayCost(start, tr);
 
-        // Advance dates to satisfy the duration (duration is in days)
-        let daysAllocated = 1;
-        while (daysAllocated < task.duration) {
-          expectedEnd.setDate(expectedEnd.getDate() + 1);
-
-          if (
-            isWorkingDay(expectedEnd, task.allowWeekend, task.allowHoliday, holidayDates) &&
-            (task.weatherIndependent || !isWeatherDelayDay(expectedEnd, weatherDelays))
-          ) {
-            daysAllocated++;
-            activeTrades.forEach((tr) => {
-              if (!tr.isFixedPrice) {
-                tradeCostsTracker[tr.id] = (tradeCostsTracker[tr.id] || 0) + getDayCost(expectedEnd, tr);
-              }
-            });
+      let allocated = 1;
+      while (allocated < task.duration) {
+        end++;
+        if (canWork(end)) {
+          allocated++;
+          for (const tr of activeTrades) {
+            if (!tr.isFixedPrice) tradeCosts[tr.id] = (tradeCosts[tr.id] || 0) + dayCost(end, tr);
           }
-        }
-
-        // Add fixed-price trades as well
-        activeTrades.forEach((tr) => {
-          if (tr.isFixedPrice) {
-            tradeCostsTracker[tr.id] = tr.rate; // Flat fixed rate
-          }
-        });
-
-        for (const tid in tradeCostsTracker) {
-          taskCost += tradeCostsTracker[tid];
         }
       }
 
-      const startStr = toDateStr(expectedStart);
-      const endStr = toDateStr(expectedEnd);
-
-      if (
-        task.calcStart !== startStr ||
-        task.calcEnd !== endStr ||
-        task.calcCost !== taskCost ||
-        JSON.stringify(task.tradeCosts) !== JSON.stringify(tradeCostsTracker)
-      ) {
-        task.calcStart = startStr;
-        task.calcEnd = endStr;
-        task.calcCost = taskCost;
-        task.tradeCosts = tradeCostsTracker;
-        changed = true;
-      }
+      for (const tr of activeTrades) if (tr.isFixedPrice) tradeCosts[tr.id] = tr.rate;
+      for (const tid in tradeCosts) taskCost += tradeCosts[tid];
     }
-    iterations++;
+
+    endDay.set(task, end);
+    task.calcStart = dayToStr(start);
+    task.calcEnd = dayToStr(end);
+    task.calcCost = taskCost;
+    task.tradeCosts = tradeCosts;
   }
 
-  // Calculate project end date from non-recurring tasks
+  // Project end = latest end among regular tasks
   let maxEndDate: string | null = null;
-  nonRecurringTasks.forEach((t) => {
-    if (t.calcEnd && (!maxEndDate || t.calcEnd > maxEndDate)) {
-      maxEndDate = t.calcEnd;
-    }
-  });
-
+  for (const t of nonRecurringTasks) {
+    if (t.calcEnd && (!maxEndDate || t.calcEnd > maxEndDate)) maxEndDate = t.calcEnd;
+  }
   const projectEndDate = maxEndDate || effectiveStartDate;
 
-  // Now calculate recurring tasks based on the project end date & chosen stages
-  const recurringTasks = tasks.filter((t) => t.isRecurring);
-  recurringTasks.forEach((task) => {
-    let rangeStart = task.manualStart || effectiveStartDate;
-    let rangeEnd = projectEndDate;
+  // Recurring tasks span the project (or chosen stages)
+  const projectEndDay = dayNumber(projectEndDate);
+  for (const task of tasks) {
+    if (!task.isRecurring) continue;
+
+    let rangeStart: string | null | undefined = task.manualStart || effectiveStartDate;
+    let rangeEnd: string | null | undefined = projectEndDate;
 
     if (task.recurringRangeType === "stages" && task.recurringStageIds && task.recurringStageIds.length > 0) {
-      const selectedStages = (stagesInput || []).filter((s) => task.recurringStageIds?.includes(s.id));
-      if (selectedStages.length > 0) {
-        // Range start is the minimum of stage start dates
-        const starts = selectedStages.map((s) => s.startDate).sort();
-        const ends = selectedStages.map((s) => s.endDate).sort();
+      const selected = (stagesInput || []).filter((s) => task.recurringStageIds?.includes(s.id));
+      if (selected.length > 0) {
+        const starts = selected.map((s) => s.startDate).sort();
+        const ends = selected.map((s) => s.endDate).sort();
         rangeStart = starts[0];
         rangeEnd = ends[ends.length - 1];
       }
     }
 
-    // Generate repeat occurrences at fixed intervals (recurringInterval)
     const occurrences: string[] = [];
-    const intervalDays = task.recurringInterval || 7;
-    
-    let curr = createSafeDate(rangeStart);
-    const stopDateVal = createSafeDate(rangeEnd).getTime();
+    const startDay = dayNumber(rangeStart);
+    const stopDay = rangeEnd === projectEndDate ? projectEndDay : dayNumber(rangeEnd);
 
-    // Prevent infinite loop if interval <= 0
-    const safeInterval = intervalDays > 0 ? intervalDays : 7;
-
-    while (curr.getTime() <= stopDateVal) {
-      const actual = new Date(curr);
-      
-      // Shift to next available work day if weekend/holiday is not permitted or weather delay is active
-      while (
-        !isWorkingDay(actual, task.allowWeekend, task.allowHoliday, holidayDates) ||
-        (!task.weatherIndependent && isWeatherDelayDay(actual, weatherDelays))
-      ) {
-        actual.setDate(actual.getDate() + 1);
+    if (startDay !== null && stopDay !== null) {
+      const interval = Math.max(1, Math.trunc(task.recurringInterval || 7) || 7);
+      const weatherSensitive = !task.weatherIndependent;
+      for (let curr = startDay; curr <= stopDay; curr += interval) {
+        let actual = curr;
+        while (
+          !cal.isWorkingDay(actual, task.allowWeekend, task.allowHoliday) ||
+          (weatherSensitive && cal.isWeatherDay(actual))
+        ) {
+          actual++;
+        }
+        if (actual <= stopDay) occurrences.push(dayToStr(actual));
       }
-
-      if (actual.getTime() <= stopDateVal) {
-        occurrences.push(toDateStr(actual));
-      }
-      
-      // Advance by original interval
-      curr.setDate(curr.getDate() + safeInterval);
     }
 
     task.occurrences = occurrences;
@@ -327,33 +324,21 @@ export function calculateSchedule(
     task.calcEnd = occurrences[occurrences.length - 1] || null;
     task.calcCost = occurrences.length * (task.recurringPrice || 0);
     task.tradeCosts = {};
-  });
+  }
 
-  const projectTotalCost = tasks.reduce((sum, t) => sum + (t.calcCost || 0), 0);
+  let projectTotalCost = 0;
+  for (const t of tasks) projectTotalCost += t.calcCost || 0;
 
-  // Trace the Critical Path for non-recurring tasks if maxEndDate exists
+  // Critical path: walk back from every task that ends on the project end date
   if (maxEndDate) {
-    const criticalTasksQueue = nonRecurringTasks.filter((t) => t.calcEnd === maxEndDate);
-    while (criticalTasksQueue.length > 0) {
-      const currentTask = criticalTasksQueue.pop();
-      if (currentTask) {
-        currentTask.isCritical = true;
-        if (currentTask.dependencyId) {
-          const dep = nonRecurringTasks.find((x) => x.id === currentTask.dependencyId);
-          if (dep && !dep.isCritical) {
-            criticalTasksQueue.push(dep);
-          }
-        }
-      }
+    const queue = nonRecurringTasks.filter((t) => t.calcEnd === maxEndDate);
+    while (queue.length > 0) {
+      const current = queue.pop()!;
+      current.isCritical = true;
+      const pred = predecessorOf(current);
+      if (pred && !pred.isCritical) queue.push(pred);
     }
   }
 
-  return {
-    tasks,
-    projectEndDate,
-    projectTotalCost,
-    scheduleError,
-    startDateWarning,
-  };
+  return { tasks, projectEndDate, projectTotalCost, scheduleError: null, startDateWarning };
 }
-

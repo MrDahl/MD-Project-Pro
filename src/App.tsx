@@ -1,13 +1,13 @@
-import React, { useState, useEffect } from "react";
+import React, { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AppData, Task, Trade, Settings, ProjectInfo, Stage, Holiday } from "./types";
 import { calculateSchedule } from "./utils/scheduler";
-import { GanttChart } from "./components/GanttChart";
-import { Glossary } from "./components/Glossary";
+import { danishHolidays, projectYears } from "./utils/holidays";
+import { indexBy } from "./components/gantt/model";
+import { GanttChart } from "./components/gantt/GanttChart";
+import { TaskCard } from "./components/TaskCard";
 import { TaskForm } from "./components/TaskForm";
 import { TradeForm } from "./components/TradeForm";
 import { ProjectSettings } from "./components/ProjectSettings";
-import { Wizard } from "./components/Wizard";
-import { motion, AnimatePresence } from "motion/react";
 import {
   FolderUp,
   FolderDown,
@@ -26,8 +26,14 @@ import {
   FolderKanban,
   Menu,
   X,
-  Flame,
 } from "lucide-react";
+
+// Rarely used views are loaded on demand to keep the first load small
+const Glossary = lazy(() => import("./components/Glossary").then((m) => ({ default: m.Glossary })));
+const Wizard = lazy(() => import("./components/Wizard").then((m) => ({ default: m.Wizard })));
+
+const STORAGE_KEY = "msProjectMobileData";
+const WIZARD_KEY = "msProjectWizardCompleted";
 
 // Initialize baseline project start data if custom local storage is empty
 const INITIAL_PROJECT_STATE: AppData = {
@@ -43,6 +49,57 @@ const INITIAL_PROJECT_STATE: AppData = {
   startDateWarning: null,
 };
 
+/** Reads the saved project (tolerating older formats) or falls back to a blank one. */
+function loadInitialState(): AppData {
+  let saved: string | null = null;
+  try {
+    saved = localStorage.getItem(STORAGE_KEY);
+  } catch {
+    /* storage unavailable */
+  }
+  if (!saved) return INITIAL_PROJECT_STATE;
+
+  try {
+    const parsed = JSON.parse(saved);
+
+    // Older versions stored holidays as plain date strings
+    const rawHolidays: unknown[] = Array.isArray(parsed.holidays) ? parsed.holidays : [];
+    const holidays: Holiday[] = rawHolidays
+      .map((h, idx) => {
+        const item = (typeof h === "string" ? { date: h } : h) as Partial<Holiday> | null;
+        return {
+          id: item?.id || `hol-norm-${idx}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+          date: item?.date || "",
+          name: item?.name || "Lukkedag / Ferie",
+        };
+      })
+      .filter((h) => h.date);
+
+    return {
+      startDate: parsed.startDate || INITIAL_PROJECT_STATE.startDate,
+      settings: parsed.settings || INITIAL_PROJECT_STATE.settings,
+      projectInfo: parsed.projectInfo || INITIAL_PROJECT_STATE.projectInfo,
+      holidays,
+      trades: parsed.trades || [],
+      tasks: parsed.tasks || [],
+      stages: parsed.stages || [],
+      weatherDelays: parsed.weatherDelays || [],
+      scheduleError: null,
+      startDateWarning: null,
+    };
+  } catch {
+    return INITIAL_PROJECT_STATE;
+  }
+}
+
+function saveState(state: AppData): void {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  } catch {
+    /* storage full or unavailable - the project can still be saved with "Gem" */
+  }
+}
+
 export default function App() {
   const [activeTab, setActiveTab2] = useState<
     "tidsplan" | "resources" | "budget" | "settings" | "glossary"
@@ -50,69 +107,17 @@ export default function App() {
 
   const [tidsplanView, setTidsplanView] = useState<"gantt" | "list">("gantt");
 
-  // Keep compatibility
-  const setActiveTab = (tab: string) => {
-    if (tab === "tasks") {
-      setActiveTab2("tidsplan");
-      setTidsplanView("list");
-    } else if (tab === "gantt") {
-      setActiveTab2("tidsplan");
-      setTidsplanView("gantt");
-    } else {
-      setActiveTab2(tab as any);
-    }
-  };
-
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [wizardOpen, setWizardOpen] = useState(() => {
     // Hvis der ikke tidligere er fuldført en wizard, åbnes den automatisk
-    return !localStorage.getItem("msProjectWizardCompleted");
-  });
-
-  const [appState, setAppState] = useState<AppData>(() => {
-    const saved = localStorage.getItem("msProjectMobileData");
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        
-        // Robust normalization of holidays
-        const rawHolidays = parsed.holidays || INITIAL_PROJECT_STATE.holidays;
-        const normalizedHolidays: Holiday[] = Array.isArray(rawHolidays)
-          ? rawHolidays.map((h: any, idx: number) => {
-              if (typeof h === "string") {
-                return {
-                  id: `hol-norm-${idx}-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
-                  date: h,
-                  name: "Lukkedag / Ferie"
-                };
-              }
-              return {
-                id: h?.id || `hol-norm-${idx}-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
-                date: h?.date || "",
-                name: h?.name || "Lukkedag / Ferie"
-              };
-            }).filter(h => h.date)
-          : [];
-
-        // Ensure standard object structure
-        return {
-          startDate: parsed.startDate || INITIAL_PROJECT_STATE.startDate,
-          settings: parsed.settings || INITIAL_PROJECT_STATE.settings,
-          projectInfo: parsed.projectInfo || INITIAL_PROJECT_STATE.projectInfo,
-          holidays: normalizedHolidays,
-          trades: parsed.trades || INITIAL_PROJECT_STATE.trades,
-          tasks: parsed.tasks || INITIAL_PROJECT_STATE.tasks,
-          stages: parsed.stages || INITIAL_PROJECT_STATE.stages || [],
-          weatherDelays: parsed.weatherDelays || INITIAL_PROJECT_STATE.weatherDelays || [],
-          scheduleError: null,
-          startDateWarning: null
-        };
-      } catch {
-        return INITIAL_PROJECT_STATE;
-      }
+    try {
+      return !localStorage.getItem(WIZARD_KEY);
+    } catch {
+      return true;
     }
-    return INITIAL_PROJECT_STATE;
   });
+
+  const [appState, setAppState] = useState<AppData>(loadInitialState);
 
   const handleWizardComplete = (completedData: {
     projectInfo: ProjectInfo;
@@ -131,7 +136,7 @@ export default function App() {
     }));
 
     if (completedData.includeDanishHolidays) {
-      const fallback = getFallbackDanishHolidays(year);
+      const fallback = danishHolidays(year);
       fallback.forEach((fH, fIdx) => {
         if (!formattedHolidays.some(h => h.date === fH.date)) {
           formattedHolidays.push({
@@ -157,7 +162,11 @@ export default function App() {
       scheduleError: null,
       startDateWarning: null,
     });
-    localStorage.setItem("msProjectWizardCompleted", "true");
+    try {
+      localStorage.setItem(WIZARD_KEY, "true");
+    } catch {
+      /* storage unavailable */
+    }
     setWizardOpen(false);
     triggerToast("Velkommen! Dit nye projekt er konfigureret med lukkedage.");
   };
@@ -166,149 +175,67 @@ export default function App() {
   const [editTradeId, setEditTradeId] = useState<string | null>(null);
   const [toastMsg, setToastMsg] = useState<string>("");
 
-  // Auto-calculated state variables cached via useEffect scheduler passes
-  const [calculatedTasks, setCalculatedTasks] = useState<Task[]>([]);
-  const [projectEndDate, setProjectEndDate] = useState<string | null>(null);
-  const [projectTotalCost, setProjectTotalCost] = useState<number>(0);
-  const [scheduleError, setScheduleError] = useState<string | null>(null);
-  const [startDateWarning, setStartDateWarning] = useState<string | null>(null);
+  // The schedule is derived data: recalculated only when something it depends on changes
+  // (typing in project info no longer triggers a full recalculation).
+  const { tasks: calculatedTasks, projectEndDate, projectTotalCost, scheduleError, startDateWarning } = useMemo(
+    () =>
+      calculateSchedule(
+        appState.tasks,
+        appState.trades,
+        appState.holidays,
+        appState.settings,
+        appState.startDate,
+        appState.stages || [],
+        appState.weatherDelays || []
+      ),
+    [appState.tasks, appState.trades, appState.holidays, appState.settings, appState.startDate, appState.stages, appState.weatherDelays]
+  );
 
-  // Synchronize Danish holidays automatically from Kalendarium API or calculation fallback for all years involved in the project
+  const tradeById = useMemo(() => indexBy(appState.trades), [appState.trades]);
+  const stageById = useMemo(() => indexBy(appState.stages || []), [appState.stages]);
+
+  // Keep Danish public holidays present for every calendar year the project touches
   useEffect(() => {
-    const startYear = parseInt(appState.startDate.split("-")[0]) || new Date().getFullYear();
-    const targetYears = [startYear];
-
-    // Read end date if available
-    if (projectEndDate) {
-      const endYear = parseInt(projectEndDate.split("-")[0]);
-      if (endYear && endYear > startYear) {
-        for (let y = startYear + 1; y <= endYear; y++) {
-          if (!targetYears.includes(y)) targetYears.push(y);
-        }
-      }
-    }
-
-    // Inspect any calculated task years to be safe
-    calculatedTasks.forEach((t) => {
-      if (t.calcStartDate) {
-        const y = parseInt(t.calcStartDate.split("-")[0]);
-        if (y && !targetYears.includes(y)) targetYears.push(y);
-      }
-      if (t.calcEndDate) {
-        const y = parseInt(t.calcEndDate.split("-")[0]);
-        if (y && !targetYears.includes(y)) targetYears.push(y);
-      }
-    });
-
-    const existingYears = new Set(
-      appState.holidays
-        .map((h) => h && typeof h === "object" ? h.date : String(h))
-        .filter(Boolean)
-        .map((dStr) => parseInt(dStr.split("-")[0]))
-        .filter(Boolean)
+    const missingYears = projectYears(appState.startDate, projectEndDate).filter(
+      (y) => !appState.holidays.some((h) => h.date.startsWith(String(y)))
     );
-
-    const missingYears = targetYears.filter((y) => !existingYears.has(y));
-
     if (missingYears.length === 0) return;
 
-    const syncHolidays = async () => {
-      try {
-        let fetchedHols: { id: string; date: string; name: string }[] = [];
-        try {
-          const response = await fetch("https://api.kalendarium.dk/v1/holidays");
-          if (response.ok) {
-            const raw = await response.json();
-            if (Array.isArray(raw)) {
-              missingYears.forEach((y) => {
-                const foundInRaw = raw
-                  .filter((item: any) => item.date && item.date.startsWith(String(y)))
-                  .map((item: any) => ({
-                    id: `hol-kal-${item.date}-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
-                    date: item.date,
-                    name: item.name || "Helligdag"
-                  }));
-                if (foundInRaw.length > 0) {
-                  fetchedHols.push(...foundInRaw);
-                } else {
-                  const fallback = getFallbackDanishHolidays(y);
-                  fetchedHols.push(...fallback.map((h, i) => ({
-                    id: `hol-fall-${y}-${i}-${Date.now()}`,
-                    date: h.date,
-                    name: h.name
-                  })));
-                }
-              });
-            }
-          }
-        } catch (fetchErr) {
-          console.warn("Kalendarium api fetch failed, using mathematical fallback", fetchErr);
-        }
+    setAppState((p) => {
+      const known = new Set(p.holidays.map((h) => h.date));
+      const added = missingYears
+        .flatMap((y) => danishHolidays(y))
+        .filter((h) => !known.has(h.date))
+        .map((h) => ({ id: `hol-auto-${h.date}`, date: h.date, name: h.name }));
+      if (added.length === 0) return p;
+      return { ...p, holidays: [...p.holidays, ...added].sort((a, b) => a.date.localeCompare(b.date)) };
+    });
+  }, [appState.startDate, appState.holidays, projectEndDate]);
 
-        if (fetchedHols.length === 0) {
-          missingYears.forEach((y) => {
-            const fallback = getFallbackDanishHolidays(y);
-            fetchedHols.push(...fallback.map((h, i) => ({
-              id: `hol-fall-${y}-${i}-${Date.now()}`,
-              date: h.date,
-              name: h.name
-            })));
-          });
-        }
-
-        setAppState((p) => {
-          const existingDates = p.holidays.map((h) => h && typeof h === "object" ? h.date : String(h));
-          const newUniqueHols = fetchedHols.filter((fh) => !existingDates.includes(fh.date));
-          if (newUniqueHols.length === 0) return p;
-          
-          return {
-            ...p,
-            holidays: [...p.holidays, ...newUniqueHols].sort((a, b) => {
-              const dateA = a && typeof a === "object" ? a.date : String(a);
-              const dateB = b && typeof b === "object" ? b.date : String(b);
-              return (dateA || "").localeCompare(dateB || "");
-            })
-          };
-        });
-      } catch (err) {
-        console.error("Fejl under indlæsning af helligdage", err);
-      }
-    };
-
-    syncHolidays();
-  }, [
-    appState.startDate, 
-    appState.holidays.length, 
-    projectEndDate, 
-    calculatedTasks.map(t => `${t.calcStartDate || ""}_${t.calcEndDate || ""}`).join(",")
-  ]);
-
-  // Trigger calendar recalculation every time core parameters mutate
+  // Persist to localStorage, debounced so dragging/typing does not serialise the whole project on every change
+  const stateRef = useRef(appState);
+  stateRef.current = appState;
   useEffect(() => {
-    const res = calculateSchedule(
-      appState.tasks,
-      appState.trades,
-      appState.holidays,
-      appState.settings,
-      appState.startDate,
-      appState.stages || [],
-      appState.weatherDelays || []
-    );
-
-    setCalculatedTasks(res.tasks);
-    setProjectEndDate(res.projectEndDate);
-    setProjectTotalCost(res.projectTotalCost);
-    setScheduleError(res.scheduleError);
-    setStartDateWarning(res.startDateWarning);
-
-    // Persist status
-    localStorage.setItem("msProjectMobileData", JSON.stringify(appState));
+    const id = window.setTimeout(() => saveState(appState), 400);
+    return () => window.clearTimeout(id);
   }, [appState]);
+  useEffect(() => {
+    const flush = () => saveState(stateRef.current);
+    const onVisibility = () => document.visibilityState === "hidden" && flush();
+    window.addEventListener("pagehide", flush);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      window.removeEventListener("pagehide", flush);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, []);
 
-  const triggerToast = (msg: string) => {
+  const toastTimer = useRef<number | undefined>(undefined);
+  const triggerToast = useCallback((msg: string) => {
     setToastMsg(msg);
-    setTimeout(() => setToastMsg(""), 3500);
-  };
+    window.clearTimeout(toastTimer.current);
+    toastTimer.current = window.setTimeout(() => setToastMsg(""), 3500);
+  }, []);
 
   // Task CRUD operations
   const handleSaveTask = (taskPayload: Omit<Task, "calcStart" | "calcEnd" | "calcCost" | "isCritical" | "tradeCosts">) => {
@@ -324,21 +251,20 @@ export default function App() {
     setAppState((p) => ({ ...p, tasks: updatedTasks }));
   };
 
-  const handleDeleteTask = (id: string) => {
-    const hasPredecessorLink = appState.tasks.some((t) => t.dependencyId === id);
-    const updatedTasks = appState.tasks
-      .filter((t) => t.id !== id)
-      .map((t) => {
-        if (t.dependencyId === id) return { ...t, dependencyId: null };
-        return t;
-      });
-
-    setAppState((p) => ({ ...p, tasks: updatedTasks }));
-    if (hasPredecessorLink) {
-      alert("Bemærk! Den slettede opgave var sat som forgænger for andre opgaver. Disse afhængigheder er automatisk nulstillet.");
-    }
-    triggerToast("Opgaven blev slettet.");
-  };
+  const handleDeleteTask = useCallback(
+    (id: string) => {
+      const hasPredecessorLink = stateRef.current.tasks.some((t) => t.dependencyId === id);
+      setAppState((p) => ({
+        ...p,
+        tasks: p.tasks.filter((t) => t.id !== id).map((t) => (t.dependencyId === id ? { ...t, dependencyId: null } : t)),
+      }));
+      if (hasPredecessorLink) {
+        alert("Bemærk! Den slettede opgave var sat som forgænger for andre opgaver. Disse afhængigheder er automatisk nulstillet.");
+      }
+      triggerToast("Opgaven blev slettet.");
+    },
+    [triggerToast]
+  );
 
   // Trade CRUD operations
   const handleSaveTrade = (tradePayload: Trade) => {
@@ -483,6 +409,8 @@ export default function App() {
             holidays: imported.holidays || [],
             trades: imported.trades || [],
             tasks: imported.tasks || [],
+            stages: imported.stages || [],
+            weatherDelays: imported.weatherDelays || [],
             scheduleError: null,
             startDateWarning: null,
           });
@@ -500,28 +428,23 @@ export default function App() {
     e.target.value = "";
   };
 
-  // Helper aggregate trades pricing metrics
-  const getTradeCostsStats = () => {
+  // Cost and task count per trade
+  const tradeStats = useMemo(() => {
     const stats: { [tid: string]: { cost: number; count: number } } = {};
     appState.trades.forEach((tr) => {
       stats[tr.id] = { cost: 0, count: 0 };
     });
-
     calculatedTasks.forEach((t) => {
-      if (t.tradeCosts) {
-        for (const tid in t.tradeCosts) {
-          if (stats[tid]) {
-            stats[tid].cost += t.tradeCosts[tid];
-            stats[tid].count += 1;
-          }
+      if (!t.tradeCosts) return;
+      for (const tid in t.tradeCosts) {
+        if (stats[tid]) {
+          stats[tid].cost += t.tradeCosts[tid];
+          stats[tid].count += 1;
         }
       }
     });
-
     return stats;
-  };
-
-  const tradeStats = getTradeCostsStats();
+  }, [appState.trades, calculatedTasks]);
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col font-sans select-none antialiased">
@@ -668,15 +591,8 @@ export default function App() {
             </button>
 
             {/* Mobile Expandable tab list with micro-animations */}
-            <AnimatePresence>
-              {mobileMenuOpen && (
-                <motion.div
-                  initial={{ height: 0, opacity: 0 }}
-                  animate={{ height: "auto", opacity: 1 }}
-                  exit={{ height: 0, opacity: 0 }}
-                  transition={{ duration: 0.2 }}
-                  className="divide-y divide-slate-100 bg-white"
-                >
+            {mobileMenuOpen && (
+                <div className="divide-y divide-slate-100 bg-white animate-menu-in">
                   <button
                     onClick={() => {
                       setActiveTab2("tidsplan");
@@ -741,9 +657,8 @@ export default function App() {
                     <HelpCircle className="w-4 h-4 shrink-0" />
                     <span>Vidensbase (?)</span>
                   </button>
-                </motion.div>
+                </div>
               )}
-            </AnimatePresence>
           </div>
 
           {/* Desktop Tab Selector Bar (hidden on mobile, visible on sm and up) */}
@@ -888,136 +803,17 @@ export default function App() {
                         </div>
                       ) : (
                         <div className="flex flex-col gap-3">
-                          {calculatedTasks.map((t, tIdx) => {
-                            const taskNum = tIdx + 1;
-                            return (
-                              <div
-                                key={t.id}
-                                className={`bg-white border p-4 rounded-xl flex flex-col gap-3 shadow-2xs hover:shadow-xs transition relative ${
-                                  t.isCritical ? "border-l-4 border-l-red-500 ring-1 ring-red-500/10" : "border-slate-200"
-                                }`}
-                              >
-                                <div className="flex justify-between items-start gap-3">
-                                  <div className="min-w-0 flex-1">
-                                    <div className="flex items-center gap-1.5 flex-wrap">
-                                      <h4 className="font-black text-xs md:text-sm text-slate-800 tracking-tight truncate max-w-[180px] xs:max-w-full">
-                                        {taskNum}. {t.title}
-                                      </h4>
-                                      {t.isCritical && (
-                                        <span className="bg-red-50 border border-red-200 text-red-700 font-extrabold text-[8px] md:text-[9px] px-2 py-0.5 rounded-full flex items-center gap-0.5">
-                                          <Flame className="w-2.5 h-2.5 text-red-500 fill-red-500 shrink-0" />
-                                          <span>Kritisk</span>
-                                        </span>
-                                      )}
-                                    </div>
-                                    
-                                    {/* Stage Etape Badge & Recurrence Badge Row */}
-                                    <div className="flex flex-wrap gap-1.5 mt-1.5">
-                                      {t.stageId && (() => {
-                                        const stg = (appState.stages || []).find((s) => s.id === t.stageId);
-                                        if (!stg) return null;
-                                        return (
-                                          <span
-                                            className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg text-[9px] font-extrabold leading-tight shadow-3xs"
-                                            style={{
-                                              backgroundColor: `${stg.color}12`,
-                                              color: stg.color,
-                                              borderColor: `${stg.color}30`,
-                                              borderWidth: "1px",
-                                            }}
-                                          >
-                                            <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: stg.color }} />
-                                            <span>{stg.name}</span>
-                                          </span>
-                                        );
-                                      })()}
-
-                                      {t.isRecurring && (
-                                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg text-[9px] font-extrabold leading-tight bg-slate-50 text-slate-750 border border-slate-200 shadow-3xs">
-                                          <span className="relative flex h-1.5 w-1.5">
-                                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-slate-400 opacity-75"></span>
-                                            <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-slate-500"></span>
-                                          </span>
-                                          <span>Tjeneste: Gentages hver {t.recurringInterval} dag</span>
-                                        </span>
-                                      )}
-                                    </div>
-
-                                    {t.desc && <p className="text-[11px] md:text-xs text-slate-450 mt-2.5 font-medium leading-normal">{t.desc}</p>}
-                                  </div>
-
-                                  <div className="flex gap-1 shrink-0">
-                                    <button
-                                      onClick={() => setEditTaskId(t.id)}
-                                      className="p-2 bg-slate-50 hover:bg-slate-100 text-slate-400 hover:text-slate-600 rounded-lg cursor-pointer border border-slate-100 transition active:scale-95 min-h-[36px] min-w-[36px] flex items-center justify-center"
-                                      title="Rediger"
-                                    >
-                                      <Pencil className="w-3.5 h-3.5" />
-                                    </button>
-                                    <button
-                                      onClick={() => handleDeleteTask(t.id)}
-                                      className="p-2 bg-red-50 hover:bg-red-100 text-red-400 hover:text-red-700 rounded-lg cursor-pointer border-0 transition active:scale-95 min-h-[36px] min-w-[36px] flex items-center justify-center"
-                                      title="Slet"
-                                    >
-                                      <Trash2 className="w-3.5 h-3.5" />
-                                    </button>
-                                  </div>
-                                </div>
-
-                                {/* Calendar info card */}
-                                <div className="grid grid-cols-2 bg-slate-50 border border-slate-100 p-2 rounded-lg text-[10px] font-bold text-slate-600 gap-2">
-                                  <div>
-                                    <span className="text-slate-400 text-[8px] uppercase tracking-wider block leading-none mb-1">
-                                      {t.isRecurring ? "Første udførelse" : "Startdato"}
-                                    </span>
-                                    <span className="block truncate font-mono">
-                                      {t.isRecurring ? "↻ " : "🏁 "}
-                                      {t.calcStart ? new Date(`${t.calcStart}T12:00:00`).toLocaleDateString("da-DK") : "Afventer"}
-                                    </span>
-                                  </div>
-                                  <div className="text-right">
-                                    <span className="text-slate-400 text-[8px] uppercase tracking-wider block leading-none mb-1">
-                                      {t.isRecurring ? "Sidste udførelse (Beregnet)" : "Slutdato"}
-                                    </span>
-                                    <span className="block truncate font-mono">
-                                      {t.isRecurring ? `✓ (${(t.occurrences || []).length} gentagelser)` : "🏆 "}
-                                      {t.calcEnd ? new Date(`${t.calcEnd}T12:00:00`).toLocaleDateString("da-DK") : "Afventer"}
-                                    </span>
-                                  </div>
-                                </div>
-
-                                {/* Badges resources and pricing inside the card */}
-                                <div className="flex justify-between items-center mt-0.5 flex-wrap gap-2 text-[10px]">
-                                  <div className="flex gap-1 flex-wrap">
-                                    {(t.tradeIds || []).map((tid) => {
-                                      const tr = appState.trades.find((x) => x.id === tid);
-                                      if (!tr) return null;
-                                      return (
-                                        <span
-                                          key={tr.id}
-                                          className="px-2 py-0.5 rounded-full font-bold border shrink-0 text-[10px]"
-                                          style={{
-                                            backgroundColor: `${tr.color}15`,
-                                            color: tr.color,
-                                            borderColor: `${tr.color}35`,
-                                          }}
-                                        >
-                                          {tr.name}
-                                        </span>
-                                      );
-                                    })}
-                                    {(t.tradeIds || []).length === 0 && (
-                                      <span className="text-slate-400 font-medium">Ingen faggrupper</span>
-                                    )}
-                                  </div>
-
-                                  <div className="font-extrabold text-xs text-slate-800 font-mono">
-                                    {(t.calcCost || 0).toLocaleString("da-DK")} kr.
-                                  </div>
-                                </div>
-                              </div>
-                            );
-                          })}
+                          {calculatedTasks.map((t, tIdx) => (
+                            <TaskCard
+                              key={t.id}
+                              task={t}
+                              number={tIdx + 1}
+                              stageById={stageById}
+                              tradeById={tradeById}
+                              onEdit={setEditTaskId}
+                              onDelete={handleDeleteTask}
+                            />
+                          ))}
                         </div>
                       )}
                     </div>
@@ -1280,7 +1076,9 @@ export default function App() {
           {/* TAP 6: Glossary / Vidensbase */}
           {activeTab === "glossary" && (
             <div className="bg-white border border-slate-200 p-4 md:p-6 rounded-2xl shadow-xs">
-              <Glossary onTriggerWizard={() => setWizardOpen(true)} />
+              <Suspense fallback={null}>
+                <Glossary onTriggerWizard={() => setWizardOpen(true)} />
+              </Suspense>
             </div>
           )}
         </div>
@@ -1301,72 +1099,20 @@ export default function App() {
         </p>
       </footer>
 
-      {/* Projekt-guide / Wizard */}
-      <Wizard
-        isOpen={wizardOpen}
-        onComplete={handleWizardComplete}
-        onClose={() => setWizardOpen(false)}
-      />
+      {/* Projekt-guide / Wizard (loaded only when needed) */}
+      {wizardOpen && (
+        <Suspense fallback={null}>
+          <Wizard isOpen={wizardOpen} onComplete={handleWizardComplete} />
+        </Suspense>
+      )}
 
       {/* Persistent slide-up toast notification panel */}
-      <AnimatePresence>
-        {toastMsg && (
-          <motion.div
-            initial={{ opacity: 0, y: 50, x: "-50%" }}
-            animate={{ opacity: 1, y: 0, x: "-50%" }}
-            exit={{ opacity: 0, y: 50, x: "-50%" }}
-            className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-slate-900 border border-slate-800 text-white rounded-xl px-4 py-3 text-xs font-bold flex items-center gap-2 shadow-lg z-50 select-none pointer-events-none"
-          >
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
-            <span>{toastMsg}</span>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {toastMsg && (
+        <div className="animate-toast-in fixed bottom-6 left-1/2 -translate-x-1/2 bg-slate-900 border border-slate-800 text-white rounded-xl px-4 py-3 text-xs font-bold flex items-center gap-2 shadow-lg z-50 select-none pointer-events-none">
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+          <span>{toastMsg}</span>
+        </div>
+      )}
     </div>
   );
-}
-
-function getFallbackDanishHolidays(year: number): { date: string; name: string }[] {
-  const g = year % 19;
-  const c = Math.floor(year / 100);
-  const h = (c - Math.floor(c / 4) - Math.floor((8 * c + 13) / 25) + 19 * g + 15) % 30;
-  const i = h - Math.floor(h / 28) * (1 - Math.floor(h / 28) * Math.floor(29 / (h + 1)) * Math.floor((21 - g) / 11));
-  const j = (year + Math.floor(year / 4) + i + 2 - c + Math.floor(c / 4)) % 7;
-  const l = i - j;
-  const month = 3 + Math.floor((l + 40) / 44);
-  const day = l + 28 - 31 * Math.floor(month / 4);
-
-  const easterDate = new Date(year, month - 1, day);
-  
-  const formatDate = (d: Date) => {
-    const yyyy = d.getFullYear();
-    const mm = String(d.getMonth() + 1).padStart(2, "0");
-    const dd = String(d.getDate()).padStart(2, "0");
-    return `${yyyy}-${mm}-${dd}`;
-  };
-
-  const addDays = (d: Date, days: number) => {
-    const res = new Date(d);
-    res.setDate(res.getDate() + days);
-    return res;
-  };
-
-  const holidaysList = [
-    { date: `${year}-01-01`, name: "Nytårsdag" },
-    { date: formatDate(addDays(easterDate, -3)), name: "Skærtorsdag" },
-    { date: formatDate(addDays(easterDate, -2)), name: "Langfredag" },
-    { date: formatDate(easterDate), name: "Påskedag" },
-    { date: formatDate(addDays(easterDate, 1)), name: "2. påskedag" },
-    { date: formatDate(addDays(easterDate, 39)), name: "Kristi himmelfartsdag" },
-    { date: formatDate(addDays(easterDate, 49)), name: "Pinsedag" },
-    { date: formatDate(addDays(easterDate, 50)), name: "2. pinsedag" },
-    { date: `${year}-12-25`, name: "Juledag" },
-    { date: `${year}-12-26`, name: "2. juledag" }
-  ];
-
-  if (year < 2024) {
-    holidaysList.push({ date: formatDate(addDays(easterDate, 26)), name: "Store bededag" });
-  }
-
-  return holidaysList.sort((a, b) => a.date.localeCompare(b.date));
 }
