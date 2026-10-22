@@ -43,7 +43,7 @@ Du kan tilgå og køre applikationen direkte i din browser:
 * **Arbejdsstop**: Registrer perioder med ekstremt vejr (sne, hård frost, storm), som forhindrer udendørsarbejde.
 * **Automatisk Tidsforlængelse**: Opgaver, der ikke tillader uvejrsarbejde, vil automatisk blive forlænget med antallet af vejrspildsdage, og alle efterfølgende opgaver skubbes tilsvarende.
 
-### 7. Resurser, Fagområder & Økonomi (Budgetstyring) 👷💰
+### 7. Faggrupper, Fagområder & Økonomi (Budgetstyring) 👷💰
 * **Faggrupper**: Opret og tilpas faglige teams (Tømrer, Murer, Elektriker etc.) med koder, faste timelønninger, overarbejdstakster og dagsnormer.
 * **Budgetoversigt**: Samlet sagspris og planlagt deadline, udgifter fordelt pr. faggruppe og pr. opgave (løn inkl. weekend-/helligdagstillæg, faste priser og gentagende serviceydelser).
 * **PDF-rapport**: Udskriv eller gem økonomioversigten som PDF direkte fra browseren.
@@ -51,18 +51,20 @@ Du kan tilgå og køre applikationen direkte i din browser:
 ### 8. Nem Import & Eksport (Backup) 💾
 * **JSON-Eksport**: Gem hele din projektopsætning lokalt som en `.json`-fil med ét klik.
 * **JSON-Import**: Indlæs en tidligere gemt fil for øjeblikkeligt at fortsætte arbejdet eller dele tidsplanen med samarbejdspartnere.
+* **Fortryd / Gentag**: Alle ændringer kan fortrydes (Ctrl+Z, Ctrl+Shift+Z/Ctrl+Y, knapperne i toppen eller "Fortryd" i beskeden efter en handling). Et helt træk i Gantt tæller som ét trin.
+* **Automatisk gemt-status & sikkerhedskopi**: Projektet gemmes løbende i browseren (status vises i toppen), og appen minder dig om at downloade en sikkerhedskopi.
+* **Nyt projekt**: Knappen "Nyt" starter guiden igen og spørger først, så intet overskrives ved en fejl.
 
 ---
 
 ## 🖥️ Brugerfladens Faner og Opbygning
 
-Applikationen er inddelt i 6 funktionelle sider, der nemt tilgås via hovedmenuen:
-1. **Opgaver**: Byg og rediger projektets opgaveliste, angiv bemanding, varigheder, forgængere og etaper.
-2. **Gantt**: Det fulde og interaktive visuelle planlægningskort over byggeriet.
-3. **Resurser**: Administration af faggrupper, farver, dagsnormer og timepriser.
-4. **Økonomi**: Det finansielle kontrolcenter med grafer over omkostningsforløb og budgettal.
-5. **Projekt**: Overordnede projektindstillinger (startdato, daglige arbejdstidsregler, helligdagskalender, uvejrslog) samt oprettelse og styring af **Etaper/Projektfaser**.
-6. **Vidensbase (Ordliste)**: Uddybende faglige forklaringer på byggetekniske planlægningsudtryk som *Kritisk Vej*, *Forgængere*, *Slæktid/Buffer* og *Arbejdskapacitet*.
+Applikationen er inddelt i 5 faner i hovedmenuen:
+1. **Tidsplan**: Skifter mellem det interaktive **Gantt**-diagram og **Opgaver** (opgavelisten, hvor du bygger og redigerer opgaver, bemanding, varigheder, forgængere og etaper).
+2. **Faggrupper**: Administration af faggrupper, farver, dagsnormer og timepriser.
+3. **Økonomi**: Det finansielle overblik over omkostninger og sagspris.
+4. **Projekt & kalender**: Overordnede projektindstillinger (startdato, daglige arbejdstidsregler, helligdagskalender, uvejrslog) samt oprettelse og styring af **Etaper/Projektfaser**.
+5. **Vidensbase (Ordliste)**: Uddybende faglige forklaringer på byggetekniske planlægningsudtryk som *Kritisk Vej*, *Forgængere*, *Slæktid/Buffer* og *Arbejdskapacitet*.
 
 ---
 

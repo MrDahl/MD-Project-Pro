@@ -426,7 +426,7 @@ export function TaskForm({ tasks, trades, stages, editTaskId, onSave, onCancel }
       <div className="flex flex-col gap-1">
         <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Hvilken resurse står for servicen?</label>
         {trades.length === 0 ? (
-          <span className="text-[10px] text-slate-400 font-medium">Opret faggrupper under fanen 👷 Resurser først.</span>
+          <span className="text-[10px] text-slate-400 font-medium">Opret faggrupper under fanen Faggrupper først.</span>
         ) : (
           <div className="grid grid-cols-2 md:grid-cols-3 gap-2 bg-slate-50 p-3 rounded-lg border border-slate-200 max-h-[140px] overflow-y-auto">
             {trades.map((tr) => {

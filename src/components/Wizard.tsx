@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { defaultStageDates, industryHolidayDays, nextMonday } from "../utils/dates";
 import { Trade, Stage, ProjectInfo, Settings } from "../types";
 import { Building, Check, ArrowRight, ArrowLeft, Clock, MapPin, Briefcase } from "lucide-react";
 
@@ -13,9 +14,11 @@ interface WizardProps {
     includeDanishHolidays?: boolean;
   }) => void;
   isOpen: boolean;
+  /** When given, the guide can be closed without changing the project (used for "Nyt projekt"). */
+  onCancel?: () => void;
 }
 
-export function Wizard({ onComplete, isOpen }: WizardProps) {
+export function Wizard({ onComplete, isOpen, onCancel }: WizardProps) {
   const [step, setStep] = useState(1);
   const totalSteps = 5;
 
@@ -27,7 +30,7 @@ export function Wizard({ onComplete, isOpen }: WizardProps) {
   const [workHoursPerDay, setWorkHoursPerDay] = useState(7.4);
 
   // Step 2: Calendar & Start Date
-  const [startDate, setStartDate] = useState("2026-06-22"); // Default upcoming Monday
+  const [startDate, setStartDate] = useState(nextMonday); // Default: the coming Monday
   const [includeSummerHoliday, setIncludeSummerHoliday] = useState(false); // Automagic summer holiday (e.g., July 13th to July 31st 2026)
   const [includeDanishHolidays, setIncludeDanishHolidays] = useState(true); // Automatically load Danish public holidays
   const [customHolidays, setCustomHolidays] = useState<string[]>([]);
@@ -41,14 +44,7 @@ export function Wizard({ onComplete, isOpen }: WizardProps) {
   });
   
   // Custom dates for selected etaper relative to start date
-  const [stageDates, setStageDates] = useState({
-    prepStartDate: "2026-06-22",
-    prepEndDate: "2026-07-05", // 2 weeks
-    rawStartDate: "2026-07-06",
-    rawEndDate: "2026-08-16",  // 6 weeks
-    finishStartDate: "2026-08-17",
-    finishEndDate: "2026-09-04", // ~3 weeks
-  });
+  const [stageDates, setStageDates] = useState(() => defaultStageDates(nextMonday()));
 
   // Step 4: Trades (Faggrupper)
   const [selectedTrades, setSelectedTrades] = useState({
@@ -90,12 +86,8 @@ export function Wizard({ onComplete, isOpen }: WizardProps) {
     // 1. Prepare Holidays
     const holidays = [...customHolidays];
     if (includeSummerHoliday) {
-      // Auto-populate industrial summer weeks (approx weeks 29, 30, 31 in 2026: July 13th to July 31st inclusive, working days)
-      const summerDays = [
-        "2026-07-13", "2026-07-14", "2026-07-15", "2026-07-16", "2026-07-17",
-        "2026-07-20", "2026-07-21", "2026-07-22", "2026-07-23", "2026-07-24",
-        "2026-07-27", "2026-07-28", "2026-07-29", "2026-07-30", "2026-07-31"
-      ];
+      // Auto-populate industrial summer weeks (weeks 29-31 of the start year)
+      const summerDays = industryHolidayDays(Number(startDate.slice(0, 4)) || new Date().getFullYear());
       summerDays.forEach(day => {
         if (!holidays.includes(day)) {
           holidays.push(day);
@@ -199,7 +191,7 @@ export function Wizard({ onComplete, isOpen }: WizardProps) {
         customer: customer.trim(),
         manager: manager.trim(),
       },
-      startDate: startDate || "2026-06-22",
+      startDate: startDate || nextMonday(),
       settings: {
         workHoursPerDay: workHoursPerDay || 7.4,
       },
@@ -225,8 +217,20 @@ export function Wizard({ onComplete, isOpen }: WizardProps) {
               <p className="text-[10px] text-slate-450 font-bold leading-none mt-1">Konfigurer dit næste byggeprojekt trin-for-trin</p>
             </div>
           </div>
-          <div className="text-right text-xs font-mono font-bold text-slate-400">
-            Trin {step} af {totalSteps}
+          <div className="flex items-center gap-3">
+            <div className="text-right text-xs font-mono font-bold text-slate-400">
+              Trin {step} af {totalSteps}
+            </div>
+            {onCancel && (
+              <button
+                type="button"
+                onClick={onCancel}
+                aria-label="Luk guiden"
+                className="px-2.5 py-1 rounded-lg bg-slate-700 hover:bg-slate-600 text-xs font-black cursor-pointer"
+              >
+                Annuller
+              </button>
+            )}
           </div>
         </div>
 
@@ -349,7 +353,10 @@ export function Wizard({ onComplete, isOpen }: WizardProps) {
                     type="date"
                     className="w-full sm:w-1/2 bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs font-bold text-slate-700 outline-none focus:border-slate-400"
                     value={startDate}
-                    onChange={(e) => setStartDate(e.target.value)}
+                    onChange={(e) => {
+                      setStartDate(e.target.value);
+                      if (e.target.value) setStageDates(defaultStageDates(e.target.value));
+                    }}
                     required
                   />
                   <span className="text-[10px] text-slate-400 font-medium mt-1">Dine tildelte opgaver i Gantt-diagrammet vil automatisk blive kaskade-beregnet i forhold til denne dato.</span>
@@ -367,7 +374,7 @@ export function Wizard({ onComplete, isOpen }: WizardProps) {
                   <label htmlFor="summer-hol-cb" className="cursor-pointer select-none">
                     <span className="text-xs font-bold text-slate-800 block">Konfigurer industrisommerferien automatisk? (3 uger)</span>
                     <span className="text-[10px] text-slate-500 block mt-1 leading-normal">
-                      Sætter uge 29, 30 og 31 (13. juli til og med 31. juli 2026) som uarbejdsdygtige lukkedage. Systemet beregner automatisk udenom disse, medmindre du eksplicit vælger weekendarbejde.
+                      Sætter uge 29, 30 og 31 (mandag-fredag) i startdatoens år som lukkedage. Systemet beregner automatisk udenom disse, medmindre du eksplicit vælger weekendarbejde.
                     </span>
                   </label>
                 </div>
@@ -564,7 +571,7 @@ export function Wizard({ onComplete, isOpen }: WizardProps) {
             </div>
           )}
 
-          {/* STEP 4: Standard Faggrupper / Resurser */}
+          {/* STEP 4: Standard Faggrupper */}
           {step === 4 && (
             <div className="flex flex-col gap-4 animate-fadeIn">
               <div className="flex gap-3 mb-2">
@@ -576,7 +583,7 @@ export function Wizard({ onComplete, isOpen }: WizardProps) {
               </div>
 
               <div className="flex flex-col gap-2 bg-slate-50 p-4 rounded-xl border border-slate-200">
-                <p className="text-[11px] text-slate-500 font-bold mb-2">Forudbyg dit sjak (I kan redigere timetakster og weekendregler løbende under Resurser):</p>
+                <p className="text-[11px] text-slate-500 font-bold mb-2">Forudbyg dit sjak (I kan redigere timetakster og weekendregler løbende under Faggrupper):</p>
                 
                 {/* Trade 1: Carpenter */}
                 <label className="flex items-center justify-between p-2.5 bg-white rounded-lg border border-slate-200 cursor-pointer hover:bg-slate-50/50 select-none">

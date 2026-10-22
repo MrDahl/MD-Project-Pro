@@ -31,7 +31,8 @@ interface GanttChartProps {
   projectStartDate: string;
   stages?: Stage[];
   weatherDelays?: WeatherDelay[];
-  onUpdateTasks: (updatedTasks: Task[]) => void;
+  /** `newGesture` is true for the first change of a drag, so the whole drag becomes one undo step. */
+  onUpdateTasks: (updatedTasks: Task[], newGesture: boolean) => void;
   onEditTask: (task: Task) => void;
   onAddHoliday: (date: string, name: string) => void;
   onDeleteHoliday: (idx: number) => void;
@@ -50,6 +51,8 @@ interface DragState {
   lastDelta: number;
   /** True once the pointer has travelled far enough to count as a drag instead of a click. */
   moved: boolean;
+  /** True once the first change of this drag has been reported (it becomes the undo step). */
+  recorded: boolean;
 }
 
 const EMPTY_STAGES: Stage[] = [];
@@ -217,6 +220,7 @@ export function GanttChart({
         baseline: live.current.tasks.map(stripCalculated),
         lastDelta: 0,
         moved: false,
+        recorded: false,
       };
       setDraggingId(task.id);
     },
@@ -242,7 +246,11 @@ export function GanttChart({
     if (delta === drag.lastDelta) return;
     drag.lastDelta = delta;
 
-    const { minDay: lo, maxDay: hi, onUpdateTasks: update } = live.current;
+    const { minDay: lo, maxDay: hi, onUpdateTasks } = live.current;
+    const update = (next: Task[]) => {
+      onUpdateTasks(next, !drag.recorded);
+      drag.recorded = true;
+    };
     if (delta === 0) {
       update(drag.baseline); // back at the starting column: restore the original plan exactly
     } else if (drag.type === "move") {

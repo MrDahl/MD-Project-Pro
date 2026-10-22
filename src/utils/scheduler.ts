@@ -181,7 +181,7 @@ export function calculateSchedule(
       tasks,
       projectEndDate: null,
       projectTotalCost: 0,
-      scheduleError: "Projektets startdato er ikke angivet. Gå til Indstillinger eller giv en opgave en startdato.",
+      scheduleError: "Projektets startdato er ikke angivet. Gå til fanen Projekt & kalender eller giv en opgave en startdato.",
       startDateWarning,
     };
   }

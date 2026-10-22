@@ -1,5 +1,6 @@
 import type { Task, Stage, Trade } from "../../types.ts";
 import { dayNumber, type Calendar } from "../../utils/scheduler.ts";
+export { stripCalculated } from "../../utils/tasks.ts";
 
 /** Layout constants (px). Every day column is COL_W wide, every row ROW_H tall. */
 export const COL_W = 48;
@@ -165,11 +166,4 @@ export function indexBy<T extends { id: string }>(items: T[]): Map<string, T> {
   const map = new Map<string, T>();
   for (const it of items) if (!map.has(it.id)) map.set(it.id, it);
   return map;
-}
-
-/** Strips calculated fields so edited tasks go back into app state as plain input data. */
-export function stripCalculated(task: Task): Task {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { calcStart, calcEnd, calcCost, isCritical, tradeCosts, occurrences, ...rest } = task;
-  return rest;
 }

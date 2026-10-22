@@ -1,5 +1,5 @@
 import React, { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AppData, Task, Trade, Settings, ProjectInfo, Stage, Holiday } from "./types";
+import { Task, Trade, Settings, ProjectInfo, Stage, Holiday } from "./types";
 import { calculateSchedule } from "./utils/scheduler";
 import { danishHolidays, projectYears } from "./utils/holidays";
 import { indexBy } from "./components/gantt/model";
@@ -8,9 +8,12 @@ import { TaskCard } from "./components/TaskCard";
 import { TaskForm } from "./components/TaskForm";
 import { TradeForm } from "./components/TradeForm";
 import { ProjectSettings } from "./components/ProjectSettings";
+import { AppHeader } from "./components/AppHeader";
+import { Toast, ToastData } from "./components/Toast";
+import { NewProjectDialog } from "./components/NewProjectDialog";
+import { useProject } from "./state/useProject";
+import { BACKUP_KEY, WIZARD_KEY, looksLikeProject, normalizeProject, readNumber, writeFlag } from "./state/project";
 import {
-  FolderUp,
-  FolderDown,
   Printer,
   Trash2,
   ListChecks,
@@ -32,92 +35,77 @@ import {
 const Glossary = lazy(() => import("./components/Glossary").then((m) => ({ default: m.Glossary })));
 const Wizard = lazy(() => import("./components/Wizard").then((m) => ({ default: m.Wizard })));
 
-const STORAGE_KEY = "msProjectMobileData";
-const WIZARD_KEY = "msProjectWizardCompleted";
+type TabId = "tidsplan" | "resources" | "budget" | "settings" | "glossary";
 
-// Initialize baseline project start data if custom local storage is empty
-const INITIAL_PROJECT_STATE: AppData = {
-  startDate: "2026-06-22",
-  settings: { workHoursPerDay: 7.4 },
-  projectInfo: { projectName: "Nyt Projekt", address: "", customer: "", manager: "" },
-  holidays: [],
-  trades: [],
-  tasks: [],
-  stages: [],
-  weatherDelays: [],
-  scheduleError: null,
-  startDateWarning: null,
-};
+const TABS: { id: TabId; label: string; Icon: typeof CalendarDays }[] = [
+  { id: "tidsplan", label: "Tidsplan", Icon: CalendarDays },
+  { id: "resources", label: "Faggrupper", Icon: UsersRound },
+  { id: "budget", label: "Økonomi", Icon: DollarSign },
+  { id: "settings", label: "Projekt & kalender", Icon: SettingsIcon },
+  { id: "glossary", label: "Vidensbase", Icon: HelpCircle },
+];
 
-/** Reads the saved project (tolerating older formats) or falls back to a blank one. */
-function loadInitialState(): AppData {
-  let saved: string | null = null;
-  try {
-    saved = localStorage.getItem(STORAGE_KEY);
-  } catch {
-    /* storage unavailable */
-  }
-  if (!saved) return INITIAL_PROJECT_STATE;
+const BACKUP_INTERVAL_MS = 7 * 24 * 3600 * 1000;
 
-  try {
-    const parsed = JSON.parse(saved);
-
-    // Older versions stored holidays as plain date strings
-    const rawHolidays: unknown[] = Array.isArray(parsed.holidays) ? parsed.holidays : [];
-    const holidays: Holiday[] = rawHolidays
-      .map((h, idx) => {
-        const item = (typeof h === "string" ? { date: h } : h) as Partial<Holiday> | null;
-        return {
-          id: item?.id || `hol-norm-${idx}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-          date: item?.date || "",
-          name: item?.name || "Lukkedag / Ferie",
-        };
-      })
-      .filter((h) => h.date);
-
-    return {
-      startDate: parsed.startDate || INITIAL_PROJECT_STATE.startDate,
-      settings: parsed.settings || INITIAL_PROJECT_STATE.settings,
-      projectInfo: parsed.projectInfo || INITIAL_PROJECT_STATE.projectInfo,
-      holidays,
-      trades: parsed.trades || [],
-      tasks: parsed.tasks || [],
-      stages: parsed.stages || [],
-      weatherDelays: parsed.weatherDelays || [],
-      scheduleError: null,
-      startDateWarning: null,
-    };
-  } catch {
-    return INITIAL_PROJECT_STATE;
-  }
-}
-
-function saveState(state: AppData): void {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-  } catch {
-    /* storage full or unavailable - the project can still be saved with "Gem" */
-  }
+/** True when the user is typing in a field, where Ctrl+Z must keep its native text-undo meaning. */
+function isTypingTarget(target: EventTarget | null): boolean {
+  const el = target as HTMLElement | null;
+  if (!el) return false;
+  return el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT" || el.isContentEditable;
 }
 
 export default function App() {
-  const [activeTab, setActiveTab2] = useState<
-    "tidsplan" | "resources" | "budget" | "settings" | "glossary"
-  >("tidsplan");
-
+  const [activeTab, setActiveTab2] = useState<TabId>("tidsplan");
   const [tidsplanView, setTidsplanView] = useState<"gantt" | "list">("gantt");
-
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [wizardOpen, setWizardOpen] = useState(() => {
-    // Hvis der ikke tidligere er fuldført en wizard, åbnes den automatisk
+    // The guide opens automatically on the very first visit
     try {
       return !localStorage.getItem(WIZARD_KEY);
     } catch {
       return true;
     }
   });
+  const [wizardCancelable, setWizardCancelable] = useState(false);
+  const [newProjectOpen, setNewProjectOpen] = useState(false);
+  const [lastBackup, setLastBackup] = useState<number | null>(() => readNumber(BACKUP_KEY));
 
-  const [appState, setAppState] = useState<AppData>(loadInitialState);
+  const { state: appState, update, undo, redo, canUndo, canRedo, saveInfo } = useProject();
+  const stateRef = useRef(appState);
+  stateRef.current = appState;
+
+  const [editTaskId, setEditTaskId] = useState<string | null>(null);
+  const [editTradeId, setEditTradeId] = useState<string | null>(null);
+
+  // --- Notifications (optionally with an "undo" button) ---
+  const [toast, setToast] = useState<ToastData | null>(null);
+  const toastTimer = useRef<number | undefined>(undefined);
+  const dismissToast = useCallback(() => {
+    window.clearTimeout(toastTimer.current);
+    setToast(null);
+  }, []);
+  const showToast = useCallback((message: string, withUndo = false) => {
+    window.clearTimeout(toastTimer.current);
+    setToast({ id: Date.now(), message, ...(withUndo ? { actionLabel: "Fortryd", onAction: undo } : {}) });
+    toastTimer.current = window.setTimeout(() => setToast(null), withUndo ? 7000 : 3500);
+  }, [undo]);
+
+  // Ctrl/Cmd+Z = undo, Ctrl/Cmd+Shift+Z or Ctrl+Y = redo (not while typing in a field)
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey) || isTypingTarget(e.target)) return;
+      const key = e.key.toLowerCase();
+      if (key === "z" && !e.shiftKey) {
+        e.preventDefault();
+        undo();
+      } else if ((key === "z" && e.shiftKey) || key === "y") {
+        e.preventDefault();
+        redo();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [undo, redo]);
 
   const handleWizardComplete = (completedData: {
     projectInfo: ProjectInfo;
@@ -136,22 +124,16 @@ export default function App() {
     }));
 
     if (completedData.includeDanishHolidays) {
-      const fallback = danishHolidays(year);
-      fallback.forEach((fH, fIdx) => {
-        if (!formattedHolidays.some(h => h.date === fH.date)) {
-          formattedHolidays.push({
-            id: `hol-wiz-den-${fIdx}-${Date.now()}`,
-            date: fH.date,
-            name: fH.name
-          });
+      danishHolidays(year).forEach((fH, fIdx) => {
+        if (!formattedHolidays.some((h) => h.date === fH.date)) {
+          formattedHolidays.push({ id: `hol-wiz-den-${fIdx}-${Date.now()}`, date: fH.date, name: fH.name });
         }
       });
     }
-
-    // Sort combined holidays
     formattedHolidays.sort((a, b) => a.date.localeCompare(b.date));
 
-    setAppState({
+    const replacing = stateRef.current.tasks.length > 0 || stateRef.current.trades.length > 0;
+    update({
       startDate: completedData.startDate,
       settings: completedData.settings,
       projectInfo: completedData.projectInfo,
@@ -159,24 +141,20 @@ export default function App() {
       trades: completedData.trades,
       stages: completedData.stages,
       tasks: [],
+      weatherDelays: [],
       scheduleError: null,
       startDateWarning: null,
     });
-    try {
-      localStorage.setItem(WIZARD_KEY, "true");
-    } catch {
-      /* storage unavailable */
-    }
+    writeFlag(WIZARD_KEY, "true");
     setWizardOpen(false);
-    triggerToast("Velkommen! Dit nye projekt er konfigureret med lukkedage.");
+    setWizardCancelable(false);
+    setEditTaskId(null);
+    setEditTradeId(null);
+    setActiveTab2("tidsplan");
+    showToast(replacing ? "Nyt projekt oprettet." : "Velkommen! Dit nye projekt er konfigureret med lukkedage.", replacing);
   };
 
-  const [editTaskId, setEditTaskId] = useState<string | null>(null);
-  const [editTradeId, setEditTradeId] = useState<string | null>(null);
-  const [toastMsg, setToastMsg] = useState<string>("");
-
   // The schedule is derived data: recalculated only when something it depends on changes
-  // (typing in project info no longer triggers a full recalculation).
   const { tasks: calculatedTasks, projectEndDate, projectTotalCost, scheduleError, startDateWarning } = useMemo(
     () =>
       calculateSchedule(
@@ -194,239 +172,179 @@ export default function App() {
   const tradeById = useMemo(() => indexBy(appState.trades), [appState.trades]);
   const stageById = useMemo(() => indexBy(appState.stages || []), [appState.stages]);
 
-  // Keep Danish public holidays present for every calendar year the project touches
+  // Keep Danish public holidays present for every calendar year the project touches (automatic: no undo step)
   useEffect(() => {
     const missingYears = projectYears(appState.startDate, projectEndDate).filter(
       (y) => !appState.holidays.some((h) => h.date.startsWith(String(y)))
     );
     if (missingYears.length === 0) return;
 
-    setAppState((p) => {
-      const known = new Set(p.holidays.map((h) => h.date));
-      const added = missingYears
-        .flatMap((y) => danishHolidays(y))
-        .filter((h) => !known.has(h.date))
-        .map((h) => ({ id: `hol-auto-${h.date}`, date: h.date, name: h.name }));
-      if (added.length === 0) return p;
-      return { ...p, holidays: [...p.holidays, ...added].sort((a, b) => a.date.localeCompare(b.date)) };
-    });
-  }, [appState.startDate, appState.holidays, projectEndDate]);
-
-  // Persist to localStorage, debounced so dragging/typing does not serialise the whole project on every change
-  const stateRef = useRef(appState);
-  stateRef.current = appState;
-  useEffect(() => {
-    const id = window.setTimeout(() => saveState(appState), 400);
-    return () => window.clearTimeout(id);
-  }, [appState]);
-  useEffect(() => {
-    const flush = () => saveState(stateRef.current);
-    const onVisibility = () => document.visibilityState === "hidden" && flush();
-    window.addEventListener("pagehide", flush);
-    document.addEventListener("visibilitychange", onVisibility);
-    return () => {
-      window.removeEventListener("pagehide", flush);
-      document.removeEventListener("visibilitychange", onVisibility);
-    };
-  }, []);
-
-  const toastTimer = useRef<number | undefined>(undefined);
-  const triggerToast = useCallback((msg: string) => {
-    setToastMsg(msg);
-    window.clearTimeout(toastTimer.current);
-    toastTimer.current = window.setTimeout(() => setToastMsg(""), 3500);
-  }, []);
+    update(
+      (p) => {
+        const known = new Set(p.holidays.map((h) => h.date));
+        const added = missingYears
+          .flatMap((y) => danishHolidays(y))
+          .filter((h) => !known.has(h.date))
+          .map((h) => ({ id: `hol-auto-${h.date}`, date: h.date, name: h.name }));
+        if (added.length === 0) return p;
+        return { ...p, holidays: [...p.holidays, ...added].sort((a, b) => a.date.localeCompare(b.date)) };
+      },
+      { history: false }
+    );
+  }, [appState.startDate, appState.holidays, projectEndDate, update]);
 
   // Task CRUD operations
   const handleSaveTask = (taskPayload: Omit<Task, "calcStart" | "calcEnd" | "calcCost" | "isCritical" | "tradeCosts">) => {
-    let updatedTasks: Task[] = [];
     if (editTaskId) {
-      updatedTasks = appState.tasks.map((t) => (t.id === editTaskId ? { ...t, ...taskPayload } : t));
+      update((p) => ({ ...p, tasks: p.tasks.map((t) => (t.id === editTaskId ? { ...t, ...taskPayload } : t)) }));
       setEditTaskId(null);
-      triggerToast("Opgaven er opdateret i dagsplanen.");
+      showToast("Opgaven er opdateret i tidsplanen.", true);
     } else {
-      updatedTasks = [...appState.tasks, { ...taskPayload }];
-      triggerToast("Ny opgave slynget på kalenderen!");
+      update((p) => ({ ...p, tasks: [...p.tasks, { ...taskPayload }] }));
+      showToast("Ny opgave oprettet.", true);
     }
-    setAppState((p) => ({ ...p, tasks: updatedTasks }));
   };
 
   const handleDeleteTask = useCallback(
     (id: string) => {
-      const hasPredecessorLink = stateRef.current.tasks.some((t) => t.dependencyId === id);
-      setAppState((p) => ({
+      const hasSuccessors = stateRef.current.tasks.some((t) => t.dependencyId === id);
+      update((p) => ({
         ...p,
         tasks: p.tasks.filter((t) => t.id !== id).map((t) => (t.dependencyId === id ? { ...t, dependencyId: null } : t)),
       }));
-      if (hasPredecessorLink) {
-        alert("Bemærk! Den slettede opgave var sat som forgænger for andre opgaver. Disse afhængigheder er automatisk nulstillet.");
-      }
-      triggerToast("Opgaven blev slettet.");
+      showToast(hasSuccessors ? "Opgaven er slettet - afhængige opgaver er gjort uafhængige." : "Opgaven er slettet.", true);
     },
-    [triggerToast]
+    [update, showToast]
   );
 
   // Trade CRUD operations
   const handleSaveTrade = (tradePayload: Trade) => {
-    let updatedTrades: Trade[] = [];
     if (editTradeId) {
-      updatedTrades = appState.trades.map((tr) => (tr.id === editTradeId ? { ...tr, ...tradePayload } : tr));
+      update((p) => ({ ...p, trades: p.trades.map((tr) => (tr.id === editTradeId ? { ...tr, ...tradePayload } : tr)) }));
       setEditTradeId(null);
-      triggerToast("Faggruppeoplysninger opdateret.");
+      showToast("Faggruppen er opdateret.", true);
     } else {
-      updatedTrades = [...appState.trades, { ...tradePayload }];
-      triggerToast("Faggruppe tilføjet til firmaet.");
+      update((p) => ({ ...p, trades: [...p.trades, { ...tradePayload }] }));
+      showToast("Faggruppe tilføjet.", true);
     }
-    setAppState((p) => ({ ...p, trades: updatedTrades }));
   };
 
   const handleDeleteTrade = (id: string) => {
-    const isLinked = appState.tasks.some((t) => t.tradeIds?.includes(id));
-    if (isLinked) {
-      alert("Kan ikke slette faggruppe: Den er tilknyttet aktive opgaver i tidsplanen. Fjern tilknytningen først!");
+    if (appState.tasks.some((t) => t.tradeIds?.includes(id))) {
+      showToast("Faggruppen bruges af opgaver i tidsplanen. Fjern den fra opgaverne først.");
       return;
     }
-    setAppState((p) => ({ ...p, trades: p.trades.filter((tr) => tr.id !== id) }));
-    triggerToast("Ressource slettet.");
+    update((p) => ({ ...p, trades: p.trades.filter((tr) => tr.id !== id) }));
+    showToast("Faggruppen er slettet.", true);
   };
 
   const handleAddStage = (newStage: Stage) => {
-    const updatedStages = [...(appState.stages || []), newStage];
-    setAppState((p) => ({ ...p, stages: updatedStages }));
-    triggerToast(`Etape "${newStage.name}" er oprettet!`);
+    update((p) => ({ ...p, stages: [...(p.stages || []), newStage] }));
+    showToast(`Etape "${newStage.name}" er oprettet.`, true);
   };
 
   const handleDeleteStage = (id: string) => {
-    const updatedStages = (appState.stages || []).filter((stg) => stg.id !== id);
-    const updatedTasks = appState.tasks.map((t) => {
-      let isChanged = false;
-      let newStageId = t.stageId;
-      let newRecurStages = t.recurringStageIds;
-      if (t.stageId === id) {
-        newStageId = null;
-        isChanged = true;
-      }
-      if (t.recurringStageIds?.includes(id)) {
-        newRecurStages = t.recurringStageIds.filter(x => x !== id);
-        isChanged = true;
-      }
-      return isChanged ? { ...t, stageId: newStageId, recurringStageIds: newRecurStages } : t;
-    });
-    setAppState((p) => ({ ...p, stages: updatedStages, tasks: updatedTasks }));
-    triggerToast("Etape slettet.");
-  };
-
-  const handleUpdateProjectInfo = (info: ProjectInfo) => {
-    setAppState((p) => ({ ...p, projectInfo: info }));
-  };
-
-  // Calendar parameters
-  const handleUpdateStartDate = (date: string) => {
-    setAppState((p) => ({ ...p, startDate: date }));
-  };
-
-  const handleUpdateWorkHours = (hours: number) => {
-    setAppState((p) => ({
+    update((p) => ({
       ...p,
-      settings: { ...p.settings, workHoursPerDay: hours },
+      stages: (p.stages || []).filter((stg) => stg.id !== id),
+      tasks: p.tasks.map((t) => {
+        const inRecurring = t.recurringStageIds?.includes(id);
+        if (t.stageId !== id && !inRecurring) return t;
+        return {
+          ...t,
+          stageId: t.stageId === id ? null : t.stageId,
+          recurringStageIds: inRecurring ? t.recurringStageIds!.filter((x) => x !== id) : t.recurringStageIds,
+        };
+      }),
     }));
+    showToast("Etapen er slettet.", true);
   };
+
+  const handleUpdateProjectInfo = (info: ProjectInfo) => update((p) => ({ ...p, projectInfo: info }), { coalesceKey: "info" });
+  const handleUpdateStartDate = (date: string) => update((p) => ({ ...p, startDate: date }), { coalesceKey: "startDate" });
+  const handleUpdateWorkHours = (hours: number) =>
+    update((p) => ({ ...p, settings: { ...p.settings, workHoursPerDay: hours } }), { coalesceKey: "hours" });
 
   const handleAddHoliday = (date: string, name: string = "Lukkedag") => {
-    if (appState.holidays.some((h) => h.date === date)) return;
+    if (stateRef.current.holidays.some((h) => h.date === date)) return;
     const newHol: Holiday = {
-      id: "hol-" + Date.now() + "-" + Math.random().toString(36).substr(2, 4),
+      id: "hol-" + Date.now() + "-" + Math.random().toString(36).slice(2, 6),
       date,
-      name: name || "Lukkedag"
+      name: name || "Lukkedag",
     };
-    setAppState((p) => ({
-      ...p,
-      holidays: [...p.holidays, newHol]
-    }));
-    triggerToast(`Lukkedag "${name}" markeret i kalenderen.`);
+    update((p) => ({ ...p, holidays: [...p.holidays, newHol] }));
+    showToast(`Lukkedag "${name}" markeret i kalenderen.`, true);
   };
 
   const handleDeleteHoliday = (idx: number) => {
-    setAppState((p) => ({
-      ...p,
-      holidays: p.holidays.filter((_, i) => i !== idx),
-    }));
-    triggerToast("Fridag/Lukkedag fjernet.");
+    update((p) => ({ ...p, holidays: p.holidays.filter((_, i) => i !== idx) }));
+    showToast("Lukkedagen er fjernet.", true);
   };
 
   const handleAddWeatherDelay = (label: string, startDate: string, endDate: string) => {
-    const newDelay = {
-      id: "delay-" + Date.now(),
-      label,
-      startDate,
-      endDate,
-    };
-    setAppState((p) => ({
-      ...p,
-      weatherDelays: [...(p.weatherDelays || []), newDelay],
-    }));
-    triggerToast(`Vejrspildsdage "${label}" registreret.`);
+    const newDelay = { id: "delay-" + Date.now(), label, startDate, endDate };
+    update((p) => ({ ...p, weatherDelays: [...(p.weatherDelays || []), newDelay] }));
+    showToast(`Vejrspildsdage "${label}" registreret.`, true);
   };
 
   const handleDeleteWeatherDelay = (id: string) => {
-    setAppState((p) => ({
-      ...p,
-      weatherDelays: (p.weatherDelays || []).filter((wd) => wd.id !== id),
-    }));
-    triggerToast("Vejrspildsdag fjernet.");
+    update((p) => ({ ...p, weatherDelays: (p.weatherDelays || []).filter((wd) => wd.id !== id) }));
+    showToast("Vejrspildsdagen er fjernet.", true);
   };
 
-  // Full export/import operations JSON
-  const handleExportProject = () => {
-    const rawName = appState.projectInfo?.projectName || "MD Project";
+  // Full export/import operations (JSON file)
+  const handleExportProject = useCallback(() => {
+    const current = stateRef.current;
+    const rawName = current.projectInfo?.projectName || "MD Project";
     const cleanName = rawName.trim().replace(/[^a-zA-Z0-9æøåÆØÅ\s-_]/g, "").replace(/\s+/g, "_");
     const filename = `${cleanName || "MD_Project"}.json`;
 
-    const dataStr = JSON.stringify(appState, null, 2);
-    const blob = new Blob([dataStr], { type: "application/json" });
+    const blob = new Blob([JSON.stringify(current, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
     a.download = filename;
     a.click();
     URL.revokeObjectURL(url);
-    triggerToast(`Projektfil gemt som ${filename}!`);
-  };
+
+    const now = Date.now();
+    writeFlag(BACKUP_KEY, String(now));
+    setLastBackup(now);
+    showToast(`Projektfil gemt som ${filename}`);
+  }, [showToast]);
 
   const handleImportProject = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    e.target.value = "";
     if (!file) return;
 
     const reader = new FileReader();
     reader.onload = (event) => {
       try {
-        const imported = JSON.parse(event.target?.result as string);
-        if (imported.tasks && imported.trades) {
-          setAppState({
-            startDate: imported.startDate || "2026-06-15",
-            settings: imported.settings || { workHoursPerDay: 7.4 },
-            projectInfo: imported.projectInfo || { projectName: "MD Project", address: "", customer: "", manager: "" },
-            holidays: imported.holidays || [],
-            trades: imported.trades || [],
-            tasks: imported.tasks || [],
-            stages: imported.stages || [],
-            weatherDelays: imported.weatherDelays || [],
-            scheduleError: null,
-            startDateWarning: null,
-          });
-          setEditTaskId(null);
-          setEditTradeId(null);
-          triggerToast("MD Project-fil importeret succesfuldt!");
-        } else {
-          alert("Filen mangler gyldige moduler. Kontroller din JSON.");
+        const parsed = JSON.parse(event.target?.result as string);
+        if (!looksLikeProject(parsed)) {
+          showToast("Filen ligner ikke en MD Project-fil (opgaver eller faggrupper mangler).");
+          return;
         }
+        update(normalizeProject(parsed));
+        setEditTaskId(null);
+        setEditTradeId(null);
+        showToast("Projektfilen er åbnet.", true);
       } catch {
-        alert("Fejl ved indlæsning af filen. Er du sikker på det er en gyldig JSON?");
+        showToast("Filen kunne ikke læses. Er det en gyldig projektfil (.json)?");
       }
     };
     reader.readAsText(file);
-    e.target.value = "";
   };
+
+  const startNewProject = () => {
+    setNewProjectOpen(false);
+    setWizardCancelable(true);
+    setWizardOpen(true);
+  };
+
+  const hasContent = appState.tasks.length > 0 || appState.trades.length > 0;
+  const backupDue = appState.tasks.length > 0 && (lastBackup === null || Date.now() - lastBackup > BACKUP_INTERVAL_MS);
 
   // Cost and task count per trade
   const tradeStats = useMemo(() => {
@@ -447,39 +365,19 @@ export default function App() {
   }, [appState.trades, calculatedTasks]);
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col font-sans select-none antialiased">
-      {/* Top Header Panel - Fully Responsive (Light Styled) */}
-      <header className="bg-slate-50 border-b border-slate-200 text-slate-800 px-4 md:px-6 py-3 md:py-4 flex justify-between items-center sticky top-0 z-50 shadow-xs">
-        <div className="flex items-center gap-2.5">
-          <div className="w-9 h-9 md:w-10 md:h-10 bg-slate-800 rounded-xl flex items-center justify-center text-white font-black text-lg md:text-xl shadow-md border border-slate-750/20 select-none leading-none">
-            MD
-          </div>
-          <div>
-            <h1 className="text-xs md:text-sm font-black tracking-tight text-slate-800 mb-0">MD Project</h1>
-            <span className="text-[9px] md:text-[10px] text-slate-500 font-extrabold block leading-none font-mono">
-              version 0.8.4
-            </span>
-          </div>
-        </div>
-
-        {/* Action triggers */}
-        <div className="flex items-center gap-1.5 print:hidden">
-          <button
-            onClick={handleExportProject}
-            className="px-3.5 py-1.5 bg-white hover:bg-slate-100 active:scale-95 transition text-slate-700 rounded-lg border border-slate-200 cursor-pointer text-xs font-extrabold flex items-center gap-1.5 shadow-2xs"
-            title="Download projektfil (Gem)"
-          >
-            <FolderDown className="w-4 h-4 text-slate-500" />
-            <span>Gem</span>
-          </button>
-
-          <label className="px-3.5 py-1.5 bg-white hover:bg-slate-100 active:scale-95 transition text-slate-700 rounded-lg border border-slate-200 cursor-pointer text-xs font-extrabold flex items-center gap-1.5 shadow-2xs">
-            <FolderUp className="w-4 h-4 text-slate-500" />
-            <span>Åbn</span>
-            <input type="file" onChange={handleImportProject} accept=".json" className="hidden" />
-          </label>
-        </div>
-      </header>
+    <div className="min-h-screen bg-slate-50 flex flex-col font-sans antialiased">
+      <AppHeader
+        canUndo={canUndo}
+        canRedo={canRedo}
+        onUndo={undo}
+        onRedo={redo}
+        onNew={() => setNewProjectOpen(true)}
+        onExport={handleExportProject}
+        onImport={handleImportProject}
+        savedAt={saveInfo.savedAt}
+        saveFailed={saveInfo.failed}
+        backupDue={backupDue}
+      />
 
       {/* Main Container Dashboard */}
       <main className="flex-1 max-w-7xl w-full mx-auto p-3 md:p-6 flex flex-col gap-4 md:gap-5">
@@ -527,17 +425,17 @@ export default function App() {
             </div>
           </div>
           <div className="bg-white border border-slate-200 rounded-xl p-3 flex flex-col justify-between shadow-2xs">
-            <span className="text-[8px] md:text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">Planlagte Opgaver</span>
+            <span className="text-[8px] md:text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">Opgaver</span>
             <div className="flex items-baseline gap-1">
               <span className="text-sm md:text-lg font-black text-slate-900 font-mono">{appState.tasks.length}</span>
-              <span className="text-[9px] md:text-[10px] text-slate-400 font-mono font-black">sedler</span>
+              <span className="text-[9px] md:text-[10px] text-slate-400 font-mono font-black">stk.</span>
             </div>
           </div>
           <div className="bg-white border border-slate-200 rounded-xl p-3 flex flex-col justify-between shadow-2xs">
-            <span className="text-[8px] md:text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">Personalefag</span>
+            <span className="text-[8px] md:text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">Faggrupper</span>
             <div className="flex items-baseline gap-1">
               <span className="text-sm md:text-lg font-black text-slate-900 font-mono">{appState.trades.length}</span>
-              <span className="text-[9px] md:text-[10px] text-slate-400 font-mono font-black">svende</span>
+              <span className="text-[9px] md:text-[10px] text-slate-400 font-mono font-black">stk.</span>
             </div>
           </div>
         </div>
@@ -563,167 +461,70 @@ export default function App() {
           </div>
         )}
 
-        {/* Mobile Hamburger menu & Desktop Tab selector bar */}
-        <div className="relative print:hidden select-none">
-          {/* Mobile hamburger header (visible only on mobile) */}
+        {/* Tab navigation: dropdown on mobile, tab bar on larger screens */}
+        <nav className="relative print:hidden" aria-label="Hovedmenu">
           <div className="sm:hidden flex flex-col border border-slate-200 rounded-xl bg-white overflow-hidden shadow-2xs">
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              aria-expanded={mobileMenuOpen}
               className="w-full px-4 py-3 flex items-center justify-between font-extrabold text-sm text-slate-800 bg-slate-50 hover:bg-slate-100/80 transition cursor-pointer"
             >
               <div className="flex items-center gap-2">
-                {activeTab === "tidsplan" && <CalendarDays className="w-5 h-5 text-slate-700" />}
-                {activeTab === "resources" && <UsersRound className="w-5 h-5 text-slate-700" />}
-                {activeTab === "budget" && <DollarSign className="w-5 h-5 text-slate-700" />}
-                {activeTab === "settings" && <SettingsIcon className="w-5 h-5 text-slate-700" />}
-                {activeTab === "glossary" && <HelpCircle className="w-5 h-5 text-slate-700" />}
-                <span className="capitalize">
-                  {activeTab === "tidsplan" && `Tidsplan (${appState.tasks.length})`}
-                  {activeTab === "resources" && "Faggrupper"}
-                  {activeTab === "budget" && "Økonomi"}
-                  {activeTab === "settings" && "Projekt & Kalender"}
-                  {activeTab === "glossary" && "Vidensbase"}
-                </span>
+                {(() => {
+                  const cur = TABS.find((t) => t.id === activeTab)!;
+                  return (
+                    <>
+                      <cur.Icon className="w-5 h-5 text-slate-700" />
+                      <span>{cur.label}{cur.id === "tidsplan" ? ` (${appState.tasks.length})` : ""}</span>
+                    </>
+                  );
+                })()}
               </div>
               <div className="p-1 rounded-md hover:bg-slate-200 transition">
                 {mobileMenuOpen ? <X className="w-5 h-5 text-slate-600" /> : <Menu className="w-5 h-5 text-slate-600" />}
               </div>
             </button>
-
-            {/* Mobile Expandable tab list with micro-animations */}
             {mobileMenuOpen && (
-                <div className="divide-y divide-slate-100 bg-white animate-menu-in">
+              <div className="divide-y divide-slate-100 bg-white animate-menu-in">
+                {TABS.map(({ id, label, Icon }) => (
                   <button
+                    key={id}
                     onClick={() => {
-                      setActiveTab2("tidsplan");
+                      setActiveTab2(id);
                       setMobileMenuOpen(false);
                     }}
                     className={`w-full px-5 py-3 text-left font-bold text-xs flex items-center gap-3 transition cursor-pointer ${
-                      activeTab === "tidsplan" ? "text-slate-900 bg-slate-100" : "text-slate-600 hover:bg-slate-50"
+                      activeTab === id ? "text-slate-900 bg-slate-100" : "text-slate-600 hover:bg-slate-50"
                     }`}
                   >
-                    <CalendarDays className="w-4 h-4 shrink-0" />
-                    <span>Opgaver ({appState.tasks.length})</span>
+                    <Icon className="w-4 h-4 shrink-0" />
+                    <span>{label}{id === "tidsplan" ? ` (${appState.tasks.length})` : ""}</span>
                   </button>
-
-                  <button
-                    onClick={() => {
-                      setActiveTab2("resources");
-                      setMobileMenuOpen(false);
-                    }}
-                    className={`w-full px-5 py-3 text-left font-bold text-xs flex items-center gap-3 transition cursor-pointer ${
-                      activeTab === "resources" ? "text-slate-900 bg-slate-100" : "text-slate-600 hover:bg-slate-50"
-                    }`}
-                  >
-                    <UsersRound className="w-4 h-4 shrink-0" />
-                    <span>Resurser</span>
-                  </button>
-
-                  <button
-                    onClick={() => {
-                      setActiveTab2("budget");
-                      setMobileMenuOpen(false);
-                    }}
-                    className={`w-full px-5 py-3 text-left font-bold text-xs flex items-center gap-3 transition cursor-pointer ${
-                      activeTab === "budget" ? "text-slate-900 bg-slate-100" : "text-slate-600 hover:bg-slate-50"
-                    }`}
-                  >
-                    <DollarSign className="w-4 h-4 shrink-0" />
-                    <span>Økonomi & Budget</span>
-                  </button>
-
-                  <button
-                    onClick={() => {
-                      setActiveTab2("settings");
-                      setMobileMenuOpen(false);
-                    }}
-                    className={`w-full px-5 py-3 text-left font-bold text-xs flex items-center gap-3 transition cursor-pointer ${
-                      activeTab === "settings" ? "text-slate-900 bg-slate-100" : "text-slate-600 hover:bg-slate-50"
-                    }`}
-                  >
-                    <SettingsIcon className="w-4 h-4 shrink-0" />
-                    <span>Projekt & Kalender</span>
-                  </button>
-
-                  <button
-                    onClick={() => {
-                      setActiveTab2("glossary");
-                      setMobileMenuOpen(false);
-                    }}
-                    className={`w-full px-5 py-3 text-left font-bold text-xs flex items-center gap-3 transition cursor-pointer ${
-                      activeTab === "glossary" ? "text-slate-900 bg-slate-100" : "text-slate-600 hover:bg-slate-50"
-                    }`}
-                  >
-                    <HelpCircle className="w-4 h-4 shrink-0" />
-                    <span>Vidensbase (?)</span>
-                  </button>
-                </div>
-              )}
+                ))}
+              </div>
+            )}
           </div>
 
-          {/* Desktop Tab Selector Bar (hidden on mobile, visible on sm and up) */}
-          <div className="hidden sm:flex border-b border-slate-200 overflow-x-auto pb-px scrollbar-hide gap-1 max-w-full">
-            <button
-              onClick={() => setActiveTab2("tidsplan")}
-              className={`px-2.5 sm:px-4 py-2 sm:py-3 font-semibold text-[10px] sm:text-xs flex flex-col sm:flex-row items-center gap-1 sm:gap-1.5 cursor-pointer whitespace-nowrap transition-all border-b-2 min-h-[48px] sm:min-h-[44px] flex-1 sm:flex-initial ${
-                activeTab === "tidsplan"
-                  ? "border-slate-800 text-slate-900 bg-white rounded-t-lg font-black"
-                  : "border-transparent text-slate-500 hover:text-slate-800"
-              }`}
-            >
-              <CalendarDays className="w-5 h-5 sm:w-4 sm:h-4 shrink-0 text-slate-500 group-hover:text-slate-800" />
-              <span>Tidsplan ({appState.tasks.length})</span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab2("resources")}
-              className={`px-2.5 sm:px-4 py-2 sm:py-3 font-semibold text-[10px] sm:text-xs flex flex-col sm:flex-row items-center gap-1 sm:gap-1.5 cursor-pointer whitespace-nowrap transition-all border-b-2 min-h-[48px] sm:min-h-[44px] flex-1 sm:flex-initial ${
-                activeTab === "resources"
-                  ? "border-slate-800 text-slate-900 bg-white rounded-t-lg font-black"
-                  : "border-transparent text-slate-500 hover:text-slate-800"
-              }`}
-            >
-              <UsersRound className="w-5 h-5 sm:w-4 sm:h-4 shrink-0 text-slate-500 group-hover:text-slate-800" />
-              <span>Resurser</span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab2("budget")}
-              className={`px-2.5 sm:px-4 py-2 sm:py-3 font-semibold text-[10px] sm:text-xs flex flex-col sm:flex-row items-center gap-1 sm:gap-1.5 cursor-pointer whitespace-nowrap transition-all border-b-2 min-h-[48px] sm:min-h-[44px] flex-1 sm:flex-initial ${
-                activeTab === "budget"
-                  ? "border-slate-800 text-slate-900 bg-white rounded-t-lg font-black"
-                  : "border-transparent text-slate-500 hover:text-slate-800"
-              }`}
-            >
-              <DollarSign className="w-5 h-5 sm:w-4 sm:h-4 shrink-0 text-slate-500 group-hover:text-slate-800" />
-              <span>Økonomi</span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab2("settings")}
-              className={`px-2.5 sm:px-4 py-2 sm:py-3 font-semibold text-[10px] sm:text-xs flex flex-col sm:flex-row items-center gap-1 sm:gap-1.5 cursor-pointer whitespace-nowrap transition-all border-b-2 min-h-[48px] sm:min-h-[44px] flex-1 sm:flex-initial ${
-                activeTab === "settings"
-                  ? "border-slate-800 text-slate-900 bg-white rounded-t-lg font-black"
-                  : "border-transparent text-slate-500 hover:text-slate-800"
-              }`}
-            >
-              <SettingsIcon className="w-5 h-5 sm:w-4 sm:h-4 shrink-0 text-slate-500 group-hover:text-slate-800" />
-              <span>Indstillinger</span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab2("glossary")}
-              className={`px-3 py-2 sm:py-3 flex items-center justify-center cursor-pointer transition-all border-b-2 min-h-[48px] sm:min-h-[44px] ${
-                activeTab === "glossary"
-                  ? "border-slate-800 text-slate-900 bg-white rounded-t-lg font-black bg-slate-50"
-                  : "border-transparent text-slate-450 hover:text-slate-800"
-              }`}
-              title="Vidensbase (?)"
-            >
-              <HelpCircle className="w-5 h-5 sm:w-4 sm:h-4 shrink-0" />
-            </button>
+          <div className="hidden sm:flex border-b border-slate-200 overflow-x-auto pb-px scrollbar-hide gap-1 max-w-full" role="tablist">
+            {TABS.map(({ id, label, Icon }) => (
+              <button
+                key={id}
+                role="tab"
+                aria-selected={activeTab === id}
+                onClick={() => setActiveTab2(id)}
+                title={id === "glossary" ? "Vidensbase (?)" : undefined}
+                className={`px-4 py-3 font-semibold text-xs flex items-center gap-1.5 cursor-pointer whitespace-nowrap transition-all border-b-2 min-h-[44px] ${
+                  activeTab === id
+                    ? "border-slate-800 text-slate-900 bg-white rounded-t-lg font-black"
+                    : "border-transparent text-slate-500 hover:text-slate-800"
+                }`}
+              >
+                <Icon className="w-4 h-4 shrink-0 text-slate-500" />
+                <span>{label}{id === "tidsplan" ? ` (${appState.tasks.length})` : ""}</span>
+              </button>
+            ))}
           </div>
-        </div>
+        </nav>
 
         {/* Tab layouts with fast simple state selectors */}
         <div className="flex-1 w-full overflow-hidden">
@@ -850,7 +651,7 @@ export default function App() {
                       projectStartDate={appState.startDate}
                       stages={appState.stages || []}
                       weatherDelays={appState.weatherDelays || []}
-                      onUpdateTasks={(ts) => setAppState((p) => ({ ...p, tasks: ts }))}
+                      onUpdateTasks={(ts, newGesture) => update((p) => ({ ...p, tasks: ts }), { history: newGesture })}
                       onEditTask={(task) => {
                         setEditTaskId(task.id);
                         setTidsplanView("list");
@@ -958,7 +759,7 @@ export default function App() {
 
           {/* TAP 4: Budget & PDF report */}
           {activeTab === "budget" && (
-            <div className="bg-white border border-slate-200 rounded-2xl p-4 md:p-5 shadow-xs flex flex-col gap-4 md:gap-5 select-none print:shadow-none print:border-none print:p-0">
+            <div className="bg-white border border-slate-200 rounded-2xl p-4 md:p-5 shadow-xs flex flex-col gap-4 md:gap-5 print:shadow-none print:border-none print:p-0">
               <div className="flex justify-between items-center border-b border-slate-100 pb-3 print:hidden gap-2">
                 <h3 className="text-xs md:text-sm font-black text-slate-800 tracking-tight flex items-center gap-1.5">
                   <DollarSign className="w-4 h-4 text-slate-700" />
@@ -1102,17 +903,32 @@ export default function App() {
       {/* Projekt-guide / Wizard (loaded only when needed) */}
       {wizardOpen && (
         <Suspense fallback={null}>
-          <Wizard isOpen={wizardOpen} onComplete={handleWizardComplete} />
+          <Wizard
+            isOpen={wizardOpen}
+            onComplete={handleWizardComplete}
+            onCancel={wizardCancelable ? () => { setWizardOpen(false); setWizardCancelable(false); } : undefined}
+          />
         </Suspense>
       )}
 
-      {/* Persistent slide-up toast notification panel */}
-      {toastMsg && (
-        <div className="animate-toast-in fixed bottom-6 left-1/2 -translate-x-1/2 bg-slate-900 border border-slate-800 text-white rounded-xl px-4 py-3 text-xs font-bold flex items-center gap-2 shadow-lg z-50 select-none pointer-events-none">
-          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-          <span>{toastMsg}</span>
+      <NewProjectDialog
+        open={newProjectOpen}
+        hasContent={hasContent}
+        onSaveFirst={() => {
+          handleExportProject();
+          startNewProject();
+        }}
+        onConfirm={startNewProject}
+        onCancel={() => setNewProjectOpen(false)}
+      />
+
+      {saveInfo.failed && (
+        <div className="fixed bottom-4 right-4 max-w-xs bg-red-600 text-white text-xs font-bold rounded-xl px-4 py-3 shadow-lg z-[55]">
+          Browseren kan ikke gemme dit projekt automatisk. Tryk "Gem" for at downloade en projektfil.
         </div>
       )}
+
+      <Toast toast={toast} onDismiss={dismissToast} />
     </div>
   );
 }

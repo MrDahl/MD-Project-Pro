@@ -1,0 +1,67 @@
+import { useEffect } from "react";
+
+interface Props {
+  open: boolean;
+  hasContent: boolean;
+  onSaveFirst: () => void;
+  onConfirm: () => void;
+  onCancel: () => void;
+}
+
+/** Confirms starting over, so the current project is never lost by accident. */
+export function NewProjectDialog({ open, hasContent, onSaveFirst, onConfirm, onCancel }: Props) {
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onCancel();
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, onCancel]);
+
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 z-[70] bg-slate-900/50 flex items-center justify-center p-4" onClick={onCancel}>
+      <div
+        id="new-project-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="new-project-title"
+        className="bg-white rounded-2xl shadow-xl border border-slate-200 max-w-md w-full p-5 flex flex-col gap-4"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h2 id="new-project-title" className="text-base font-black text-slate-900">
+          Start et nyt projekt?
+        </h2>
+        <p className="text-xs text-slate-600 leading-relaxed">
+          {hasContent
+            ? "Dit nuværende projekt bliver erstattet. Gem det som fil først, hvis du vil beholde det - du kan også fortryde bagefter."
+            : "Guiden hjælper dig i gang med et nyt projekt."}
+        </p>
+        <div className="flex flex-wrap gap-2 justify-end">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="px-3.5 py-2 rounded-lg text-xs font-extrabold text-slate-600 bg-slate-100 hover:bg-slate-200 cursor-pointer"
+          >
+            Annuller
+          </button>
+          {hasContent && (
+            <button
+              type="button"
+              onClick={onSaveFirst}
+              className="px-3.5 py-2 rounded-lg text-xs font-extrabold text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 cursor-pointer"
+            >
+              Gem fil først
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={onConfirm}
+            className="px-3.5 py-2 rounded-lg text-xs font-extrabold text-white bg-slate-900 hover:bg-black cursor-pointer"
+          >
+            Start nyt projekt
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
