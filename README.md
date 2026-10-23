@@ -126,3 +126,16 @@ Under **Tidsplan → Gem som PDF…** kan hele Gantt-diagrammet gemmes som vekto
 ## Skabeloner
 
 Fire eksempelprojekter under **Nyt projekt**: parcelhus, badeværelse, tilbygning og **Charmdal lejligheder** (226 opgaver, 7 zoner som etaper, 11 faggrupper, ca. 5 år) til stresstest og som kompleks undervisningsopgave.
+
+## Ressourcer og underressourcer
+
+- **Faggrupper → Underresurser:** læg medarbejdere ind under en entreprise, fx 1 overmontør, 2 svende og 3 lærlinge med hver sin timepris.
+- **Opgave → Bemanding pr. aktivitet:** del en opgave i aktiviteter (kabeltræk, rillefræsning, byggemøde ...) og vælg hvem og hvor mange der udfører dem og hvor stor en del af tiden. Prisen beregnes ud fra rollerne i stedet for entreprisens standardtakst. Opgaver uden bemanding bruger stadig standardtakst.
+- **Økonomi → Ressourceoverblik:** vælg entreprise (og evt. etape) og se omkostning, timer og mandedage pr. rolle og pr. aktivitet.
+- **Advarsler:** hvis der skal bruges flere af en rolle samtidigt, end entreprisen har, vises "overbelastning".
+
+## Store projekter
+
+- **Fold etaper sammen** i Gantt (pil ved hver etape, eller "Fold etaper sammen / Fold alle ud").
+- **Vælg flere** i opgavelisten og ret etape, faggruppe eller varighed samlet, eller slet. Kan fortrydes.
+- **Indsæt fra Excel:** kopiér rækker fra Excel og indsæt dem. Kolonner genkendes på overskrifter (Opgave, Varighed, Forgænger(e), Faggruppe, Etape, Start, ID). Nye faggrupper og etaper oprettes automatisk.

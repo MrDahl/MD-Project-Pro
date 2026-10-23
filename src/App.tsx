@@ -1,3 +1,7 @@
+import { ResourceReport } from "./components/ResourceReport";
+import { applyBulk, deleteMany, type BulkChange } from "./utils/bulk";
+import type { ImportResult } from "./utils/pasteImport";
+import { fitStageDates } from "./utils/stages";
 import React, { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Task, Trade, Settings, ProjectInfo, Stage, Holiday } from "./types";
 import { calculateSchedule } from "./utils/scheduler";
@@ -205,7 +209,7 @@ export default function App() {
   }, [appState.startDate, appState.holidays, projectEndDate, update]);
 
   // Task CRUD operations
-  const handleSaveTask = (taskPayload: Omit<Task, "calcStart" | "calcEnd" | "calcCost" | "isCritical" | "tradeCosts">) => {
+  const handleSaveTask = (taskPayload: Omit<Task, "calcStart" | "calcEnd" | "calcCost" | "isCritical" | "tradeCosts" | "assignmentCosts" | "roleCosts" | "roleHours">) => {
     if (editTaskId) {
       update((p) => ({ ...p, tasks: p.tasks.map((t) => (t.id === editTaskId ? { ...t, ...taskPayload } : t)) }));
       showToast("Opgaven er opdateret i tidsplanen.", true);
@@ -228,6 +232,38 @@ export default function App() {
         return { ...p, tasks };
       });
       showToast(`"${copy.title}" er oprettet.`, true);
+    },
+    [update, showToast]
+  );
+
+  const handleBulkApply = useCallback(
+    (ids: string[], change: BulkChange) => {
+      const set = new Set(ids);
+      update((p) => ({ ...p, tasks: applyBulk(p.tasks, set, change) }));
+      showToast(`${ids.length} opgaver er opdateret.`, true);
+    },
+    [update, showToast]
+  );
+
+  const handleBulkDelete = useCallback(
+    (ids: string[]) => {
+      const set = new Set(ids);
+      update((p) => ({ ...p, tasks: deleteMany(p.tasks, set) }));
+      showToast(`${ids.length} opgaver er slettet. Brug Fortryd hvis det var en fejl.`, true);
+    },
+    [update, showToast]
+  );
+
+  const handleImport = useCallback(
+    (r: ImportResult) => {
+      update((p) => {
+        const tasks = [...p.tasks, ...r.tasks];
+        const trades = [...p.trades, ...r.newTrades];
+        const fresh = new Set(r.newStages.map((s) => s.id));
+        const stages = fresh.size > 0 ? fitStageDates(tasks, trades, p.holidays, p.settings, p.startDate, [...(p.stages || []), ...r.newStages], fresh) : p.stages;
+        return { ...p, tasks, trades, stages };
+      });
+      showToast(`${r.tasks.length} opgaver er indsat${r.warnings.length ? ` (${r.warnings.length} bemærkninger)` : ""}.`, true);
     },
     [update, showToast]
   );
@@ -632,6 +668,10 @@ export default function App() {
                     onEdit={(id) => setDrawer({ taskId: id })}
                     onDelete={handleDeleteTask}
                     onDuplicate={handleDuplicateTask}
+                    startDate={appState.startDate}
+                    onBulkApply={handleBulkApply}
+                    onBulkDelete={handleBulkDelete}
+                    onImport={handleImport}
                   />
                 ) : (
                   <div className="bg-white border border-slate-200 p-3 md:p-5 rounded-2xl shadow-xs">
@@ -733,6 +773,11 @@ export default function App() {
                                   </span>
                                 )}
                               </span>
+                              {(tr.roles || []).length > 0 && (
+                                <span data-testid="trade-roles" className="text-[10px] text-slate-500 font-semibold block mt-1 leading-tight">
+                                  Hold: {(tr.roles || []).map((r) => `${r.count} ${r.name.toLowerCase()}`).join(", ")}
+                                </span>
+                              )}
                             </div>
                           </div>
 
@@ -844,6 +889,8 @@ export default function App() {
                 <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider border-b border-slate-100 pb-1">Omkostninger over tid (S-kurve)</h4>
                 <CostCurve tasks={calculatedTasks} baseline={appState.baseline} />
               </div>
+
+              <ResourceReport tasks={calculatedTasks} trades={appState.trades} stages={appState.stages || []} workHoursPerDay={appState.settings.workHoursPerDay} />
 
               {/* Breakdown lists split */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5 md:gap-6 mt-1">

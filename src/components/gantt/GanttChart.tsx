@@ -103,6 +103,17 @@ export function GanttChart({
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [zoom, setZoom] = useState<Zoom>("day");
   const [showArrows, setShowArrows] = useState(true);
+  const [collapsedStages, setCollapsedStages] = useState<Set<string>>(() => new Set());
+  const toggleStage = useCallback(
+    (id: string) =>
+      setCollapsedStages((prev) => {
+        const next = new Set(prev);
+        if (next.has(id)) next.delete(id);
+        else next.add(id);
+        return next;
+      }),
+    []
+  );
   const [showBaseline, setShowBaseline] = useState(true);
   const [pdfOpen, setPdfOpen] = useState(false);
   const [pdfBusy, setPdfBusy] = useState(false);
@@ -174,12 +185,18 @@ export function GanttChart({
   const visibleTasks = useMemo(
     () =>
       scheduled.filter((t) => {
+        if (t.stageId && collapsedStages.has(t.stageId)) return false;
         const a = dayNumber(t.calcStart);
         const b = dayNumber(t.calcEnd);
         return a !== null && b !== null && a <= maxDay && b >= minDay;
       }),
-    [scheduled, minDay, maxDay]
+    [scheduled, minDay, maxDay, collapsedStages]
   );
+  const stageTaskCount = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const t of scheduled) if (t.stageId) m.set(t.stageId, (m.get(t.stageId) ?? 0) + 1);
+    return m;
+  }, [scheduled]);
   const rowCount = visibleStages.length + visibleTasks.length;
 
   // Dependency arrows (finish -> start). Built once per layout; only the ones near the viewport are drawn.
@@ -640,6 +657,9 @@ export function GanttChart({
         <GanttStageRow
           key={`s-${stage.id}`}
           stage={stage}
+          collapsed={collapsedStages.has(stage.id)}
+          taskCount={stageTaskCount.get(stage.id) ?? 0}
+          onToggle={toggleStage}
           top={top}
           totalWidth={totalWidth}
           timelineWidth={timelineWidth}
@@ -845,6 +865,28 @@ export function GanttChart({
             Projektslut
           </button>
         </div>
+
+        {visibleStages.length > 0 && (
+          <div className="flex items-center gap-1.5" role="group" aria-label="Etaper">
+            <button
+              type="button"
+              data-testid="collapse-all"
+              onClick={() => setCollapsedStages(new Set(stages.map((s) => s.id)))}
+              className="px-2.5 py-1 text-[11px] font-extrabold rounded-lg bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 cursor-pointer"
+            >
+              Fold etaper sammen
+            </button>
+            <button
+              type="button"
+              data-testid="expand-all"
+              onClick={() => setCollapsedStages(new Set())}
+              disabled={collapsedStages.size === 0}
+              className="px-2.5 py-1 text-[11px] font-extrabold rounded-lg bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 cursor-pointer disabled:opacity-40 disabled:cursor-default"
+            >
+              Fold alle ud
+            </button>
+          </div>
+        )}
 
         <label className="flex items-center gap-1.5 text-[11px] font-extrabold text-slate-600 cursor-pointer">
           <input type="checkbox" checked={showArrows} onChange={(e) => setShowArrows(e.target.checked)} className="accent-sky-600" />

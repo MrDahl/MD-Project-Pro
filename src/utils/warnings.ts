@@ -1,6 +1,6 @@
 import type { Stage, Task, Trade } from "../types.ts";
 
-export type WarningKind = "after-stage-end" | "before-stage-start" | "no-trade" | "double-booking" | "unscheduled";
+export type WarningKind = "after-stage-end" | "before-stage-start" | "no-trade" | "double-booking" | "role-overload" | "unscheduled";
 
 export interface PlanWarning {
   id: string;
@@ -56,9 +56,11 @@ export function findWarnings(tasks: Task[], trades: Trade[], stages: Stage[]): P
 
   // Possible double booking: the same trade on two tasks that overlap in time (sweep per trade)
   const byTrade = new Map<string, Task[]>();
+  const hasRoles = new Set(trades.filter((tr) => (tr.roles || []).length > 0).map((tr) => tr.id));
   for (const t of tasks) {
     if (t.isRecurring || t.isMilestone || !t.calcStart || !t.calcEnd) continue;
     for (const id of new Set(t.tradeIds || [])) {
+      if (hasRoles.has(id) && (t.assignments || []).some((a) => a.tradeId === id)) continue; // staffed tasks are checked per role below
       const list = byTrade.get(id);
       if (list) list.push(t);
       else byTrade.set(id, [t]);
@@ -82,5 +84,51 @@ export function findWarnings(tasks: Task[], trades: Trade[], stages: Stage[]): P
     }
   }
 
+  // Role overload: more people of one role needed at the same time than the trade has
+  for (const tr of trades) {
+    for (const role of tr.roles || []) {
+      const events: { day: string; delta: number; task: Task }[] = [];
+      for (const t of tasks) {
+        if (t.isRecurring || t.isMilestone || !t.calcStart || !t.calcEnd) continue;
+        let need = 0;
+        for (const a of t.assignments || []) if (a.tradeId === tr.id) for (const c of a.crew) if (c.roleId === role.id) need += c.count;
+        if (need <= 0) continue;
+        events.push({ day: t.calcStart, delta: need, task: t });
+        events.push({ day: nextDay(t.calcEnd), delta: -need, task: t });
+      }
+      events.sort((a, b) => a.day.localeCompare(b.day) || a.delta - b.delta);
+      let load = 0;
+      const active = new Map<string, Task>();
+      let over: { from: string; peak: number; ids: Set<string> } | null = null;
+      for (let i = 0; i < events.length; i++) {
+        const e = events[i];
+        load += e.delta;
+        if (e.delta > 0) active.set(e.task.id, e.task);
+        else active.delete(e.task.id);
+        if (events[i + 1]?.day === e.day) continue; // apply all events of one day first
+        if (load > role.count) {
+          if (!over) over = { from: e.day, peak: load, ids: new Set() };
+          over.peak = Math.max(over.peak, load);
+          for (const id of active.keys()) over.ids.add(id);
+        } else if (over) {
+          const ids = [...over.ids];
+          out.push({
+            id: `overload:${role.id}:${over.from}`,
+            kind: "role-overload",
+            taskIds: ids,
+            message: `${tr.name}: ${over.peak} ${role.name.toLowerCase()} skal arbejde samtidig fra ${fmt(over.from)}, men der er kun ${role.count} (${ids.length} opgaver).`,
+          });
+          over = null;
+        }
+      }
+    }
+  }
+
   return out;
+}
+
+function nextDay(iso: string): string {
+  const d = new Date(`${iso}T12:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + 1);
+  return d.toISOString().slice(0, 10);
 }

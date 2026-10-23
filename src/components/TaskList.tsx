@@ -1,8 +1,11 @@
-import { useEffect, useMemo, useState } from "react";
-import { ListChecks, PlusCircle, Search, Layers } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { ListChecks, PlusCircle, Search, Layers, CheckSquare, ClipboardPaste } from "lucide-react";
 import type { Stage, Task, Trade } from "../types";
 import { EMPTY_FILTER, filterTasks, isFilterActive, type TaskFilter } from "../utils/taskFilter";
 import { TaskCard } from "./TaskCard";
+import { PasteImportDialog } from "./PasteImportDialog";
+import type { BulkChange } from "../utils/bulk";
+import type { ImportResult } from "../utils/pasteImport";
 
 const PAGE = 100;
 
@@ -16,15 +19,44 @@ interface Props {
   onEdit: (id: string) => void;
   onDelete: (id: string) => void;
   onDuplicate: (id: string) => void;
+  startDate: string;
+  onBulkApply: (ids: string[], change: BulkChange) => void;
+  onBulkDelete: (ids: string[]) => void;
+  onImport: (result: ImportResult) => void;
 }
 
 const selectCls =
   "p-1.5 px-2.5 rounded-lg border border-slate-200 text-xs font-bold bg-white text-slate-700 cursor-pointer focus:outline-sky-500";
 
-export function TaskList({ tasks, trades, stages, stageById, tradeById, onNew, onEdit, onDelete, onDuplicate }: Props) {
+export function TaskList({ tasks, trades, stages, stageById, tradeById, onNew, onEdit, onDelete, onDuplicate, startDate, onBulkApply, onBulkDelete, onImport }: Props) {
   const [filter, setFilter] = useState<TaskFilter>(EMPTY_FILTER);
   const [groupByStage, setGroupByStage] = useState(false);
   const [limit, setLimit] = useState(PAGE);
+  const [selectMode, setSelectMode] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(() => new Set());
+  const [pasteOpen, setPasteOpen] = useState(false);
+  const toggleSelect = useCallback(
+    (id: string) =>
+      setSelected((prev) => {
+        const next = new Set(prev);
+        if (next.has(id)) next.delete(id);
+        else next.add(id);
+        return next;
+      }),
+    []
+  );
+  // Tasks that disappeared (deleted, undo) can no longer be selected
+  useEffect(() => {
+    setSelected((prev) => {
+      const ids = new Set(tasks.map((t) => t.id));
+      const keep = [...prev].filter((id) => ids.has(id));
+      return keep.length === prev.size ? prev : new Set(keep);
+    });
+  }, [tasks]);
+  const exitSelect = () => {
+    setSelectMode(false);
+    setSelected(new Set());
+  };
 
   const items = useMemo(() => filterTasks(tasks, trades, filter), [tasks, trades, filter]);
   const active = isFilterActive(filter);
@@ -93,6 +125,28 @@ export function TaskList({ tasks, trades, stages, stageById, tradeById, onNew, o
         <h3 className="text-[10px] md:text-xs font-bold text-slate-400 uppercase tracking-wider" data-testid="task-count">
           {active ? `Viser ${items.length} af ${tasks.length} opgaver` : `Opgaver (${tasks.length})`}
         </h3>
+        <div className="flex items-center gap-2">
+        <button
+          type="button"
+          data-testid="open-paste"
+          onClick={() => setPasteOpen(true)}
+          className="bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 font-extrabold text-xs py-2 px-3 rounded-lg cursor-pointer flex items-center gap-1 min-h-[34px]"
+        >
+          <ClipboardPaste className="w-3.5 h-3.5" />
+          <span>Indsæt fra Excel</span>
+        </button>
+        <button
+          type="button"
+          data-testid="toggle-select"
+          aria-pressed={selectMode}
+          onClick={() => (selectMode ? exitSelect() : setSelectMode(true))}
+          className={`border font-extrabold text-xs py-2 px-3 rounded-lg cursor-pointer flex items-center gap-1 min-h-[34px] ${
+            selectMode ? "bg-sky-600 border-sky-600 text-white" : "bg-white hover:bg-slate-100 border-slate-200 text-slate-700"
+          }`}
+        >
+          <CheckSquare className="w-3.5 h-3.5" />
+          <span>Vælg flere</span>
+        </button>
         <button
           type="button"
           onClick={onNew}
@@ -101,7 +155,38 @@ export function TaskList({ tasks, trades, stages, stageById, tradeById, onNew, o
           <PlusCircle className="w-3.5 h-3.5" />
           <span>Ny opgave</span>
         </button>
+        </div>
       </div>
+
+      {selectMode && (
+        <BulkBar
+          count={selected.size}
+          total={items.length}
+          trades={trades}
+          stages={stages}
+          onSelectAll={() => setSelected(new Set(items.map((i) => i.task.id)))}
+          onClear={() => setSelected(new Set())}
+          onApply={(change) => onBulkApply([...selected], change)}
+          onDelete={() => {
+            onBulkDelete([...selected]);
+            setSelected(new Set());
+          }}
+          onDone={exitSelect}
+        />
+      )}
+
+      {pasteOpen && (
+        <PasteImportDialog
+          trades={trades}
+          stages={stages}
+          startDate={startDate}
+          onImport={(r) => {
+            onImport(r);
+            setPasteOpen(false);
+          }}
+          onClose={() => setPasteOpen(false)}
+        />
+      )}
 
       {tasks.length === 0 ? (
         <div className="bg-white border border-dashed border-slate-200 p-8 md:p-12 text-center rounded-xl text-xs text-slate-400 flex flex-col items-center justify-center">
@@ -134,6 +219,9 @@ export function TaskList({ tasks, trades, stages, stageById, tradeById, onNew, o
                   onEdit={onEdit}
                   onDelete={onDelete}
                   onDuplicate={onDuplicate}
+                  selectMode={selectMode}
+                  selected={selected.has(task.id)}
+                  onToggleSelect={toggleSelect}
                 />
               ))}
             </section>
@@ -149,6 +237,106 @@ export function TaskList({ tasks, trades, stages, stageById, tradeById, onNew, o
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+interface BulkBarProps {
+  count: number;
+  total: number;
+  trades: Trade[];
+  stages: Stage[];
+  onSelectAll: () => void;
+  onClear: () => void;
+  onApply: (change: BulkChange) => void;
+  onDelete: () => void;
+  onDone: () => void;
+}
+
+/** Actions for the selected tasks. Each dropdown applies as soon as a value is picked, then resets. */
+function BulkBar({ count, total, trades, stages, onSelectAll, onClear, onApply, onDelete, onDone }: BulkBarProps) {
+  const [days, setDays] = useState("");
+  const off = count === 0;
+  const pick = (fn: (v: string) => BulkChange | null) => (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const v = e.target.value;
+    e.target.value = "";
+    if (!v) return;
+    const change = fn(v);
+    if (change) onApply(change);
+  };
+  return (
+    <div data-testid="bulk-bar" className="sticky top-2 z-30 bg-sky-50 border border-sky-200 rounded-xl p-3 shadow-sm flex flex-wrap items-center gap-2">
+      <span className="text-xs font-black text-sky-900" data-testid="bulk-count">
+        {count} valgt
+      </span>
+      <button type="button" onClick={onSelectAll} className="text-[11px] font-extrabold text-sky-700 hover:underline cursor-pointer">
+        Vælg alle {total}
+      </button>
+      <button type="button" onClick={onClear} disabled={off} className="text-[11px] font-extrabold text-sky-700 hover:underline cursor-pointer disabled:opacity-40">
+        Fravælg
+      </button>
+      <span className="w-px h-5 bg-sky-200 mx-1" />
+      <select aria-label="Sæt etape" disabled={off} defaultValue="" onChange={pick((v) => ({ stageId: v === "none" ? null : v }))} className={selectCls}>
+        <option value="">Sæt etape…</option>
+        {stages.map((s) => (
+          <option key={s.id} value={s.id}>
+            {s.name}
+          </option>
+        ))}
+        <option value="none">Ingen etape</option>
+      </select>
+      <select aria-label="Tilføj faggruppe" disabled={off} defaultValue="" onChange={pick((v) => ({ addTradeId: v }))} className={selectCls}>
+        <option value="">Tilføj faggruppe…</option>
+        {trades.map((t) => (
+          <option key={t.id} value={t.id}>
+            {t.name}
+          </option>
+        ))}
+      </select>
+      <select aria-label="Skift faggruppe til" disabled={off} defaultValue="" onChange={pick((v) => ({ setTradeId: v }))} className={selectCls}>
+        <option value="">Skift faggruppe til…</option>
+        {trades.map((t) => (
+          <option key={t.id} value={t.id}>
+            {t.name}
+          </option>
+        ))}
+      </select>
+      <div className="flex items-center gap-1">
+        <input
+          type="number"
+          min={1}
+          aria-label="Varighed i dage"
+          placeholder="dage"
+          value={days}
+          onChange={(e) => setDays(e.target.value)}
+          className="w-16 p-1.5 rounded-lg border border-slate-200 text-xs font-bold bg-white"
+        />
+        <button
+          type="button"
+          disabled={off || !(Number(days) >= 1)}
+          onClick={() => {
+            onApply({ duration: Number(days) });
+            setDays("");
+          }}
+          className="px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 text-[11px] font-extrabold text-slate-700 hover:bg-slate-100 cursor-pointer disabled:opacity-40"
+        >
+          Sæt varighed
+        </button>
+      </div>
+      <button
+        type="button"
+        data-testid="bulk-delete"
+        disabled={off}
+        onClick={() => {
+          if (window.confirm(`Slet ${count} opgaver? Det kan fortrydes med Fortryd.`)) onDelete();
+        }}
+        className="px-2.5 py-1.5 rounded-lg bg-red-50 border border-red-200 text-[11px] font-extrabold text-red-700 hover:bg-red-100 cursor-pointer disabled:opacity-40"
+      >
+        Slet valgte
+      </button>
+      <button type="button" onClick={onDone} className="ml-auto px-3 py-1.5 rounded-lg bg-sky-600 text-white text-[11px] font-extrabold hover:bg-sky-700 cursor-pointer">
+        Færdig
+      </button>
     </div>
   );
 }

@@ -156,6 +156,9 @@ export function calculateSchedule(
     calcCost: 0,
     isCritical: false,
     tradeCosts: {} as { [tradeId: string]: number },
+    assignmentCosts: {},
+    roleCosts: {},
+    roleHours: {},
     occurrences: [] as string[],
   }));
 
@@ -288,29 +291,63 @@ export function calculateSchedule(
     let end = start;
     let taskCost = 0;
     const tradeCosts: { [tid: string]: number } = {};
+    const assignmentCosts: { [aid: string]: number } = {};
+    const roleCosts: { [rid: string]: number } = {};
+    const roleHours: { [rid: string]: number } = {};
 
     if (!task.isMilestone) {
-      const activeTrades = (task.tradeIds || [])
-        .map((tid) => tradeById.get(tid))
-        .filter((tr): tr is Trade => !!tr);
+      const assignments = task.assignments || [];
+      // Trades on the task: the chosen ones plus any trade that only appears in a crew
+      const tradeIdSet = new Set(task.tradeIds || []);
+      for (const a of assignments) tradeIdSet.add(a.tradeId);
+      const activeTrades = [...tradeIdSet].map((tid) => tradeById.get(tid)).filter((tr): tr is Trade => !!tr);
+      const crewOf = new Map<string, typeof assignments>();
+      for (const a of assignments) {
+        const tr = tradeById.get(a.tradeId);
+        if (!tr || tr.isFixedPrice) continue; // fixed price trades ignore crews
+        const l = crewOf.get(a.tradeId);
+        if (l) l.push(a);
+        else crewOf.set(a.tradeId, [a]);
+      }
 
-      const dayCost = (day: number, tr: Trade): number => {
-        let cost = hours * tr.rate;
-        if (cal.isHoliday(day)) cost += cost * (tr.holidaySupplement / 100);
-        else if (isWeekendDay(day)) cost += cost * (tr.weekendSupplement / 100);
-        return cost;
+      const supplement = (day: number, tr: Trade): number =>
+        cal.isHoliday(day) ? 1 + tr.holidaySupplement / 100 : isWeekendDay(day) ? 1 + tr.weekendSupplement / 100 : 1;
+
+      const addDay = (day: number) => {
+        for (const tr of activeTrades) {
+          if (tr.isFixedPrice) continue;
+          const sup = supplement(day, tr);
+          const crews = crewOf.get(tr.id);
+          if (!crews) {
+            tradeCosts[tr.id] = (tradeCosts[tr.id] || 0) + hours * tr.rate * sup;
+            continue;
+          }
+          const roleById = new Map((tr.roles || []).map((r) => [r.id, r]));
+          for (const a of crews) {
+            const share = (a.percent ?? 100) / 100;
+            for (const c of a.crew) {
+              const role = roleById.get(c.roleId);
+              if (!role || !(c.count > 0)) continue;
+              const h = hours * share * c.count;
+              const cost = h * role.rate * sup;
+              tradeCosts[tr.id] = (tradeCosts[tr.id] || 0) + cost;
+              assignmentCosts[a.id] = (assignmentCosts[a.id] || 0) + cost;
+              roleCosts[role.id] = (roleCosts[role.id] || 0) + cost;
+              roleHours[role.id] = (roleHours[role.id] || 0) + h;
+            }
+          }
+        }
       };
 
-      for (const tr of activeTrades) tradeCosts[tr.id] = tr.isFixedPrice ? tr.rate : dayCost(start, tr);
+      for (const tr of activeTrades) tradeCosts[tr.id] = 0;
+      addDay(start);
 
       let allocated = 1;
       while (allocated < task.duration) {
         end++;
         if (canWork(end)) {
           allocated++;
-          for (const tr of activeTrades) {
-            if (!tr.isFixedPrice) tradeCosts[tr.id] = (tradeCosts[tr.id] || 0) + dayCost(end, tr);
-          }
+          addDay(end);
         }
       }
 
@@ -324,6 +361,9 @@ export function calculateSchedule(
     task.calcEnd = dayToStr(end);
     task.calcCost = taskCost;
     task.tradeCosts = tradeCosts;
+    task.assignmentCosts = assignmentCosts;
+    task.roleCosts = roleCosts;
+    task.roleHours = roleHours;
   }
 
   // Project end = latest end among regular tasks

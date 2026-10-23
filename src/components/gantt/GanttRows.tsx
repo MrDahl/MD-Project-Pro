@@ -1,7 +1,7 @@
 import React, { memo } from "react";
 import type { Task, Trade, Stage } from "../../types";
 import { dayNumber, type Calendar } from "../../utils/scheduler";
-import { Flame, Layers } from "lucide-react";
+import { ChevronDown, ChevronRight, Flame, Layers } from "lucide-react";
 import { ROW_H, getTaskSegments, multiColorGradient } from "./model";
 
 interface RowBase {
@@ -19,12 +19,18 @@ interface RowBase {
 
 interface GanttStageRowProps extends RowBase {
   stage: Stage;
+  collapsed: boolean;
+  taskCount: number;
+  onToggle: (stageId: string) => void;
   minDay: number;
   maxDay: number;
 }
 
 export const GanttStageRow = memo(function GanttStageRow({
   stage,
+  collapsed,
+  taskCount,
+  onToggle,
   top,
   totalWidth,
   timelineWidth,
@@ -54,13 +60,24 @@ export const GanttStageRow = memo(function GanttStageRow({
       ) : (
         <div className="w-52 shrink-0 border-r border-slate-250 p-3 h-full flex flex-col justify-center sticky left-0 bg-slate-100/30 z-20 shadow-xs">
           <div className="flex items-center gap-1.5 min-w-0">
+            <button
+              type="button"
+              data-testid="stage-toggle"
+              aria-expanded={!collapsed}
+              aria-label={`${collapsed ? "Fold ud" : "Fold sammen"}: ${stage.name}`}
+              title={collapsed ? `Vis ${taskCount} opgaver` : "Skjul opgaverne i denne etape"}
+              onClick={() => onToggle(stage.id)}
+              className="p-0.5 -ml-1 rounded hover:bg-slate-200 text-slate-500 cursor-pointer shrink-0"
+            >
+              {collapsed ? <ChevronRight className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+            </button>
             <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: stage.color }} />
             <span className="text-[11px] font-black uppercase tracking-tight text-slate-800 leading-tight truncate">
               {stage.name}
             </span>
           </div>
           <span className="text-[8px] font-bold text-slate-400 mt-1 pl-4 uppercase tracking-widest leading-none">
-            Etape / Fase
+            {collapsed ? `${taskCount} opgaver skjult` : "Etape / Fase"}
           </span>
         </div>
       )}

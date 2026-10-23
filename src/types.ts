@@ -1,3 +1,21 @@
+/** A sub-resource of a trade (entreprise), e.g. "Svend" x 2 at 450 kr/t. */
+export interface Role {
+  id: string;
+  name: string;
+  count: number; // how many people the trade has in this role
+  rate: number; // kr/t per person
+}
+
+/** An activity inside a task with its own crew, e.g. "Kabeltræk" = 2 apprentices. */
+export interface Assignment {
+  id: string;
+  tradeId: string;
+  label: string;
+  crew: { roleId: string; count: number }[];
+  /** Share of the task's working hours the crew is busy (default 100) */
+  percent?: number;
+}
+
 export interface Trade {
   id: string;
   name: string;
@@ -6,6 +24,8 @@ export interface Trade {
   weekendSupplement: number;
   holidaySupplement: number;
   color: string;
+  /** Optional sub-resources. Without them the trade is paid by `rate` alone. */
+  roles?: Role[];
 }
 
 export interface Stage {
@@ -37,6 +57,8 @@ export interface Task {
   duration: number; // working days
   manualStart: string | null; // "YYYY-MM-DD" style or null
   tradeIds: string[]; // multi-resource support
+  /** Optional crews per activity. For a trade with assignments the cost comes from these instead of the trade rate. */
+  assignments?: Assignment[];
   /** Primary predecessor (Finish-to-Start). Kept in sync with `dependencies` for older files and versions. */
   dependencyId: string | null;
   /** All predecessors. When present it is the source of truth; see utils/links.ts. */
@@ -67,6 +89,9 @@ export interface Task {
   calcCost?: number;
   isCritical?: boolean;
   tradeCosts?: { [tradeId: string]: number };
+  assignmentCosts?: { [assignmentId: string]: number };
+  roleCosts?: { [roleId: string]: number };
+  roleHours?: { [roleId: string]: number }; // person-hours
   occurrences?: string[]; // List of YYYY-MM-DD dates where recurring task takes place
 }
 

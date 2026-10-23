@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from "react";
-import { Task, Trade, Stage, Dependency } from "../types";
+import { Task, Trade, Stage, Dependency, Assignment } from "../types";
+import { CrewEditor } from "./CrewEditor";
+import { cleanAssignments } from "../utils/roles";
 import { descendantsOf, taskLinks } from "../utils/links";
 import { Save, Ban, Calendar, Clock, Link, Check, Plus, RefreshCw, Layers, DollarSign, Trash2 } from "lucide-react";
 
@@ -8,7 +10,7 @@ interface TaskFormProps {
   trades: Trade[];
   stages: Stage[];
   editTaskId: string | null;
-  onSave: (task: Omit<Task, "calcStart" | "calcEnd" | "calcCost" | "isCritical" | "tradeCosts">) => void;
+  onSave: (task: Omit<Task, "calcStart" | "calcEnd" | "calcCost" | "isCritical" | "tradeCosts" | "assignmentCosts" | "roleCosts" | "roleHours">) => void;
   onCancel: () => void;
   /** Hide the form's own heading (when a surrounding panel already shows a title). */
   hideHeading?: boolean;
@@ -21,6 +23,7 @@ export function TaskForm({ tasks, trades, stages, editTaskId, onSave, onCancel, 
   const [duration, setDuration] = useState<number>(3);
   const [selectedTradeIds, setSelectedTradeIds] = useState<string[]>([]);
   const [links, setLinks] = useState<Dependency[]>([]);
+  const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [allowWeekend, setAllowWeekend] = useState(false);
   const [allowHoliday, setAllowHoliday] = useState(false);
   const [weatherIndependent, setWeatherIndependent] = useState(false);
@@ -45,6 +48,7 @@ export function TaskForm({ tasks, trades, stages, editTaskId, onSave, onCancel, 
         setDuration(task.duration || 3);
         setSelectedTradeIds(task.tradeIds || []);
         setLinks(taskLinks(task));
+        setAssignments(task.assignments || []);
         setAllowWeekend(task.allowWeekend);
         setAllowHoliday(task.allowHoliday);
         setWeatherIndependent(task.weatherIndependent || false);
@@ -69,6 +73,7 @@ export function TaskForm({ tasks, trades, stages, editTaskId, onSave, onCancel, 
     setDuration(3);
     setSelectedTradeIds([]);
     setLinks([]);
+    setAssignments([]);
     setAllowWeekend(false);
     setAllowHoliday(false);
     setWeatherIndependent(false);
@@ -116,6 +121,7 @@ export function TaskForm({ tasks, trades, stages, editTaskId, onSave, onCancel, 
       manualStart: isRecurring ? null : (manualStart || null),
       duration: isRecurring ? 0 : (isMilestone ? 0 : Math.max(1, duration)),
       tradeIds: selectedTradeIds,
+      assignments: isRecurring || isMilestone ? undefined : cleanAssignments(assignments.filter((a) => selectedTradeIds.includes(a.tradeId)).map((a) => ({ ...a, label: a.label.trim() })), trades),
       dependencyId: isRecurring ? null : cleanLinks[0]?.taskId ?? null,
       dependencies: isRecurring ? [] : cleanLinks,
       allowWeekend,
@@ -486,6 +492,10 @@ export function TaskForm({ tasks, trades, stages, editTaskId, onSave, onCancel, 
           </div>
         )}
       </div>
+
+      {!isRecurring && !isMilestone && (
+        <CrewEditor trades={trades.filter((t) => selectedTradeIds.includes(t.id))} assignments={assignments} onChange={setAssignments} />
+      )}
 
       {/* Constraints Weekend/Holiday permissions boxes */}
       <div className="flex flex-col gap-3 sm:flex-row sm:gap-4 bg-slate-50/50 p-2.5 rounded-lg border border-slate-100">

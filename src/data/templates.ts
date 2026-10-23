@@ -53,6 +53,10 @@ interface TemplateDef extends TemplateInfo {
   stageColors?: string[];
   /** Years of holidays to generate (default 3) */
   years?: number;
+  /** Sub-resources per trade key */
+  roles?: Record<string, { name: string; count: number; rate: number }[]>;
+  /** Crews added to every task of a trade key */
+  crews?: Record<string, { label: string; percent?: number; crew: [number, string][] }[]>;
 }
 
 const TEMPLATES: TemplateDef[] = [
@@ -141,6 +145,20 @@ const CHARMDAL: TemplateDef = {
   tradeTable: CHARMDAL_TRADES,
   stageColors: ["#475569", "#0369a1", "#15803d", "#b45309", "#7c3aed", "#be123c", "#0f766e"],
   years: 7,
+  roles: {
+    el: [
+      { name: "Overmontør", count: 8, rate: 620 },
+      { name: "Svend", count: 8, rate: 460 },
+      { name: "Lærling", count: 16, rate: 210 },
+    ],
+  },
+  crews: {
+    el: [
+      { label: "Planlægning og byggemøde", percent: 20, crew: [[1, "Overmontør"]] },
+      { label: "Kabeltræk", percent: 60, crew: [[2, "Lærling"]] },
+      { label: "Montage", percent: 80, crew: [[1, "Svend"]] },
+    ],
+  },
   tasks: CHARMDAL_ROWS.map(([key, title, days, trade, stage, after, off, fase]) => ({
     key,
     title,
@@ -170,6 +188,7 @@ export function buildTemplate(id: string, startDate: string): AppData | null {
     weekendSupplement: 50,
     holidaySupplement: 100,
     color: table[key].color,
+    roles: def.roles?.[key]?.map((r, i) => ({ id: `role-${key}-${i + 1}`, name: r.name, count: r.count, rate: r.rate })),
   }));
   const usedTrades = new Set(def.tasks.flatMap((t) => t.trades));
   const projectTrades = trades.filter((tr) => usedTrades.has(tr.id.slice(3)));
@@ -182,9 +201,21 @@ export function buildTemplate(id: string, startDate: string): AppData | null {
       const [key, type, lag] = typeof a === "string" ? [a, "FS" as const, 0] : a;
       return { taskId: idOf.get(key)!, type, lag };
     });
+    const crewDefs = d.milestone ? [] : d.trades.flatMap((k) => (def.crews?.[k] || []).map((c) => ({ k, c })));
+    const assignments = crewDefs.map(({ k, c }, i) => {
+      const roles = def.roles?.[k] || [];
+      return {
+        id: `${idOf.get(d.key)}-a${i + 1}`,
+        tradeId: `tr-${k}`,
+        label: c.label,
+        percent: c.percent,
+        crew: c.crew.map(([count, roleName]) => ({ roleId: `role-${k}-${roles.findIndex((r) => r.name === roleName) + 1}`, count })),
+      };
+    });
     return withLinks(
       {
         id: idOf.get(d.key)!,
+        assignments: assignments.length ? assignments : undefined,
         title: d.title,
         desc: d.desc || "",
         duration: d.days,

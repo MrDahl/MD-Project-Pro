@@ -10,17 +10,34 @@ interface TaskCardProps {
   onEdit: (id: string) => void;
   onDelete: (id: string) => void;
   onDuplicate: (id: string) => void;
+  /** Selection mode: a checkbox is shown instead of relying on the action buttons */
+  selectMode?: boolean;
+  selected?: boolean;
+  onToggleSelect?: (id: string) => void;
 }
 
 /** One row in the task list. Memoised, and the browser skips layout/paint for cards that are off-screen. */
-export const TaskCard = memo(function TaskCard({ task: t, number, stageById, tradeById, onEdit, onDelete, onDuplicate }: TaskCardProps) {
+export const TaskCard = memo(function TaskCard({ task: t, number, stageById, tradeById, onEdit, onDelete, onDuplicate, selectMode, selected, onToggleSelect }: TaskCardProps) {
   return (
     <div
       style={{ contentVisibility: "auto", containIntrinsicSize: "auto 170px" }}
       className={`bg-white border p-4 rounded-xl flex flex-col gap-3 shadow-2xs hover:shadow-xs transition relative ${
         t.isCritical ? "border-l-4 border-l-red-500 ring-1 ring-red-500/10" : "border-slate-200"
-      }`}
+      } ${selected ? "ring-2 ring-sky-500 bg-sky-50/40" : ""} ${selectMode ? "cursor-pointer" : ""}`}
+      onClick={selectMode ? () => onToggleSelect?.(t.id) : undefined}
     >
+      {selectMode && (
+        <label className="absolute top-3 right-3 z-10 flex items-center gap-1.5 text-[10px] font-extrabold text-slate-500 cursor-pointer">
+          <input
+            type="checkbox"
+            data-testid="select-task"
+            aria-label={`Markér ${t.title}`}
+            checked={!!selected}
+            readOnly
+            className="w-4 h-4 accent-sky-600 cursor-pointer"
+          />
+        </label>
+      )}
       <div className="flex justify-between items-start gap-3">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5 flex-wrap">
@@ -67,7 +84,7 @@ export const TaskCard = memo(function TaskCard({ task: t, number, stageById, tra
           {t.desc && <p className="text-[11px] md:text-xs text-slate-450 mt-2.5 font-medium leading-normal">{t.desc}</p>}
         </div>
 
-        <div className="flex gap-1 shrink-0">
+        <div className={`flex gap-1 shrink-0 ${selectMode ? "invisible" : ""}`}>
           <button
             onClick={() => onEdit(t.id)}
             className="p-2 bg-slate-50 hover:bg-slate-100 text-slate-400 hover:text-slate-600 rounded-lg cursor-pointer border border-slate-100 transition active:scale-95 min-h-[36px] min-w-[36px] flex items-center justify-center"
@@ -146,6 +163,17 @@ export const TaskCard = memo(function TaskCard({ task: t, number, stageById, tra
           {(t.calcCost || 0).toLocaleString("da-DK")} kr.
         </div>
       </div>
+      {(t.assignments || []).length > 0 && (
+        <div className="text-[10px] text-slate-500 font-semibold leading-snug" data-testid="card-crew">
+          {(t.assignments || [])
+            .map((a) => {
+              const roles = tradeById.get(a.tradeId)?.roles || [];
+              const crew = a.crew.map((c) => `${c.count} ${(roles.find((r) => r.id === c.roleId)?.name ?? "?").toLowerCase()}`).join(" + ");
+              return `${a.label || "Aktivitet"}: ${crew}`;
+            })
+            .join(" · ")}
+        </div>
+      )}
     </div>
   );
 });

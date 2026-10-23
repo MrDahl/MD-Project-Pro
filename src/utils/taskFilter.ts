@@ -1,4 +1,5 @@
 import type { Task, Trade } from "../types.ts";
+import { stripCalculated } from "./tasks.ts";
 
 export interface TaskFilter {
   query: string;
@@ -34,7 +35,8 @@ export function filterTasks(tasks: Task[], trades: Trade[], f: TaskFilter): { ta
 
 /** Fresh copy of a task for "duplicate": new id, "(kopi)" in the title, progress reset. */
 export function duplicateTask(task: Task, newId: string): Task {
-  const { calcStart, calcEnd, calcCost, isCritical, tradeCosts, occurrences, ...rest } = task;
-  void calcStart; void calcEnd; void calcCost; void isCritical; void tradeCosts; void occurrences;
-  return { ...rest, id: newId, title: `${task.title} (kopi)`, progress: 0, tradeIds: [...(task.tradeIds || [])] };
+  const rest = stripCalculated(task);
+  const copy: Task = { ...rest, id: newId, title: `${task.title} (kopi)`, progress: 0, tradeIds: [...(task.tradeIds || [])] };
+  if (task.assignments) copy.assignments = task.assignments.map((a, i) => ({ ...a, id: `${newId}-a${i + 1}`, crew: a.crew.map((c) => ({ ...c })) }));
+  return copy;
 }

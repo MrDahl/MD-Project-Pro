@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { Trade } from "../types";
+import { Trade, Role } from "../types";
+import { RolesEditor } from "./RolesEditor";
 import { Save, Ban, Plus, Percent, Coins, Palette } from "lucide-react";
 
 interface TradeFormProps {
@@ -28,6 +29,7 @@ export function TradeForm({ trades, editTradeId, onSave, onCancel }: TradeFormPr
   const [weekendSupplement, setWeekendSupplement] = useState<number>(50);
   const [holidaySupplement, setHolidaySupplement] = useState<number>(100);
   const [color, setColor] = useState("#3b82f6");
+  const [roles, setRoles] = useState<Role[]>([]);
 
   useEffect(() => {
     if (editTradeId) {
@@ -39,6 +41,7 @@ export function TradeForm({ trades, editTradeId, onSave, onCancel }: TradeFormPr
         setWeekendSupplement(tr.weekendSupplement);
         setHolidaySupplement(tr.holidaySupplement);
         setColor(tr.color);
+        setRoles(tr.roles || []);
       }
     } else {
       resetForm();
@@ -52,6 +55,7 @@ export function TradeForm({ trades, editTradeId, onSave, onCancel }: TradeFormPr
     setWeekendSupplement(50);
     setHolidaySupplement(100);
     setColor("#3b82f6");
+    setRoles([]);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -66,6 +70,7 @@ export function TradeForm({ trades, editTradeId, onSave, onCancel }: TradeFormPr
       weekendSupplement: isFixedPrice ? 0 : weekendSupplement,
       holidaySupplement: isFixedPrice ? 0 : holidaySupplement,
       color,
+      roles: !isFixedPrice && roles.some((r) => r.name.trim()) ? roles.filter((r) => r.name.trim()).map((r) => ({ ...r, name: r.name.trim() })) : undefined,
     });
     resetForm();
   };
@@ -105,7 +110,7 @@ export function TradeForm({ trades, editTradeId, onSave, onCancel }: TradeFormPr
       <div className="flex flex-col gap-1">
         <label className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
           <Coins className="w-3.5 h-3.5 text-slate-400" />
-          <span>{isFixedPrice ? "Fast pris pr. tilknyttet opgave (kr.)" : "Standard timepris (kr./t)"}</span>
+          <span>{isFixedPrice ? "Fast pris pr. tilknyttet opgave (kr.)" : roles.length > 0 ? "Standard timepris (bruges når en opgave ikke er bemandet)" : "Standard timepris (kr./t)"}</span>
         </label>
         <input
           type="number"
@@ -153,6 +158,8 @@ export function TradeForm({ trades, editTradeId, onSave, onCancel }: TradeFormPr
           </div>
         </div>
       )}
+
+      {!isFixedPrice && <RolesEditor roles={roles} onChange={setRoles} />}
 
       {/* Row 5: Preset colors selections */}
       <div className="flex flex-col gap-1.5">
