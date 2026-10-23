@@ -5,8 +5,8 @@ import { calculateSchedule, detectCycle } from "../utils/scheduler.ts";
 import { findWarnings } from "../utils/warnings.ts";
 import { nextMonday } from "../utils/dates.ts";
 
-test("there are three templates and an unknown id gives null", () => {
-  assert.equal(TEMPLATE_LIST.length, 3);
+test("there are four templates and an unknown id gives null", () => {
+  assert.equal(TEMPLATE_LIST.length, 4);
   assert.equal(buildTemplate("nope", "2026-06-22"), null);
 });
 

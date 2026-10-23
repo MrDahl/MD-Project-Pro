@@ -122,3 +122,7 @@ Under **Tidsplan → Gem som PDF…** kan hele Gantt-diagrammet gemmes som vekto
 - **Indhold:** kalender (måneder/uger/dage, weekend, helligdage, vejrdage), opgavenavn + faggruppe + datoer over hver bjælke, afhængighedspile, baseline-skygge, i dag-linje, titelfelt og signaturforklaring.
 - Maks. sidestørrelse i PDF er ca. 5 m; større skaleres automatisk ned. Indbygget skrifttype dækker Latin-1 (æøå fungerer).
 - jsPDF indlæses først når dialogen bruges (påvirker ikke opstartstid).
+
+## Skabeloner
+
+Fire eksempelprojekter under **Nyt projekt**: parcelhus, badeværelse, tilbygning og **Charmdal lejligheder** (226 opgaver, 7 zoner som etaper, 11 faggrupper, ca. 5 år) til stresstest og som kompleks undervisningsopgave.

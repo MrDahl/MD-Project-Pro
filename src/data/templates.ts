@@ -2,6 +2,8 @@ import type { AppData, Dependency, Stage, Task, Trade } from "../types.ts";
 import { calculateSchedule } from "../utils/scheduler.ts";
 import { danishHolidays } from "../utils/holidays.ts";
 import { withLinks } from "../utils/links.ts";
+import { CHARMDAL_ROWS, CHARMDAL_STAGES, CHARMDAL_TRADES } from "./charmdal.ts";
+import { addDaysStr } from "../utils/dates.ts";
 
 export interface TemplateInfo {
   id: string;
@@ -9,9 +11,11 @@ export interface TemplateInfo {
   description: string;
 }
 
-type TradeKey = "ground" | "concrete" | "carpenter" | "roofer" | "plumber" | "electrician" | "painter" | "floor";
+type BuiltInKey = "ground" | "concrete" | "carpenter" | "roofer" | "plumber" | "electrician" | "painter" | "floor";
 
-const TRADES: Record<TradeKey, { name: string; rate: number; color: string }> = {
+type TradeKey = string;
+
+const TRADES: Record<BuiltInKey, { name: string; rate: number; color: string }> = {
   ground: { name: "Entreprenør (jord)", rate: 520, color: "#92400e" },
   concrete: { name: "Beton & murer", rate: 480, color: "#64748b" },
   carpenter: { name: "Tømrer", rate: 470, color: "#d97706" },
@@ -36,12 +40,19 @@ interface TaskDef {
   after?: After[];
   milestone?: boolean;
   desc?: string;
+  /** Calendar days after the project start; fixes the start (used to stagger zones). */
+  startOffset?: number;
 }
 
 interface TemplateDef extends TemplateInfo {
   projectName: string;
   stages: string[];
   tasks: TaskDef[];
+  /** Own trade table (otherwise the built-in one) */
+  tradeTable?: Record<string, { name: string; rate: number; color: string }>;
+  stageColors?: string[];
+  /** Years of holidays to generate (default 3) */
+  years?: number;
 }
 
 const TEMPLATES: TemplateDef[] = [
@@ -121,6 +132,28 @@ const TEMPLATES: TemplateDef[] = [
   },
 ];
 
+const CHARMDAL: TemplateDef = {
+  id: "charmdal",
+  name: "Charmdal lejligheder (stort projekt)",
+  description: `Stort stresstest-projekt: ${CHARMDAL_ROWS.length} opgaver i 7 zoner over ca. 5 år med forskudte produktionsrunder.`,
+  projectName: "Charmdal Lejligheder",
+  stages: CHARMDAL_STAGES,
+  tradeTable: CHARMDAL_TRADES,
+  stageColors: ["#475569", "#0369a1", "#15803d", "#b45309", "#7c3aed", "#be123c", "#0f766e"],
+  years: 7,
+  tasks: CHARMDAL_ROWS.map(([key, title, days, trade, stage, after, off, fase]) => ({
+    key,
+    title,
+    days,
+    trades: [trade],
+    stage,
+    after,
+    startOffset: off ?? undefined,
+    desc: `Fase: ${fase}`,
+  })),
+};
+TEMPLATES.push(CHARMDAL);
+
 export const TEMPLATE_LIST: TemplateInfo[] = TEMPLATES.map(({ id, name, description }) => ({ id, name, description }));
 
 /** A ready-made project that starts on `startDate`. Stage dates are derived from the calculated plan. */
@@ -128,20 +161,21 @@ export function buildTemplate(id: string, startDate: string): AppData | null {
   const def = TEMPLATES.find((t) => t.id === id);
   if (!def) return null;
 
-  const trades: Trade[] = (Object.keys(TRADES) as TradeKey[]).map((key) => ({
+  const table: Record<string, { name: string; rate: number; color: string }> = def.tradeTable ?? TRADES;
+  const trades: Trade[] = Object.keys(table).map((key) => ({
     id: `tr-${key}`,
-    name: TRADES[key].name,
-    rate: TRADES[key].rate,
+    name: table[key].name,
+    rate: table[key].rate,
     isFixedPrice: false,
     weekendSupplement: 50,
     holidaySupplement: 100,
-    color: TRADES[key].color,
+    color: table[key].color,
   }));
   const usedTrades = new Set(def.tasks.flatMap((t) => t.trades));
-  const projectTrades = trades.filter((tr) => usedTrades.has(tr.id.slice(3) as TradeKey));
+  const projectTrades = trades.filter((tr) => usedTrades.has(tr.id.slice(3)));
 
   const idOf = new Map(def.tasks.map((t, i) => [t.key, `task-${id}-${i + 1}`]));
-  const stages: Stage[] = def.stages.map((name, i) => ({ id: `stage-${id}-${i + 1}`, name, color: STAGE_COLORS[i % STAGE_COLORS.length], startDate, endDate: startDate }));
+  const stages: Stage[] = def.stages.map((name, i) => ({ id: `stage-${id}-${i + 1}`, name, color: (def.stageColors ?? STAGE_COLORS)[i % (def.stageColors ?? STAGE_COLORS).length], startDate, endDate: startDate }));
 
   const tasks: Task[] = def.tasks.map((d) => {
     const links: Dependency[] = (d.after || []).map((a) => {
@@ -154,7 +188,7 @@ export function buildTemplate(id: string, startDate: string): AppData | null {
         title: d.title,
         desc: d.desc || "",
         duration: d.days,
-        manualStart: null,
+        manualStart: d.startOffset != null ? addDaysStr(startDate, d.startOffset) : null,
         tradeIds: d.trades.map((k) => `tr-${k}`),
         dependencyId: null,
         allowWeekend: false,
@@ -168,7 +202,7 @@ export function buildTemplate(id: string, startDate: string): AppData | null {
   });
 
   const year = Number(startDate.slice(0, 4));
-  const holidays = [year, year + 1, year + 2]
+  const holidays = Array.from({ length: def.years ?? 3 }, (_, i) => year + i)
     .flatMap((y) => danishHolidays(y))
     .map((h) => ({ id: `hol-auto-${h.date}`, date: h.date, name: h.name }));
   const settings = { workHoursPerDay: 7.4 };
