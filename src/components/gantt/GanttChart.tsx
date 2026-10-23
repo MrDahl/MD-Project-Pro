@@ -1,8 +1,8 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import type { Task, Trade, Stage, WeatherDelay, Holiday, Baseline } from "../../types";
+import type { Task, Trade, Stage, WeatherDelay, Holiday, Baseline, ProjectInfo } from "../../types";
 import { baselineById, endDeviationDays } from "../../utils/baseline";
 import { buildCalendar, dayNumber, dayToStr, isWeekendDay, weekdayOf } from "../../utils/scheduler";
-import { Calendar, Zap, ChevronLeft, ChevronRight, FolderDown, Flame, SlidersHorizontal, ZoomIn, Link2 } from "lucide-react";
+import { Calendar, Zap, ChevronLeft, ChevronRight, FolderDown, Flame, SlidersHorizontal, ZoomIn, Link2, FileText } from "lucide-react";
 import { todayStr } from "../../utils/dates";
 import { taskLinks } from "../../utils/links";
 import {
@@ -24,6 +24,9 @@ import {
 } from "./model";
 import { applyMove, applyResize } from "./drag";
 import { exportFullGantt } from "./exportGantt";
+import { PdfExportDialog } from "./pdf/PdfExportDialog";
+import { buildPdf, downloadBlob } from "./pdf/exportPdf";
+import type { PdfInput, PdfOptions } from "./pdf/layout";
 import { GanttStageRow, GanttTaskRow } from "./GanttRows";
 import { DayActionModal } from "./DayActionModal";
 import { TaskDetailModal } from "./TaskDetailModal";
@@ -36,6 +39,7 @@ interface GanttChartProps {
   stages?: Stage[];
   weatherDelays?: WeatherDelay[];
   baseline?: Baseline | null;
+  projectInfo?: ProjectInfo;
   onSaveBaseline: () => void;
   onClearBaseline: () => void;
   /** `newGesture` is true for the first change of a drag, so the whole drag becomes one undo step. */
@@ -82,6 +86,7 @@ export function GanttChart({
   stages = EMPTY_STAGES,
   weatherDelays = EMPTY_DELAYS,
   baseline = null,
+  projectInfo,
   onSaveBaseline,
   onClearBaseline,
   onUpdateTasks,
@@ -99,6 +104,9 @@ export function GanttChart({
   const [zoom, setZoom] = useState<Zoom>("day");
   const [showArrows, setShowArrows] = useState(true);
   const [showBaseline, setShowBaseline] = useState(true);
+  const [pdfOpen, setPdfOpen] = useState(false);
+  const [pdfBusy, setPdfBusy] = useState(false);
+  const [pdfError, setPdfError] = useState<string | null>(null);
   const [jumpTo, setJumpTo] = useState<number | null>(null);
   const zoomAnchor = useRef<number | null>(null);
   const colW = ZOOM_COL_W[zoom];
@@ -476,6 +484,34 @@ export function GanttChart({
     [focusNeighbour]
   );
 
+  // --- PDF export (whole project or one stage, vector) ---
+  const pdfInput: PdfInput = {
+    tasks,
+    trades,
+    stages,
+    cal,
+    weatherRanges: cal.weatherRanges,
+    baseline,
+    projectInfo,
+    today: dayNumber(todayStr()) ?? 0,
+    printedAt: new Date(),
+  };
+  const handlePdf = async (opts: PdfOptions) => {
+    setPdfBusy(true);
+    setPdfError(null);
+    try {
+      const { blob } = await buildPdf({ ...pdfInput, printedAt: new Date() }, opts);
+      const stage = opts.scope === "all" ? "" : `_${stages.find((s) => s.id === opts.scope)?.name ?? "etape"}`;
+      const name = `${projectInfo?.projectName || "Tidsplan"}${stage}_Gantt`.trim().replace(/[^a-zA-Z0-9æøåÆØÅ\s-_]/g, "").replace(/\s+/g, "_");
+      downloadBlob(blob, `${name}.pdf`);
+      setPdfOpen(false);
+    } catch (e) {
+      setPdfError(`PDF'en kunne ikke laves: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setPdfBusy(false);
+    }
+  };
+
   // --- Export ---
   const handleExport = () => {
     let scopeLabel = "Hele projektet";
@@ -751,7 +787,15 @@ export function GanttChart({
           className="px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white font-extrabold text-xs rounded-xl shadow-sm border-0 transition active:scale-95 flex items-center gap-2 cursor-pointer transition-all"
         >
           <FolderDown className="w-4 h-4" />
-          <span>Hent fuld tidsplan (HTML/PDF)</span>
+          <span>Hent som HTML</span>
+        </button>
+        <button
+          onClick={() => setPdfOpen(true)}
+          data-testid="open-pdf"
+          className="px-4 py-2 bg-slate-900 hover:bg-black text-white font-extrabold text-xs rounded-xl shadow-sm border-0 transition active:scale-95 flex items-center gap-2 cursor-pointer"
+        >
+          <FileText className="w-4 h-4" />
+          <span>Gem som PDF…</span>
         </button>
       </div>
 
@@ -972,6 +1016,17 @@ export function GanttChart({
           <span className="font-extrabold text-red-650">Kritisk Vej (Forsinkelse her skubber hele projektets slutdato)</span>
         </div>
       </div>
+
+      {pdfOpen && (
+        <PdfExportDialog
+          input={pdfInput}
+          hasBaseline={!!baseline}
+          busy={pdfBusy}
+          error={pdfError}
+          onExport={handlePdf}
+          onClose={() => setPdfOpen(false)}
+        />
+      )}
 
       {selectedDay && (
         <DayActionModal

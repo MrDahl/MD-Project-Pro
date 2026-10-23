@@ -111,3 +111,14 @@ Ved push til `main` bygger GitHub Actions appen og udgiver den på GitHub Pages.
 ---
 
 *Værktøjet er udviklet med dyb respekt for byggeledelsens daglige virkelighed, hvor tidsplaner ikke blot er statiske streger, men dynamiske og komplekse planer, der påvirkes af vejr, helligdage og faglige sammenhænge.* 🛠🏗
+
+## PDF-eksport af hele tidsplanen
+
+Under **Tidsplan → Gem som PDF…** kan hele Gantt-diagrammet gemmes som vektor-PDF (skarp tekst i alle størrelser):
+
+- **Omfang:** hele projektet eller én etape ad gangen.
+- **Papir:** automatisk størrelse (ét stort ark, bredde efter projektets længde) eller fast A4/A3/A2/A1/A0 (liggende/stående). Ved fast papir fortsætter rækkerne på næste side.
+- **Maks. opgaver pr. side:** 300 som standard (kan sættes til 150/75/40). Etaper-overskrifter gentages med "(fortsat)".
+- **Indhold:** kalender (måneder/uger/dage, weekend, helligdage, vejrdage), opgavenavn + faggruppe + datoer over hver bjælke, afhængighedspile, baseline-skygge, i dag-linje, titelfelt og signaturforklaring.
+- Maks. sidestørrelse i PDF er ca. 5 m; større skaleres automatisk ned. Indbygget skrifttype dækker Latin-1 (æøå fungerer).
+- jsPDF indlæses først når dialogen bruges (påvirker ikke opstartstid).

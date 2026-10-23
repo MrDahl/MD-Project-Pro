@@ -663,6 +663,7 @@ export default function App() {
                       stages={appState.stages || []}
                       weatherDelays={appState.weatherDelays || []}
                       baseline={appState.baseline}
+                      projectInfo={appState.projectInfo}
                       onSaveBaseline={handleSaveBaseline}
                       onClearBaseline={handleClearBaseline}
                       onUpdateTasks={(ts, newGesture) => update((p) => ({ ...p, tasks: ts }), { history: newGesture })}
