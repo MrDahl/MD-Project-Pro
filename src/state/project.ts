@@ -1,3 +1,4 @@
+import { isValidWeek } from "../utils/worktime.ts";
 import type { AppData, Holiday, Task } from "../types.ts";
 import { dayNumber } from "../utils/scheduler.ts";
 import { nextMonday } from "../utils/dates.ts";
@@ -70,7 +71,10 @@ export function normalizeProject(raw: unknown): AppData {
   return {
     ...base,
     startDate,
-    settings: { workHoursPerDay: hours > 0 ? hours : base.settings.workHoursPerDay },
+    settings: {
+      workHoursPerDay: hours > 0 ? hours : base.settings.workHoursPerDay,
+      ...(isRecord(raw.settings) && isValidWeek(raw.settings.workWeek) ? { workWeek: raw.settings.workWeek } : {}),
+    },
     projectInfo: { ...base.projectInfo!, ...(isRecord(raw.projectInfo) ? raw.projectInfo : {}) },
     holidays,
     trades: asArray(raw.trades),

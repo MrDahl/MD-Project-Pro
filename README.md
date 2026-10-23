@@ -139,3 +139,12 @@ Fire eksempelprojekter under **Nyt projekt**: parcelhus, badeværelse, tilbygnin
 - **Fold etaper sammen** i Gantt (pil ved hver etape, eller "Fold etaper sammen / Fold alle ud").
 - **Vælg flere** i opgavelisten og ret etape, faggruppe eller varighed samlet, eller slet. Kan fortrydes.
 - **Indsæt fra Excel:** kopiér rækker fra Excel og indsæt dem. Kolonner genkendes på overskrifter (Opgave, Varighed, Forgænger(e), Faggruppe, Etape, Start, ID). Nye faggrupper og etaper oprettes automatisk.
+
+## Arbejdstider og timeplanlægning
+
+- **Projekt & kalender → Arbejdstid:** enten "Enkel" (fx 7,4 t/dag fra kl. 07:00) eller "Detaljeret" med klokkeslæt og pauser pr. ugedag (man-tor, fredag, weekend), fx 06:00-14:30 med pauser kl. 9:00-9:15 og 11:30-12:00 og kortere fredag.
+- **Pr. faggruppe og pr. rolle:** en faggruppe kan have egne arbejdstider, og en rolle (fx lærling) kan have sine egne til lønberegningen. Opgavens placering følger faggruppens arbejdstid.
+- **Opgaver i timer:** vælg enheden "timer" i opgaveformularen. Opgaven placeres på klokkeslæt, så fx rillefræsning (4 t) og oprydning (2 t) følger efter hinanden samme dag og springer pauser og fridage over. Opgaver i dage opfører sig som før, så de to typer kan blandes i samme projekt.
+- **Bemanding:** en aktivitet kan bruge en andel af tiden eller et fast antal timer pr. person.
+- **Gantt:** ny zoom "Time" viser klokkeslæt (06-18) pr. dag. Pris, advarsler om dobbeltbooking og overbelastning følger klokken.
+- Skabelon: "Eldag i timer (detaljeret)".

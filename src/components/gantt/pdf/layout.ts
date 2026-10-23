@@ -132,6 +132,11 @@ const dm = (day: number): string => {
   return `${Number(d)}/${Number(m)}`;
 };
 
+const hm = (min: number | undefined): string => {
+  const m = Math.round(min ?? 0);
+  return `${Math.floor(m / 60)}:${String(m % 60).padStart(2, "0")}`;
+};
+
 /** ISO week number of a day number. */
 export function isoWeek(day: number): number {
   const thursday = day + 3 - ((weekdayOf(day) + 6) % 7);
@@ -475,6 +480,8 @@ export function layoutPages(input: PdfInput, opts: PdfOptions, measure: Measure 
         ? `hver ${t.recurringInterval || 7}. dag`
         : t.isMilestone
         ? dm(s)
+        : t.durationHours
+        ? `${dm(s)} ${hm(t.calcStartMin)}-${s === e ? "" : dm(e) + " "}${hm(t.calcEndMin)} (${t.durationHours}t)`
         : `${dm(s)}-${dm(e)} (${t.duration}d)`;
       const dev = showBaseline ? endDeviationDays(t, base) : null;
       const devText = dev ? ` ${dev > 0 ? "+" : ""}${dev}d` : "";

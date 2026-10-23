@@ -1,4 +1,5 @@
 import type { Stage, Task, Trade } from "../types.ts";
+import { dayNumber } from "./scheduler.ts";
 
 export type WarningKind = "after-stage-end" | "before-stage-start" | "no-trade" | "double-booking" | "role-overload" | "unscheduled";
 
@@ -9,6 +10,11 @@ export interface PlanWarning {
   taskIds: string[];
   message: string;
 }
+
+/** Position on the clock (minutes). Tasks without clock info count as whole days. */
+const startOf = (t: Task): number => (dayNumber(t.calcStart) ?? 0) * 1440 + (t.calcStartMin ?? 0);
+const endOf = (t: Task): number => (dayNumber(t.calcEnd) ?? 0) * 1440 + (t.calcEndMin ?? 1440);
+const hm = (min: number): string => `${Math.floor((min % 1440) / 60)}:${String(Math.round(min % 60)).padStart(2, "0")}`;
 
 const fmt = (iso: string): string => {
   const [y, m, d] = iso.split("-");
@@ -67,56 +73,58 @@ export function findWarnings(tasks: Task[], trades: Trade[], stages: Stage[]): P
     }
   }
   for (const [tradeId, list] of byTrade) {
-    list.sort((a, b) => a.calcStart!.localeCompare(b.calcStart!));
+    list.sort((x, y) => startOf(x) - startOf(y));
     let holder: Task | null = null; // the task with the latest end so far
     for (const t of list) {
-      if (holder && t.calcStart! <= holder.calcEnd!) {
+      if (holder && startOf(t) < endOf(holder)) {
         const from = t.calcStart!;
         const to = t.calcEnd! < holder.calcEnd! ? t.calcEnd! : holder.calcEnd!;
+        const clockInfo = t.durationHours || holder.durationHours ? ` (kl. ${hm(startOf(t))}-${hm(Math.min(endOf(t), endOf(holder)))})` : "";
         out.push({
           id: `double:${tradeId}:${holder.id}:${t.id}`,
           kind: "double-booking",
           taskIds: [t.id, holder.id],
-          message: `${tradeName.get(tradeId) ?? "Faggruppen"} er på både "${holder.title}" og "${t.title}" ${fmt(from)}-${fmt(to)}.`,
+          message: `${tradeName.get(tradeId) ?? "Faggruppen"} er på både "${holder.title}" og "${t.title}" ${fmt(from)}-${fmt(to)}${clockInfo}.`,
         });
       }
-      if (!holder || t.calcEnd! > holder.calcEnd!) holder = t;
+      if (!holder || endOf(t) > endOf(holder)) holder = t;
     }
   }
 
   // Role overload: more people of one role needed at the same time than the trade has
   for (const tr of trades) {
     for (const role of tr.roles || []) {
-      const events: { day: string; delta: number; task: Task }[] = [];
+      const events: { at: number; delta: number; task: Task }[] = [];
       for (const t of tasks) {
         if (t.isRecurring || t.isMilestone || !t.calcStart || !t.calcEnd) continue;
         let need = 0;
         for (const a of t.assignments || []) if (a.tradeId === tr.id) for (const c of a.crew) if (c.roleId === role.id) need += c.count;
         if (need <= 0) continue;
-        events.push({ day: t.calcStart, delta: need, task: t });
-        events.push({ day: nextDay(t.calcEnd), delta: -need, task: t });
+        events.push({ at: startOf(t), delta: need, task: t });
+        events.push({ at: endOf(t), delta: -need, task: t });
       }
-      events.sort((a, b) => a.day.localeCompare(b.day) || a.delta - b.delta);
+      events.sort((a, b) => a.at - b.at || a.delta - b.delta);
       let load = 0;
       const active = new Map<string, Task>();
-      let over: { from: string; peak: number; ids: Set<string> } | null = null;
+      let over: { from: number; peak: number; ids: Set<string> } | null = null;
       for (let i = 0; i < events.length; i++) {
         const e = events[i];
         load += e.delta;
         if (e.delta > 0) active.set(e.task.id, e.task);
         else active.delete(e.task.id);
-        if (events[i + 1]?.day === e.day) continue; // apply all events of one day first
+        if (events[i + 1]?.at === e.at) continue; // apply all events at one moment first
         if (load > role.count) {
-          if (!over) over = { from: e.day, peak: load, ids: new Set() };
+          if (!over) over = { from: e.at, peak: load, ids: new Set() };
           over.peak = Math.max(over.peak, load);
           for (const id of active.keys()) over.ids.add(id);
         } else if (over) {
           const ids = [...over.ids];
+          const fromDay = Math.floor(over.from / 1440);
           out.push({
-            id: `overload:${role.id}:${over.from}`,
+            id: `overload:${role.id}:${Math.round(over.from)}`,
             kind: "role-overload",
             taskIds: ids,
-            message: `${tr.name}: ${over.peak} ${role.name.toLowerCase()} skal arbejde samtidig fra ${fmt(over.from)}, men der er kun ${role.count} (${ids.length} opgaver).`,
+            message: `${tr.name}: ${over.peak} ${role.name.toLowerCase()} skal arbejde samtidig fra ${fmtDay(fromDay)}, men der er kun ${role.count} (${ids.length} opgaver).`,
           });
           over = null;
         }
@@ -127,8 +135,7 @@ export function findWarnings(tasks: Task[], trades: Trade[], stages: Stage[]): P
   return out;
 }
 
-function nextDay(iso: string): string {
-  const d = new Date(`${iso}T12:00:00Z`);
-  d.setUTCDate(d.getUTCDate() + 1);
-  return d.toISOString().slice(0, 10);
+function fmtDay(day: number): string {
+  const d = new Date(day * 86_400_000);
+  return `${d.getUTCDate()}/${d.getUTCMonth() + 1}`;
 }

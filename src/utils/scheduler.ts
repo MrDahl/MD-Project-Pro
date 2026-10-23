@@ -1,4 +1,5 @@
-import type { Task, Trade, Settings, Stage, WeatherDelay, Holiday } from "../types.ts";
+import type { Task, Trade, Settings, Stage, WeatherDelay, Holiday, WeekSchedule } from "../types.ts";
+import { DEFAULT_START, MINUTES_PER_DAY, isValidWeek, resolveWeek, type ResolvedDay } from "./worktime.ts";
 import { taskLinks } from "./links.ts";
 
 /*
@@ -154,6 +155,9 @@ export function calculateSchedule(
     calcStart: null,
     calcEnd: null,
     calcCost: 0,
+    calcStartMin: undefined,
+    calcEndMin: undefined,
+    calcHours: undefined,
     isCritical: false,
     tradeCosts: {} as { [tradeId: string]: number },
     assignmentCosts: {},
@@ -258,11 +262,41 @@ export function calculateSchedule(
   }
 
   const hours = settings.workHoursPerDay;
+  const EPS = 1e-6;
+
+  // Working hours per weekday for a calendar (project or trade), resolved once
+  const resolvedCache = new Map<WeekSchedule | undefined, (ResolvedDay | null)[]>();
+  const resolved = (week: WeekSchedule | undefined): (ResolvedDay | null)[] => {
+    let r = resolvedCache.get(week);
+    if (!r) {
+      r = resolveWeek(week && isValidWeek(week) ? week : undefined, hours);
+      resolvedCache.set(week, r);
+    }
+    return r;
+  };
+
+  // Position on the clock: minutes since 1970-01-01 00:00 (day * 1440 + minute of day)
+  const startT = new Map<Task, number>();
+  const endT = new Map<Task, number>();
 
   for (const task of order) {
-    // Earliest start allowed by the predecessors: FS = day after the predecessor ends, SS = the day it starts, plus lag
+    const hourMode = !task.isMilestone && (task.durationHours ?? 0) > 0;
+
+    // The task's working calendar: the first of its trades with its own hours, otherwise the project's
+    const assignments = task.assignments || [];
+    const tradeIdSet = new Set(task.tradeIds || []);
+    for (const a of assignments) tradeIdSet.add(a.tradeId);
+    const activeTrades = [...tradeIdSet].map((tid) => tradeById.get(tid)).filter((tr): tr is Trade => !!tr);
+    const week = activeTrades.find((tr) => tr.workWeek && isValidWeek(tr.workWeek))?.workWeek ?? settings.workWeek;
+    const days = resolved(week);
+    const explicit = !!week;
+
+    // Earliest start allowed by the predecessors: FS = day after the predecessor ends, SS = the day it starts, plus lag.
+    // Day-based tasks use whole days; hour-based tasks use the clock (they may start right after a predecessor ends).
     let depStart: number | null = null;
     let driving: Task[] = [];
+    let depT: number | null = null;
+    let drivingT: Task[] = [];
     for (const { pred, type, lag } of linksOf.get(task)!) {
       if (!endDay.has(pred)) continue;
       const limit = type === "SS" ? startDayOf.get(pred)! + lag : endDay.get(pred)! + 1 + lag;
@@ -272,23 +306,104 @@ export function calculateSchedule(
       } else if (limit === depStart) {
         driving.push(pred);
       }
+      const limT = (type === "SS" ? startT.get(pred)! : endT.get(pred)!) + lag * MINUTES_PER_DAY;
+      if (depT === null || limT > depT + EPS) {
+        depT = limT;
+        drivingT = [pred];
+      } else if (Math.abs(limT - depT) <= EPS) {
+        drivingT.push(pred);
+      }
     }
-    drivers.set(task, driving);
+    drivers.set(task, hourMode ? drivingT : driving);
 
     const manStart = task.manualStart ? dayNumber(task.manualStart) : null;
 
-    let start = effectiveStartDay ?? 0;
-    if (depStart !== null && manStart !== null) start = Math.max(depStart, manStart);
-    else if (manStart !== null) start = manStart;
-    else if (depStart !== null) start = depStart;
-
     const weatherSensitive = !task.weatherIndependent;
     const canWork = (day: number) =>
-      cal.isWorkingDay(day, task.allowWeekend, task.allowHoliday) && (!weatherSensitive || !cal.isWeatherDay(day));
+      cal.isWorkingDay(day, task.allowWeekend, task.allowHoliday) &&
+      (!weatherSensitive || !cal.isWeatherDay(day)) &&
+      days[weekdayOf(day)] !== null;
 
-    while (!canWork(start)) start++;
+    let start: number;
+    let end: number;
+    let startMin = 0;
+    let endMin = 0;
+    // Hours worked on each day of the task (used for the cost)
+    const dayList: { day: number; hours: number }[] = [];
 
-    let end = start;
+    if (hourMode) {
+      const manT = manStart !== null ? manStart * MINUTES_PER_DAY + (task.startTime ?? 0) : null;
+      let at = (effectiveStartDay ?? 0) * MINUTES_PER_DAY;
+      if (depT !== null && manT !== null) at = Math.max(depT, manT);
+      else if (manT !== null) at = manT;
+      else if (depT !== null) at = depT;
+
+      let remaining = (task.durationHours as number) * 60;
+      let day = Math.floor(at / MINUTES_PER_DAY);
+      let m = at - day * MINUTES_PER_DAY;
+      let first = true;
+      let sT = at;
+      let eT = at;
+      for (let guard = 0; remaining > EPS && guard < 100_000; guard++) {
+        if (!canWork(day)) {
+          day++;
+          m = 0;
+          continue;
+        }
+        let used = 0;
+        for (const [a, b] of days[weekdayOf(day)]!.windows) {
+          if (m >= b) continue;
+          const from = Math.max(a, m);
+          const take = Math.min(b - from, remaining);
+          if (take <= 0) continue;
+          if (first) {
+            sT = day * MINUTES_PER_DAY + from;
+            first = false;
+          }
+          used += take;
+          remaining -= take;
+          eT = day * MINUTES_PER_DAY + from + take;
+          m = from + take;
+          if (remaining <= EPS) break;
+        }
+        if (used > 0) dayList.push({ day, hours: used / 60 });
+        day++;
+        m = 0;
+      }
+      start = Math.floor(sT / MINUTES_PER_DAY);
+      end = Math.floor((eT - EPS) / MINUTES_PER_DAY);
+      startMin = sT - start * MINUTES_PER_DAY;
+      endMin = eT - end * MINUTES_PER_DAY;
+      startT.set(task, sT);
+      endT.set(task, eT);
+    } else {
+      start = effectiveStartDay ?? 0;
+      if (depStart !== null && manStart !== null) start = Math.max(depStart, manStart);
+      else if (manStart !== null) start = manStart;
+      else if (depStart !== null) start = depStart;
+
+      while (!canWork(start)) start++;
+
+      end = start;
+      const dayHours = (d: number) => (explicit ? days[weekdayOf(d)]!.minutes / 60 : hours);
+      if (!task.isMilestone) {
+        dayList.push({ day: start, hours: dayHours(start) });
+        let allocated = 1;
+        while (allocated < task.duration) {
+          end++;
+          if (canWork(end)) {
+            allocated++;
+            dayList.push({ day: end, hours: dayHours(end) });
+          }
+        }
+      }
+      startMin = days[weekdayOf(start)]!.windows[0]?.[0] ?? DEFAULT_START;
+      const lastWindows = days[weekdayOf(end)]!.windows;
+      endMin = lastWindows[lastWindows.length - 1]?.[1] ?? DEFAULT_START;
+      startT.set(task, start * MINUTES_PER_DAY + startMin);
+      endT.set(task, end * MINUTES_PER_DAY + endMin);
+    }
+
     let taskCost = 0;
     const tradeCosts: { [tid: string]: number } = {};
     const assignmentCosts: { [aid: string]: number } = {};
@@ -296,11 +411,6 @@ export function calculateSchedule(
     const roleHours: { [rid: string]: number } = {};
 
     if (!task.isMilestone) {
-      const assignments = task.assignments || [];
-      // Trades on the task: the chosen ones plus any trade that only appears in a crew
-      const tradeIdSet = new Set(task.tradeIds || []);
-      for (const a of assignments) tradeIdSet.add(a.tradeId);
-      const activeTrades = [...tradeIdSet].map((tid) => tradeById.get(tid)).filter((tr): tr is Trade => !!tr);
       const crewOf = new Map<string, typeof assignments>();
       for (const a of assignments) {
         const tr = tradeById.get(a.tradeId);
@@ -313,13 +423,19 @@ export function calculateSchedule(
       const supplement = (day: number, tr: Trade): number =>
         cal.isHoliday(day) ? 1 + tr.holidaySupplement / 100 : isWeekendDay(day) ? 1 + tr.weekendSupplement / 100 : 1;
 
-      const addDay = (day: number) => {
+      const totalHours = dayList.reduce((sum, d) => sum + d.hours, 0);
+      // Hours a trade or role is paid for on a day: its own hours on day-based tasks, the task's clock hours on hour-based tasks
+      const paidHours = (week2: WeekSchedule | undefined, day: number, taskH: number): number =>
+        hourMode || !week2 ? taskH : (resolved(week2)[weekdayOf(day)]?.minutes ?? 0) / 60;
+
+      const addDay = (day: number, taskH: number) => {
         for (const tr of activeTrades) {
           if (tr.isFixedPrice) continue;
           const sup = supplement(day, tr);
+          const trH = paidHours(tr.workWeek, day, taskH);
           const crews = crewOf.get(tr.id);
           if (!crews) {
-            tradeCosts[tr.id] = (tradeCosts[tr.id] || 0) + hours * tr.rate * sup;
+            tradeCosts[tr.id] = (tradeCosts[tr.id] || 0) + trH * tr.rate * sup;
             continue;
           }
           const roleById = new Map((tr.roles || []).map((r) => [r.id, r]));
@@ -328,7 +444,8 @@ export function calculateSchedule(
             for (const c of a.crew) {
               const role = roleById.get(c.roleId);
               if (!role || !(c.count > 0)) continue;
-              const h = hours * share * c.count;
+              const base = a.hours !== undefined && a.hours !== null ? (totalHours > 0 ? (a.hours * taskH) / totalHours : 0) : paidHours(role.workWeek ?? tr.workWeek, day, taskH) * share;
+              const h = base * c.count;
               const cost = h * role.rate * sup;
               tradeCosts[tr.id] = (tradeCosts[tr.id] || 0) + cost;
               assignmentCosts[a.id] = (assignmentCosts[a.id] || 0) + cost;
@@ -340,16 +457,7 @@ export function calculateSchedule(
       };
 
       for (const tr of activeTrades) tradeCosts[tr.id] = 0;
-      addDay(start);
-
-      let allocated = 1;
-      while (allocated < task.duration) {
-        end++;
-        if (canWork(end)) {
-          allocated++;
-          addDay(end);
-        }
-      }
+      for (const d of dayList) addDay(d.day, d.hours);
 
       for (const tr of activeTrades) if (tr.isFixedPrice) tradeCosts[tr.id] = tr.rate;
       for (const tid in tradeCosts) taskCost += tradeCosts[tid];
@@ -359,6 +467,9 @@ export function calculateSchedule(
     endDay.set(task, end);
     task.calcStart = dayToStr(start);
     task.calcEnd = dayToStr(end);
+    task.calcStartMin = startMin;
+    task.calcEndMin = endMin;
+    task.calcHours = dayList.reduce((sum, d) => sum + d.hours, 0);
     task.calcCost = taskCost;
     task.tradeCosts = tradeCosts;
     task.assignmentCosts = assignmentCosts;
@@ -422,7 +533,9 @@ export function calculateSchedule(
 
   // Critical path: walk back from every task that ends on the project end date
   if (maxEndDate) {
-    const queue = nonRecurringTasks.filter((t) => t.calcEnd === maxEndDate);
+    let maxEndT = -Infinity;
+    for (const t of nonRecurringTasks) if (t.calcEnd === maxEndDate) maxEndT = Math.max(maxEndT, endT.get(t) ?? -Infinity);
+    const queue = nonRecurringTasks.filter((t) => t.calcEnd === maxEndDate && Math.abs((endT.get(t) ?? 0) - maxEndT) <= EPS);
     while (queue.length > 0) {
       const current = queue.pop()!;
       current.isCritical = true;

@@ -20,9 +20,12 @@ import {
   yearsBetween,
   type FilterState,
   type Zoom,
+  TIME_FROM,
+  TIME_TO,
+  clockX,
   type ScopeType,
 } from "./model";
-import { applyMove, applyResize } from "./drag";
+import { applyHours, applyMove, applyResize } from "./drag";
 import { exportFullGantt } from "./exportGantt";
 import { PdfExportDialog } from "./pdf/PdfExportDialog";
 import { buildPdf, downloadBlob } from "./pdf/exportPdf";
@@ -121,6 +124,7 @@ export function GanttChart({
   const [jumpTo, setJumpTo] = useState<number | null>(null);
   const zoomAnchor = useRef<number | null>(null);
   const colW = ZOOM_COL_W[zoom];
+  const timeMode = zoom === "time";
 
   // --- Focus area filter ---
   const [filter, setFilter] = useState<FilterState>({ scope: "all", stageId: "", monthStr: "", yearVal: 0 });
@@ -222,11 +226,17 @@ export function GanttChart({
         const rs = rowOf.get(t.id)!;
         const ss = link.type === "SS";
         const x1 = ss
-          ? (pred.isMilestone ? (predStart - minDay) * colW + colW / 2 - 10 : (predStart - minDay) * colW)
+          ? (pred.isMilestone ? (predStart - minDay) * colW + colW / 2 - 10 : timeMode ? clockX(predStart, pred.calcStartMin ?? TIME_FROM, minDay, colW) : (predStart - minDay) * colW)
           : pred.isMilestone
           ? (predEnd - minDay) * colW + colW / 2 + 10
+          : timeMode
+          ? clockX(predEnd, pred.calcEndMin ?? TIME_TO, minDay, colW)
           : (predEnd - minDay + 1) * colW;
-        const x2 = t.isMilestone ? (succStart - minDay) * colW + colW / 2 - 10 : (succStart - minDay) * colW;
+        const x2 = t.isMilestone
+          ? (succStart - minDay) * colW + colW / 2 - 10
+          : timeMode
+          ? clockX(succStart, t.calcStartMin ?? TIME_FROM, minDay, colW)
+          : (succStart - minDay) * colW;
         const y1 = rp * ROW_H + ROW_H / 2;
         const y2 = rs * ROW_H + ROW_H / 2;
         const midY = y2 > y1 ? y2 - ROW_H / 2 : y2 + ROW_H / 2;
@@ -251,7 +261,7 @@ export function GanttChart({
       }
     }
     return list;
-  }, [visibleTasks, visibleStages.length, minDay, colW]);
+  }, [visibleTasks, visibleStages.length, minDay, colW, timeMode]);
 
   const labelW = columnCollapsed ? LABEL_W_COLLAPSED : LABEL_W;
   const timelineWidth = days * colW;
@@ -408,9 +418,10 @@ export function GanttChart({
     backgroundImage: [
       colW >= 24 ? `linear-gradient(to right, transparent ${colW - 1}px, rgba(226,232,240,0.6) ${colW - 1}px)` : "none",
       `linear-gradient(to right, ${weekendColor} 0, ${weekendColor} ${colW}px, transparent ${colW}px, transparent ${colW * 6}px, ${weekendColor} ${colW * 6}px)`,
+      ...(timeMode ? ["linear-gradient(to right, rgba(148,163,184,0.28) 1px, transparent 1px)"] : []),
     ].join(", "),
-    backgroundSize: `${colW}px 100%, ${colW * 7}px 100%`,
-    backgroundPosition: `0 0, ${-weekdayOf(minDay) * colW}px 0`,
+    backgroundSize: `${colW}px 100%, ${colW * 7}px 100%${timeMode ? `, ${colW / 12}px 100%` : ""}`,
+    backgroundPosition: `0 0, ${-weekdayOf(minDay) * colW}px 0${timeMode ? ", 0 0" : ""}`,
     backgroundRepeat: "repeat-x",
   };
 
@@ -480,11 +491,13 @@ export function GanttChart({
         }
         case "+":
         case "=":
-          apply(applyResize(all.map(stripCalculated), task.id, task.duration + 1));
+          if (task.durationHours) apply(applyHours(all.map(stripCalculated), task.id, task.durationHours + 0.5));
+          else apply(applyResize(all.map(stripCalculated), task.id, task.duration + 1));
           return;
         case "-":
         case "_":
-          if (task.duration > 1) apply(applyResize(all.map(stripCalculated), task.id, task.duration - 1));
+          if (task.durationHours) apply(applyHours(all.map(stripCalculated), task.id, task.durationHours - 0.5));
+          else if (task.duration > 1) apply(applyResize(all.map(stripCalculated), task.id, task.duration - 1));
           return;
         case "Enter":
         case " ":
@@ -561,7 +574,7 @@ export function GanttChart({
   const firstRow = Math.min(win.firstRow, Math.max(0, rowCount - 1));
   const lastRow = Math.min(win.lastRow, rowCount - 1);
 
-  const compact = zoom !== "day";
+  const compact = zoom === "week" || zoom === "month";
   const headerCells: React.ReactNode[] = [];
   for (let idx = firstCol; idx <= lastCol; idx++) {
     const day = minDay + idx;
@@ -609,6 +622,15 @@ export function GanttChart({
         {isWeather && <div className="absolute top-0 inset-x-0 h-1 bg-sky-500" />}
         {isWe && !isHol && !isWeather && <div className="absolute top-0 inset-x-0 h-1 bg-emerald-400" />}
 
+        {timeMode && (
+          <div className="absolute bottom-0 inset-x-0 h-3 pointer-events-none">
+            {[6, 8, 10, 12, 14, 16].map((h) => (
+              <span key={h} style={{ left: `${((h * 60 - TIME_FROM) / (TIME_TO - TIME_FROM)) * 100}%` }} className="absolute -translate-x-1/2 text-[8px] font-bold text-slate-400">
+                {h}
+              </span>
+            ))}
+          </div>
+        )}
         <span className="text-[8.5px] uppercase font-black text-slate-400 select-none">{MONTHS_SHORT[date.getUTCMonth()]}</span>
         <div className="flex items-center gap-0.5 mt-0.5 select-none font-black">
           <span className={`text-[12px] font-black ${isWe || isHol || isWeather ? "text-slate-900" : "text-slate-800"}`}>
@@ -684,6 +706,7 @@ export function GanttChart({
           minDay={minDay}
           maxDay={maxDay}
           cal={cal}
+          timeMode={timeMode}
           tradeById={tradeById}
           stageById={stageById}
           isDragging={draggingId === task.id}
@@ -824,7 +847,7 @@ export function GanttChart({
         <div className="flex items-center gap-2" role="group" aria-label="Zoom">
           <ZoomIn className="w-4 h-4 text-sky-600 shrink-0" />
           <div className="flex bg-white p-0.5 rounded-lg border border-slate-200">
-            {([["day", "Dag"], ["week", "Uge"], ["month", "Måned"]] as [Zoom, string][]).map(([z, label]) => (
+            {([["time", "Time"], ["day", "Dag"], ["week", "Uge"], ["month", "Måned"]] as [Zoom, string][]).map(([z, label]) => (
               <button
                 key={z}
                 type="button"

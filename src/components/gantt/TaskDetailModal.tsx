@@ -1,5 +1,6 @@
 import type { Task, Trade } from "../../types";
 import { multiColorGradient } from "./model";
+import { durationText, clockText } from "../../utils/tasks";
 import { useEscapeKey } from "../useEscapeKey";
 import { X, Flame, ExternalLink, CloudLightning, Sun } from "lucide-react";
 
@@ -60,12 +61,13 @@ export function TaskDetailModal({ task, tradeById, onEdit, onClose }: TaskDetail
                         ? `${new Date(`${task.calcStart}T12:00:00`).toLocaleDateString("da-DK", { day: "numeric", month: "short" })} - ${new Date(`${task.calcEnd}T12:00:00`).toLocaleDateString("da-DK", { day: "numeric", month: "short" })}`
                         : "Ikke planlagt"}
                     </span>
+                    {clockText(task) && <span className="text-[10px] font-bold text-slate-500">{clockText(task)}</span>}
                   </div>
 
                   <div className="flex flex-col">
                     <span className="text-[9px] font-black uppercase tracking-wider text-slate-400">Varighed</span>
                     <span className="text-xs font-extrabold text-slate-700 mt-1">
-                      {task.duration} {task.duration === 1 ? "arbejdsdag" : "arbejdsdage"}
+                      {durationText(task)}
                     </span>
                   </div>
 

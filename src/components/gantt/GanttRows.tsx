@@ -2,7 +2,8 @@ import React, { memo } from "react";
 import type { Task, Trade, Stage } from "../../types";
 import { dayNumber, type Calendar } from "../../utils/scheduler";
 import { ChevronDown, ChevronRight, Flame, Layers } from "lucide-react";
-import { ROW_H, getTaskSegments, multiColorGradient } from "./model";
+import { durationText, clockText } from "../../utils/tasks";
+import { TIME_FROM, TIME_TO, clockX, ROW_H, getTaskSegments, multiColorGradient } from "./model";
 
 interface RowBase {
   top: number;
@@ -108,6 +109,7 @@ export const GanttStageRow = memo(function GanttStageRow({
 /* ------------------------------------------------------------------ task row */
 
 interface GanttTaskRowProps extends RowBase {
+  timeMode?: boolean;
   task: Task;
   number: number;
   minDay: number;
@@ -139,6 +141,7 @@ export const GanttTaskRow = memo(function GanttTaskRow({
   minDay,
   maxDay,
   cal,
+  timeMode,
   tradeById,
   stageById,
   isDragging,
@@ -151,11 +154,19 @@ export const GanttTaskRow = memo(function GanttTaskRow({
   onPointerUp,
   onBarKeyDown,
 }: GanttTaskRowProps) {
-  const segments = !task.isRecurring && !task.isMilestone ? getTaskSegments(task, minDay, maxDay, cal) : [];
+  let segments = !task.isRecurring && !task.isMilestone ? getTaskSegments(task, minDay, maxDay, cal) : [];
+  if (timeMode && segments.length > 0) {
+    // One bar from the start time to the end time (fractions of day columns)
+    const sD = dayNumber(task.calcStart) as number;
+    const eD = dayNumber(task.calcEnd) as number;
+    const xs = clockX(Math.max(sD, minDay), sD < minDay ? TIME_FROM : task.calcStartMin ?? TIME_FROM, minDay, colW);
+    const xe = Math.max(xs + 6, clockX(Math.min(eD, maxDay), eD > maxDay ? TIME_TO : task.calcEndMin ?? TIME_TO, minDay, colW));
+    segments = [{ startIndex: xs / colW, endIndex: xe / colW - 1, type: "work" }];
+  }
   const lastIdx = segments.length - 1;
   const lastWorkIdx = segments.map((s) => s.type).lastIndexOf("work");
   const firstWorkIdx = segments.findIndex((s) => s.type === "work");
-  const barLabel = `${task.title}: ${task.calcStart} til ${task.calcEnd}, ${task.duration} ${task.duration === 1 ? "dag" : "dage"}${task.isCritical ? ", kritisk vej" : ""}`;
+  const barLabel = `${task.title}: ${task.calcStart} til ${task.calcEnd}, ${task.durationHours ? `${durationText(task)} ${clockText(task)}` : `${task.duration} ${task.duration === 1 ? "dag" : "dage"}`}${task.isCritical ? ", kritisk vej" : ""}`;
 
   const endDay = dayNumber(task.calcEnd);
   const endCol = endDay !== null && endDay >= minDay && endDay <= maxDay ? endDay - minDay : -1;
@@ -276,7 +287,7 @@ export const GanttTaskRow = memo(function GanttTaskRow({
               )}
 
               {/* Resize handle on the last working segment */}
-              {sIdx === lastWorkIdx && (
+              {sIdx === lastWorkIdx && !task.durationHours && (
                 <div
                   onPointerDown={(e) => onPointerDown(e, task, "resize-right")}
                   onPointerMove={onPointerMove}
@@ -359,7 +370,7 @@ export const GanttTaskRow = memo(function GanttTaskRow({
             className="absolute text-[10px] font-black text-slate-700 whitespace-nowrap z-15 pointer-events-none drop-shadow-xs flex items-center gap-1.5 bg-white/90 border border-slate-200/50 py-1 px-2.5 rounded-full shadow-2xs"
           >
             <span className={`font-black ${task.isCritical ? "text-red-650" : "text-slate-800"}`}>{task.title}</span>
-            <span className="text-slate-400 font-bold">({task.duration}d)</span>
+            <span className="text-slate-400 font-bold">({task.durationHours ? `${task.durationHours.toLocaleString("da-DK")}t` : `${task.duration}d`})</span>
             {deviation !== null && deviation !== undefined && deviation !== 0 && (
               <span className={`font-black ${deviation > 0 ? "text-red-600" : "text-emerald-600"}`} title="Afvigelse fra baseline (kalenderdage)">
                 {deviation > 0 ? `+${deviation}` : deviation}d

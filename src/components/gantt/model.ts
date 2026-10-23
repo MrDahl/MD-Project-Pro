@@ -2,10 +2,18 @@ import type { Task, Stage, Trade } from "../../types.ts";
 import { dayNumber, type Calendar } from "../../utils/scheduler.ts";
 export { stripCalculated } from "../../utils/tasks.ts";
 
-export type Zoom = "day" | "week" | "month";
+export type Zoom = "time" | "day" | "week" | "month";
 
 /** Width of one day column per zoom level (px). */
-export const ZOOM_COL_W: Record<Zoom, number> = { day: 48, week: 24, month: 10 };
+export const ZOOM_COL_W: Record<Zoom, number> = { time: 240, day: 48, week: 24, month: 10 };
+
+/** In the time zoom every day column shows the hours between these two clock times. */
+export const TIME_FROM = 6 * 60;
+export const TIME_TO = 18 * 60;
+export const timeFrac = (min: number): number => Math.max(0, Math.min(1, (min - TIME_FROM) / (TIME_TO - TIME_FROM)));
+
+/** Horizontal position of a clock moment (day + minute) inside the time zoom. */
+export const clockX = (day: number, min: number, minDay: number, colW: number): number => (day - minDay + timeFrac(min)) * colW;
 
 /** Layout constants (px). Every row is ROW_H tall. */
 export const ROW_H = 56;

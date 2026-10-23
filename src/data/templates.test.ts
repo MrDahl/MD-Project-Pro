@@ -5,8 +5,8 @@ import { calculateSchedule, detectCycle } from "../utils/scheduler.ts";
 import { findWarnings } from "../utils/warnings.ts";
 import { nextMonday } from "../utils/dates.ts";
 
-test("there are four templates and an unknown id gives null", () => {
-  assert.equal(TEMPLATE_LIST.length, 4);
+test("there are five templates and an unknown id gives null", () => {
+  assert.equal(TEMPLATE_LIST.length, 5);
   assert.equal(buildTemplate("nope", "2026-06-22"), null);
 });
 
@@ -14,7 +14,7 @@ for (const info of TEMPLATE_LIST) {
   test(`template "${info.id}" is a valid, warning-free plan`, () => {
     const start = nextMonday(new Date("2026-10-22T12:00:00"));
     const p = buildTemplate(info.id, start)!;
-    assert.ok(p.tasks.length >= 10);
+    assert.ok(p.tasks.length >= 8);
     assert.equal(new Set(p.tasks.map((t) => t.id)).size, p.tasks.length, "unique task ids");
     assert.equal(detectCycle(p.tasks), false);
 

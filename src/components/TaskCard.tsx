@@ -1,5 +1,6 @@
 import { memo } from "react";
 import type { Task, Trade, Stage } from "../types";
+import { durationText, clockText } from "../utils/tasks";
 import { Copy, Flame, Pencil, Trash2 } from "lucide-react";
 
 interface TaskCardProps {
@@ -111,6 +112,12 @@ export const TaskCard = memo(function TaskCard({ task: t, number, stageById, tra
           </button>
         </div>
       </div>
+
+      {clockText(t) && (
+        <div className="text-[10px] font-bold text-slate-500" data-testid="card-clock">
+          {durationText(t)} &middot; {clockText(t)}
+        </div>
+      )}
 
       {/* Calendar info card */}
       <div className="grid grid-cols-2 bg-slate-50 border border-slate-100 p-2 rounded-lg text-[10px] font-bold text-slate-600 gap-2">

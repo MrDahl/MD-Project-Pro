@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { Trade, Role } from "../types";
+import { Trade, Role, WeekSchedule } from "../types";
+import { WorkWeekEditor } from "./WorkWeekEditor";
 import { RolesEditor } from "./RolesEditor";
 import { Save, Ban, Plus, Percent, Coins, Palette } from "lucide-react";
 
@@ -30,6 +31,7 @@ export function TradeForm({ trades, editTradeId, onSave, onCancel }: TradeFormPr
   const [holidaySupplement, setHolidaySupplement] = useState<number>(100);
   const [color, setColor] = useState("#3b82f6");
   const [roles, setRoles] = useState<Role[]>([]);
+  const [workWeek, setWorkWeek] = useState<WeekSchedule | undefined>(undefined);
 
   useEffect(() => {
     if (editTradeId) {
@@ -42,6 +44,7 @@ export function TradeForm({ trades, editTradeId, onSave, onCancel }: TradeFormPr
         setHolidaySupplement(tr.holidaySupplement);
         setColor(tr.color);
         setRoles(tr.roles || []);
+        setWorkWeek(tr.workWeek);
       }
     } else {
       resetForm();
@@ -56,6 +59,7 @@ export function TradeForm({ trades, editTradeId, onSave, onCancel }: TradeFormPr
     setHolidaySupplement(100);
     setColor("#3b82f6");
     setRoles([]);
+    setWorkWeek(undefined);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -70,6 +74,7 @@ export function TradeForm({ trades, editTradeId, onSave, onCancel }: TradeFormPr
       weekendSupplement: isFixedPrice ? 0 : weekendSupplement,
       holidaySupplement: isFixedPrice ? 0 : holidaySupplement,
       color,
+      workWeek: !isFixedPrice ? workWeek : undefined,
       roles: !isFixedPrice && roles.some((r) => r.name.trim()) ? roles.filter((r) => r.name.trim()).map((r) => ({ ...r, name: r.name.trim() })) : undefined,
     });
     resetForm();
@@ -156,6 +161,13 @@ export function TradeForm({ trades, editTradeId, onSave, onCancel }: TradeFormPr
               required
             />
           </div>
+        </div>
+      )}
+
+      {!isFixedPrice && (
+        <div className="flex flex-col gap-2">
+          <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Arbejdstid for denne faggruppe</label>
+          <WorkWeekEditor week={workWeek} onChange={setWorkWeek} plainLabel="Som projektet" />
         </div>
       )}
 

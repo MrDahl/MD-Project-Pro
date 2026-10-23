@@ -1,9 +1,21 @@
+/** One working day: from `start` to `end` (minutes after midnight), with unpaid breaks in between. */
+export interface DaySchedule {
+  start: number;
+  end: number;
+  breaks: { from: number; to: number }[];
+}
+
+/** Seven entries, index 0 = Sunday ... 6 = Saturday. null = no work that day. */
+export type WeekSchedule = (DaySchedule | null)[];
+
 /** A sub-resource of a trade (entreprise), e.g. "Svend" x 2 at 450 kr/t. */
 export interface Role {
   id: string;
   name: string;
   count: number; // how many people the trade has in this role
   rate: number; // kr/t per person
+  /** Own working hours (used for pay of this role on day-based tasks) */
+  workWeek?: WeekSchedule;
 }
 
 /** An activity inside a task with its own crew, e.g. "Kabeltræk" = 2 apprentices. */
@@ -14,6 +26,8 @@ export interface Assignment {
   crew: { roleId: string; count: number }[];
   /** Share of the task's working hours the crew is busy (default 100) */
   percent?: number;
+  /** Hours per person for the whole task. When set it is used instead of `percent`. */
+  hours?: number;
 }
 
 export interface Trade {
@@ -26,6 +40,8 @@ export interface Trade {
   color: string;
   /** Optional sub-resources. Without them the trade is paid by `rate` alone. */
   roles?: Role[];
+  /** Own working hours; otherwise the project's are used. */
+  workWeek?: WeekSchedule;
 }
 
 export interface Stage {
@@ -55,6 +71,10 @@ export interface Task {
   title: string;
   desc: string;
   duration: number; // working days
+  /** Effort in working hours. When set the task is placed by the clock and `duration` is only an estimate in days. */
+  durationHours?: number;
+  /** Earliest start time on the manual start date (minutes after midnight), for hour-based tasks. */
+  startTime?: number;
   manualStart: string | null; // "YYYY-MM-DD" style or null
   tradeIds: string[]; // multi-resource support
   /** Optional crews per activity. For a trade with assignments the cost comes from these instead of the trade rate. */
@@ -87,6 +107,10 @@ export interface Task {
   calcStart?: string | null;
   calcEnd?: string | null;
   calcCost?: number;
+  /** Minute of day the task starts / ends (end is exclusive) on calcStart / calcEnd */
+  calcStartMin?: number;
+  calcEndMin?: number;
+  calcHours?: number;
   isCritical?: boolean;
   tradeCosts?: { [tradeId: string]: number };
   assignmentCosts?: { [assignmentId: string]: number };
@@ -103,6 +127,8 @@ export interface Holiday {
 
 export interface Settings {
   workHoursPerDay: number;
+  /** Detailed working hours per weekday; workHoursPerDay is then the weekday average. */
+  workWeek?: WeekSchedule;
 }
 
 export interface ProjectInfo {

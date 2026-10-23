@@ -1,9 +1,10 @@
+import { weekdayAverageHours } from "./utils/worktime";
 import { ResourceReport } from "./components/ResourceReport";
 import { applyBulk, deleteMany, type BulkChange } from "./utils/bulk";
 import type { ImportResult } from "./utils/pasteImport";
 import { fitStageDates } from "./utils/stages";
 import React, { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Task, Trade, Settings, ProjectInfo, Stage, Holiday } from "./types";
+import { Task, Trade, Settings, ProjectInfo, Stage, Holiday, WeekSchedule } from "./types";
 import { calculateSchedule } from "./utils/scheduler";
 import { danishHolidays, projectYears } from "./utils/holidays";
 import { findWarnings } from "./utils/warnings";
@@ -209,7 +210,7 @@ export default function App() {
   }, [appState.startDate, appState.holidays, projectEndDate, update]);
 
   // Task CRUD operations
-  const handleSaveTask = (taskPayload: Omit<Task, "calcStart" | "calcEnd" | "calcCost" | "isCritical" | "tradeCosts" | "assignmentCosts" | "roleCosts" | "roleHours">) => {
+  const handleSaveTask = (taskPayload: Omit<Task, "calcStart" | "calcEnd" | "calcCost" | "isCritical" | "tradeCosts" | "assignmentCosts" | "roleCosts" | "roleHours" | "calcStartMin" | "calcEndMin" | "calcHours">) => {
     if (editTaskId) {
       update((p) => ({ ...p, tasks: p.tasks.map((t) => (t.id === editTaskId ? { ...t, ...taskPayload } : t)) }));
       showToast("Opgaven er opdateret i tidsplanen.", true);
@@ -332,6 +333,20 @@ export default function App() {
   const handleUpdateStartDate = (date: string) => update((p) => ({ ...p, startDate: date }), { coalesceKey: "startDate" });
   const handleUpdateWorkHours = (hours: number) =>
     update((p) => ({ ...p, settings: { ...p.settings, workHoursPerDay: hours } }), { coalesceKey: "hours" });
+
+  const handleUpdateWorkWeek = (week: WeekSchedule | undefined) =>
+    update(
+      (p) => {
+        const settings = { ...p.settings };
+        if (week) {
+          settings.workWeek = week;
+          const avg = weekdayAverageHours(week);
+          if (avg > 0) settings.workHoursPerDay = Math.round(avg * 100) / 100;
+        } else delete settings.workWeek;
+        return { ...p, settings };
+      },
+      { coalesceKey: "workweek" }
+    );
 
   const handleAddHoliday = (date: string, name: string = "Lukkedag") => {
     if (stateRef.current.holidays.some((h) => h.date === date)) return;
@@ -948,6 +963,7 @@ export default function App() {
           {/* TAP 5: Config Settings */}
           {activeTab === "settings" && (
             <ProjectSettings
+              onUpdateWorkWeek={handleUpdateWorkWeek}
               startDate={appState.startDate}
               settings={appState.settings}
               projectInfo={appState.projectInfo}
@@ -1007,6 +1023,7 @@ export default function App() {
         <TaskDrawer title={editTaskId ? "Rediger opgave" : "Ny opgave"} onClose={() => setDrawer(null)}>
           <Suspense fallback={<p className="text-xs text-slate-500">Indlæser…</p>}>
             <TaskForm
+              hoursPerDay={appState.settings.workHoursPerDay}
               tasks={appState.tasks}
               trades={appState.trades}
               stages={appState.stages || []}

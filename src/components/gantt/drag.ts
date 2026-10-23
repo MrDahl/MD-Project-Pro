@@ -46,6 +46,12 @@ export function applyMove(baseline: Task[], taskId: string, newStartDate: string
   return result;
 }
 
+/** Changes the hours of an hour-based task (the day count is only an estimate for such tasks). */
+export function applyHours(baseline: Task[], taskId: string, hours: number, hoursPerDay = 7.4): Task[] {
+  const h = Math.max(0.25, Math.round(hours * 4) / 4);
+  return baseline.map((t) => (t.id === taskId ? { ...t, durationHours: h, duration: Math.max(1, Math.ceil(h / hoursPerDay - 1e-9)) } : t));
+}
+
 export function applyResize(baseline: Task[], taskId: string, newDuration: number): Task[] {
   return baseline.map((t) => (t.id === taskId ? { ...t, duration: Math.max(1, newDuration) } : t));
 }

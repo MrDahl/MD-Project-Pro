@@ -4,6 +4,8 @@ import { danishHolidays } from "../utils/holidays.ts";
 import { withLinks } from "../utils/links.ts";
 import { CHARMDAL_ROWS, CHARMDAL_STAGES, CHARMDAL_TRADES } from "./charmdal.ts";
 import { addDaysStr } from "../utils/dates.ts";
+import { exampleWeek, weekdayAverageHours } from "../utils/worktime.ts";
+import type { WeekSchedule } from "../types.ts";
 
 export interface TemplateInfo {
   id: string;
@@ -42,6 +44,10 @@ interface TaskDef {
   desc?: string;
   /** Calendar days after the project start; fixes the start (used to stagger zones). */
   startOffset?: number;
+  /** Effort in hours (the task is then placed by the clock) */
+  hours?: number;
+  /** Own crew for this task: [count, role name] per activity */
+  crew?: { label: string; percent?: number; hours?: number; crew: [number, string][] }[];
 }
 
 interface TemplateDef extends TemplateInfo {
@@ -53,10 +59,12 @@ interface TemplateDef extends TemplateInfo {
   stageColors?: string[];
   /** Years of holidays to generate (default 3) */
   years?: number;
+  /** Detailed project working hours */
+  workWeek?: WeekSchedule;
   /** Sub-resources per trade key */
   roles?: Record<string, { name: string; count: number; rate: number }[]>;
   /** Crews added to every task of a trade key */
-  crews?: Record<string, { label: string; percent?: number; crew: [number, string][] }[]>;
+  crews?: Record<string, { label: string; percent?: number; hours?: number; crew: [number, string][] }[]>;
 }
 
 const TEMPLATES: TemplateDef[] = [
@@ -136,6 +144,34 @@ const TEMPLATES: TemplateDef[] = [
   },
 ];
 
+const ELDAG: TemplateDef = {
+  id: "eldag",
+  name: "Eldag i timer (detaljeret)",
+  description: "Lille eksempel på timeplanlægning: arbejdstid 06:00-14:30 med pauser, opgaver i timer og bemanding med overmontør, svend og lærlinge.",
+  projectName: "El-installation, lejlighed 3",
+  stages: ["Forberedelse", "Udførelse", "Afslutning"],
+  tradeTable: { el: { name: "Elektriker", rate: 520, color: "#ca8a04" } },
+  roles: {
+    el: [
+      { name: "Overmontør", count: 1, rate: 620 },
+      { name: "Svend", count: 2, rate: 460 },
+      { name: "Lærling", count: 3, rate: 210 },
+    ],
+  },
+  workWeek: exampleWeek(),
+  tasks: [
+    { key: "mode", title: "Byggemøde og instruktion", hours: 0.5, days: 1, trades: ["el"], stage: 0, crew: [{ label: "Planlægning og byggemøde", crew: [[1, "Overmontør"], [2, "Svend"], [3, "Lærling"]] }] },
+    { key: "opm", title: "Opmåling og afmærkning", hours: 1.5, days: 1, trades: ["el"], stage: 0, after: ["mode"], crew: [{ label: "Afmærkning", crew: [[1, "Svend"]] }] },
+    { key: "rille", title: "Rillefræsning", hours: 4, days: 1, trades: ["el"], stage: 1, after: ["opm"], crew: [{ label: "Fræsning", crew: [[1, "Svend"]] }, { label: "Støvsugning", percent: 100, crew: [[1, "Lærling"]] }] },
+    { key: "kabel", title: "Kabeltræk", hours: 3, days: 1, trades: ["el"], stage: 1, after: ["rille"], crew: [{ label: "Kabeltræk", crew: [[2, "Lærling"]] }, { label: "Kontrol", percent: 25, crew: [[1, "Svend"]] }] },
+    { key: "daaser", title: "Montage af dåser og afbrydere", hours: 3, days: 1, trades: ["el"], stage: 1, after: [["rille", "FS", 0]], crew: [{ label: "Montage", crew: [[1, "Svend"]] }] },
+    { key: "tavle", title: "Tavlearbejde", hours: 2, days: 1, trades: ["el"], stage: 1, after: ["kabel", "daaser"], crew: [{ label: "Tavlearbejde", crew: [[1, "Overmontør"]] }] },
+    { key: "oprydning", title: "Oprydning", hours: 2, days: 1, trades: ["el"], stage: 2, after: ["tavle"], crew: [{ label: "Oprydning", crew: [[2, "Lærling"]] }] },
+    { key: "afl", title: "Aflevering og egenkontrol", hours: 1, days: 1, trades: ["el"], stage: 2, after: ["oprydning"], crew: [{ label: "Egenkontrol", crew: [[1, "Overmontør"]] }] },
+  ],
+};
+TEMPLATES.push(ELDAG);
+
 const CHARMDAL: TemplateDef = {
   id: "charmdal",
   name: "Charmdal lejligheder (stort projekt)",
@@ -201,7 +237,7 @@ export function buildTemplate(id: string, startDate: string): AppData | null {
       const [key, type, lag] = typeof a === "string" ? [a, "FS" as const, 0] : a;
       return { taskId: idOf.get(key)!, type, lag };
     });
-    const crewDefs = d.milestone ? [] : d.trades.flatMap((k) => (def.crews?.[k] || []).map((c) => ({ k, c })));
+    const crewDefs = d.milestone ? [] : d.crew ? d.crew.map((c) => ({ k: d.trades[0], c })) : d.trades.flatMap((k) => (def.crews?.[k] || []).map((c) => ({ k, c })));
     const assignments = crewDefs.map(({ k, c }, i) => {
       const roles = def.roles?.[k] || [];
       return {
@@ -209,6 +245,7 @@ export function buildTemplate(id: string, startDate: string): AppData | null {
         tradeId: `tr-${k}`,
         label: c.label,
         percent: c.percent,
+        hours: c.hours,
         crew: c.crew.map(([count, roleName]) => ({ roleId: `role-${k}-${roles.findIndex((r) => r.name === roleName) + 1}`, count })),
       };
     });
@@ -219,6 +256,7 @@ export function buildTemplate(id: string, startDate: string): AppData | null {
         title: d.title,
         desc: d.desc || "",
         duration: d.days,
+        durationHours: d.hours,
         manualStart: d.startOffset != null ? addDaysStr(startDate, d.startOffset) : null,
         tradeIds: d.trades.map((k) => `tr-${k}`),
         dependencyId: null,
@@ -236,7 +274,7 @@ export function buildTemplate(id: string, startDate: string): AppData | null {
   const holidays = Array.from({ length: def.years ?? 3 }, (_, i) => year + i)
     .flatMap((y) => danishHolidays(y))
     .map((h) => ({ id: `hol-auto-${h.date}`, date: h.date, name: h.name }));
-  const settings = { workHoursPerDay: 7.4 };
+  const settings: AppData["settings"] = def.workWeek ? { workHoursPerDay: Math.round(weekdayAverageHours(def.workWeek) * 100) / 100, workWeek: def.workWeek } : { workHoursPerDay: 7.4 };
 
   // Stage dates follow the calculated plan so the template starts without warnings
   const plan = calculateSchedule(tasks, projectTrades, holidays, settings, startDate, [], []);

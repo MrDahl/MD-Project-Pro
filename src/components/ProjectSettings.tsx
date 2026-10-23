@@ -1,5 +1,6 @@
 import React, { useState } from "react";
-import { Settings, ProjectInfo, Stage, WeatherDelay, Holiday } from "../types";
+import { Settings, ProjectInfo, Stage, WeatherDelay, Holiday, WeekSchedule } from "../types";
+import { WorkWeekEditor } from "./WorkWeekEditor";
 import { Calendar, Clock, Plus, Trash2, CalendarX, Info, FileText, MapPin, User, Building, Layers, CloudSnow } from "lucide-react";
 
 interface ProjectSettingsProps {
@@ -11,6 +12,7 @@ interface ProjectSettingsProps {
   weatherDelays?: WeatherDelay[];
   onUpdateStartDate: (date: string) => void;
   onUpdateWorkHours: (hours: number) => void;
+  onUpdateWorkWeek: (week: WeekSchedule | undefined) => void;
   onUpdateProjectInfo: (info: ProjectInfo) => void;
   onAddHoliday: (date: string, name: string) => void;
   onDeleteHoliday: (idx: number) => void;
@@ -39,6 +41,7 @@ export function ProjectSettings({
   weatherDelays = [],
   onUpdateStartDate,
   onUpdateWorkHours,
+  onUpdateWorkWeek,
   onUpdateProjectInfo,
   onAddHoliday,
   onDeleteHoliday,
@@ -189,6 +192,7 @@ export function ProjectSettings({
           <input
             type="number"
             value={settings.workHoursPerDay}
+            disabled={!!settings.workWeek}
             onChange={(e) => onUpdateWorkHours(Math.max(1, parseFloat(e.target.value) || 7.4))}
             className="bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs font-bold text-slate-700 outline-none focus:border-slate-500"
             step="0.1"
@@ -200,6 +204,18 @@ export function ProjectSettings({
             Bruges til at udregne dagsprisen for faggrupper (Standard er en 7.4 timers overenskomst).
           </span>
         </div>
+
+        <WorkWeekEditor
+          week={settings.workWeek}
+          onChange={onUpdateWorkWeek}
+          plainLabel="Enkel: samme antal timer hver hverdag (opgaver placeres fra kl. 07:00)"
+          ownLabel="Detaljeret: klokkeslæt og pauser pr. ugedag"
+        />
+        {settings.workWeek && (
+          <span className="text-[10px] text-slate-400 font-medium">
+            Gennemsnit man-fre: {settings.workHoursPerDay.toLocaleString("da-DK", { maximumFractionDigits: 2 })} t/dag. Faggrupper og roller kan have deres egne arbejdstider under Faggrupper.
+          </span>
+        )}
 
         <div className="bg-amber-50 rounded-lg p-3 border border-amber-100/50 flex gap-2 text-[10px] font-medium text-amber-900 mt-2">
           <Info className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Task, Trade, Stage, Dependency, Assignment } from "../types";
 import { CrewEditor } from "./CrewEditor";
 import { cleanAssignments } from "../utils/roles";
+import { formatTime, parseTime } from "../utils/worktime";
 import { descendantsOf, taskLinks } from "../utils/links";
 import { Save, Ban, Calendar, Clock, Link, Check, Plus, RefreshCw, Layers, DollarSign, Trash2 } from "lucide-react";
 
@@ -10,17 +11,22 @@ interface TaskFormProps {
   trades: Trade[];
   stages: Stage[];
   editTaskId: string | null;
-  onSave: (task: Omit<Task, "calcStart" | "calcEnd" | "calcCost" | "isCritical" | "tradeCosts" | "assignmentCosts" | "roleCosts" | "roleHours">) => void;
+  onSave: (task: Omit<Task, "calcStart" | "calcEnd" | "calcCost" | "isCritical" | "tradeCosts" | "assignmentCosts" | "roleCosts" | "roleHours" | "calcStartMin" | "calcEndMin" | "calcHours">) => void;
   onCancel: () => void;
   /** Hide the form's own heading (when a surrounding panel already shows a title). */
   hideHeading?: boolean;
+  /** Project hours per day, used to estimate the days of an hour-based task */
+  hoursPerDay?: number;
 }
 
-export function TaskForm({ tasks, trades, stages, editTaskId, onSave, onCancel, hideHeading }: TaskFormProps) {
+export function TaskForm({ tasks, trades, stages, editTaskId, onSave, onCancel, hideHeading, hoursPerDay = 7.4 }: TaskFormProps) {
   const [title, setTitle] = useState("");
   const [desc, setDesc] = useState("");
   const [manualStart, setManualStart] = useState("");
   const [duration, setDuration] = useState<number>(3);
+  const [unit, setUnit] = useState<"days" | "hours">("days");
+  const [hours, setHours] = useState<number>(4);
+  const [startTime, setStartTime] = useState("");
   const [selectedTradeIds, setSelectedTradeIds] = useState<string[]>([]);
   const [links, setLinks] = useState<Dependency[]>([]);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
@@ -46,6 +52,9 @@ export function TaskForm({ tasks, trades, stages, editTaskId, onSave, onCancel, 
         setDesc(task.desc);
         setManualStart(task.manualStart || "");
         setDuration(task.duration || 3);
+        setUnit(task.durationHours ? "hours" : "days");
+        setHours(task.durationHours || 4);
+        setStartTime(task.startTime !== undefined ? formatTime(task.startTime) : "");
         setSelectedTradeIds(task.tradeIds || []);
         setLinks(taskLinks(task));
         setAssignments(task.assignments || []);
@@ -71,6 +80,9 @@ export function TaskForm({ tasks, trades, stages, editTaskId, onSave, onCancel, 
     setDesc("");
     setManualStart("");
     setDuration(3);
+    setUnit("days");
+    setHours(4);
+    setStartTime("");
     setSelectedTradeIds([]);
     setLinks([]);
     setAssignments([]);
@@ -119,7 +131,9 @@ export function TaskForm({ tasks, trades, stages, editTaskId, onSave, onCancel, 
       title,
       desc,
       manualStart: isRecurring ? null : (manualStart || null),
-      duration: isRecurring ? 0 : (isMilestone ? 0 : Math.max(1, duration)),
+      duration: isRecurring ? 0 : isMilestone ? 0 : unit === "hours" ? Math.max(1, Math.ceil(hours / hoursPerDay - 1e-9)) : Math.max(1, duration),
+      durationHours: !isRecurring && !isMilestone && unit === "hours" ? Math.max(0.25, hours) : undefined,
+      startTime: !isRecurring && !isMilestone && unit === "hours" && manualStart && parseTime(startTime) !== null ? (parseTime(startTime) as number) : undefined,
       tradeIds: selectedTradeIds,
       assignments: isRecurring || isMilestone ? undefined : cleanAssignments(assignments.filter((a) => selectedTradeIds.includes(a.tradeId)).map((a) => ({ ...a, label: a.label.trim() })), trades),
       dependencyId: isRecurring ? null : cleanLinks[0]?.taskId ?? null,
@@ -247,16 +261,48 @@ export function TaskForm({ tasks, trades, stages, editTaskId, onSave, onCancel, 
               <div className="flex flex-col gap-1">
                 <label className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
                   <Clock className="w-3.5 h-3.5 text-slate-400" />
-                  <span>Varighed (arbejdsdage)</span>
+                  <span>Varighed</span>
                 </label>
-                <input
-                  type="number"
-                  value={duration}
-                  onChange={(e) => setDuration(Math.max(1, parseInt(e.target.value) || 1))}
-                  className="bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs font-bold text-slate-700 outline-none focus:border-slate-500"
-                  min={1}
-                  required
-                />
+                <div className="flex gap-1.5">
+                  {unit === "days" ? (
+                    <input
+                      type="number"
+                      aria-label="Varighed i arbejdsdage"
+                      value={duration}
+                      onChange={(e) => setDuration(Math.max(1, parseInt(e.target.value) || 1))}
+                      className="flex-1 min-w-0 bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs font-bold text-slate-700 outline-none focus:border-slate-500"
+                      min={1}
+                      required
+                    />
+                  ) : (
+                    <input
+                      type="number"
+                      data-testid="duration-hours"
+                      aria-label="Varighed i timer"
+                      value={hours}
+                      onChange={(e) => setHours(Math.max(0, parseFloat(e.target.value) || 0))}
+                      className="flex-1 min-w-0 bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs font-bold text-slate-700 outline-none focus:border-slate-500"
+                      min={0.25}
+                      step={0.25}
+                      required
+                    />
+                  )}
+                  <select
+                    aria-label="Enhed"
+                    data-testid="duration-unit"
+                    value={unit}
+                    onChange={(e) => setUnit(e.target.value as "days" | "hours")}
+                    className="bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs font-bold text-slate-700 outline-none"
+                  >
+                    <option value="days">arbejdsdage</option>
+                    <option value="hours">timer</option>
+                  </select>
+                </div>
+                {unit === "hours" && (
+                  <span className="text-[10px] text-slate-400 font-medium leading-snug">
+                    Placeres efter arbejdstiden med klokkeslæt. Små opgaver kan følge efter hinanden samme dag.
+                  </span>
+                )}
               </div>
             )}
 
@@ -271,6 +317,18 @@ export function TaskForm({ tasks, trades, stages, editTaskId, onSave, onCancel, 
                 onChange={(e) => setManualStart(e.target.value)}
                 className="bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs font-semibold text-slate-700 outline-none focus:border-slate-500"
               />
+              {unit === "hours" && !isMilestone && manualStart && (
+                <label className="flex items-center gap-1.5 text-[11px] font-bold text-slate-500 mt-1">
+                  Tidligst kl.
+                  <input
+                    type="time"
+                    aria-label="Starttidspunkt"
+                    value={startTime}
+                    onChange={(e) => setStartTime(e.target.value)}
+                    className="bg-slate-50 border border-slate-200 rounded-lg p-1.5 text-xs font-semibold text-slate-700 outline-none focus:border-slate-500"
+                  />
+                </label>
+              )}
             </div>
           </div>
 

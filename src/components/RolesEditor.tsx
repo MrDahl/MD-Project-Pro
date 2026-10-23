@@ -1,4 +1,6 @@
-import { Plus, Trash2, Users } from "lucide-react";
+import { useState } from "react";
+import { Clock, Plus, Trash2, Users } from "lucide-react";
+import { WorkWeekEditor } from "./WorkWeekEditor";
 import type { Role } from "../types";
 import { newId } from "../utils/roles";
 
@@ -11,6 +13,7 @@ const input = "bg-white border border-slate-200 rounded-lg p-2 text-xs font-bold
 
 /** Sub-resources of a trade: e.g. "Svend" x 2 at 450 kr/t. */
 export function RolesEditor({ roles, onChange }: Props) {
+  const [open, setOpen] = useState<string | null>(null);
   const update = (id: string, patch: Partial<Role>) => onChange(roles.map((r) => (r.id === id ? { ...r, ...patch } : r)));
   const total = roles.reduce((s, r) => s + r.rate * r.count, 0);
   return (
@@ -31,13 +34,24 @@ export function RolesEditor({ roles, onChange }: Props) {
             <span />
           </div>
           {roles.map((r) => (
-            <div key={r.id} className="grid grid-cols-[1fr_64px_88px_32px] gap-1.5 items-center" data-testid="role-row">
+            <div key={r.id} className="flex flex-col gap-1.5" data-testid="role-row">
+            <div className="grid grid-cols-[1fr_64px_88px_32px] gap-1.5 items-center">
               <input aria-label="Rollenavn" value={r.name} onChange={(e) => update(r.id, { name: e.target.value })} placeholder="Svend" className={input} />
               <input aria-label="Antal" type="number" min={1} value={r.count} onChange={(e) => update(r.id, { count: Math.max(1, parseInt(e.target.value) || 1) })} className={input} />
               <input aria-label="Timepris" type="number" min={0} value={r.rate} onChange={(e) => update(r.id, { rate: Math.max(0, parseInt(e.target.value) || 0) })} className={input} />
               <button type="button" aria-label="Fjern rolle" onClick={() => onChange(roles.filter((x) => x.id !== r.id))} className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 cursor-pointer">
                 <Trash2 className="w-4 h-4" />
               </button>
+            </div>
+              <button
+                type="button"
+                data-testid="role-hours-toggle"
+                onClick={() => setOpen(open === r.id ? null : r.id)}
+                className="self-start text-[10px] font-extrabold text-sky-700 hover:text-sky-900 flex items-center gap-1 cursor-pointer"
+              >
+                <Clock className="w-3 h-3" /> {r.workWeek ? "Egne arbejdstider" : "Arbejdstid: som faggruppen"}
+              </button>
+              {open === r.id && <WorkWeekEditor week={r.workWeek} onChange={(w) => update(r.id, { workWeek: w })} plainLabel="Som faggruppen" />}
             </div>
           ))}
           <div className="text-[10px] font-bold text-slate-500 pt-1 border-t border-slate-200">

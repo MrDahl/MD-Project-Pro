@@ -41,13 +41,32 @@ export function CrewEditor({ trades, assignments, onChange }: Props) {
               <div key={a.id} className="bg-white border border-slate-200 rounded-lg p-2.5 flex flex-col gap-2" data-testid="assignment">
                 <div className="flex gap-1.5">
                   <input aria-label="Aktivitet" value={a.label} onChange={(e) => patch(a.id, { label: e.target.value })} placeholder="Aktivitet, fx Kabeltræk" className={`${input} flex-1`} />
-                  <select aria-label="Andel af tiden" value={a.percent ?? 100} onChange={(e) => patch(a.id, { percent: Number(e.target.value) })} className={input} title="Hvor stor del af opgavens arbejdstid er holdet optaget?">
+                  <select
+                    aria-label="Andel af tiden"
+                    value={a.hours !== undefined ? "hours" : String(a.percent ?? 100)}
+                    onChange={(e) => (e.target.value === "hours" ? patch(a.id, { hours: a.hours ?? 2 }) : patch(a.id, { hours: undefined, percent: Number(e.target.value) }))}
+                    className={input}
+                    title="Hvor meget af opgavens arbejdstid er holdet optaget?"
+                  >
                     {[100, 75, 50, 25, 10].map((p) => (
                       <option key={p} value={p}>
                         {p}% af tiden
                       </option>
                     ))}
+                    <option value="hours">fast antal timer</option>
                   </select>
+                  {a.hours !== undefined && (
+                    <input
+                      type="number"
+                      aria-label="Timer pr. person"
+                      title="Timer pr. person i alt"
+                      min={0.25}
+                      step={0.25}
+                      value={a.hours}
+                      onChange={(e) => patch(a.id, { hours: Math.max(0, parseFloat(e.target.value) || 0) })}
+                      className={`${input} w-16`}
+                    />
+                  )}
                   <button type="button" aria-label="Fjern aktivitet" onClick={() => onChange(assignments.filter((x) => x.id !== a.id))} className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 cursor-pointer">
                     <Trash2 className="w-4 h-4" />
                   </button>
@@ -87,7 +106,9 @@ export function CrewEditor({ trades, assignments, onChange }: Props) {
                     <Plus className="w-3 h-3" /> Tilføj person
                   </button>
                   <span className="text-[10px] font-bold text-slate-400">
-                    {Math.round(crewHourly(a, tr.roles) * ((a.percent ?? 100) / 100)).toLocaleString("da-DK")} kr./t
+                    {a.hours !== undefined
+                      ? `${Math.round(crewHourly(a, tr.roles) * a.hours).toLocaleString("da-DK")} kr. i alt`
+                      : `${Math.round(crewHourly(a, tr.roles) * ((a.percent ?? 100) / 100)).toLocaleString("da-DK")} kr./t`}
                   </span>
                 </div>
               </div>
