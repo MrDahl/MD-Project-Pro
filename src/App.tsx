@@ -1,8 +1,6 @@
 import { weekdayAverageHours } from "./utils/worktime";
 import { ResourceReport } from "./components/ResourceReport";
 import { applyBulk, deleteMany, type BulkChange } from "./utils/bulk";
-import type { ImportResult } from "./utils/pasteImport";
-import { fitStageDates } from "./utils/stages";
 import React, { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Task, Trade, Settings, ProjectInfo, Stage, Holiday, WeekSchedule } from "./types";
 import { calculateSchedule } from "./utils/scheduler";
@@ -26,23 +24,11 @@ import { Toast, ToastData } from "./components/Toast";
 import { NewProjectDialog } from "./components/NewProjectDialog";
 import { useProject } from "./state/useProject";
 import { BACKUP_KEY, WIZARD_KEY, looksLikeProject, normalizeProject, readNumber, writeFlag } from "./state/project";
-import {
-  Printer,
-  Trash2,
-  ListChecks,
-  CalendarDays,
-  UsersRound,
-  DollarSign,
-  Settings as SettingsIcon,
-  Info,
-  XCircle,
-  Pencil,
-  PlusCircle,
-  HelpCircle,
-  FolderKanban,
-  Menu,
-  X,
-} from "lucide-react";
+import { GOTO_TAB_EVENT } from "./components/HelpTip";
+import { EmptyState } from "./components/EmptyState";
+import { ContextMenu, type ContextMenuState } from "./components/ContextMenu";
+import { CommandPalette, type PaletteItem } from "./components/CommandPalette";
+import { Printer, Trash2, ListChecks, CalendarDays, UsersRound, DollarSign, Settings as SettingsIcon, Info, XCircle, Pencil, PlusCircle, HelpCircle, FolderKanban, Menu, X, HardHat, ClipboardList } from "lucide-react";
 
 // Rarely used views are loaded on demand to keep the first load small
 const Glossary = lazy(() => import("./components/Glossary").then((m) => ({ default: m.Glossary })));
@@ -68,10 +54,52 @@ function isTypingTarget(target: EventTarget | null): boolean {
   return el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT" || el.isContentEditable;
 }
 
+const UI_KEY = "mdppUi";
+const TAB_IDS: TabId[] = ["tidsplan", "resources", "budget", "settings", "glossary"];
+function loadUi(): { tab?: TabId; view?: "gantt" | "list"; dark?: boolean } {
+  try {
+    const raw = JSON.parse(localStorage.getItem(UI_KEY) || "{}");
+    return {
+      tab: TAB_IDS.includes(raw.tab) ? raw.tab : undefined,
+      view: raw.view === "list" || raw.view === "gantt" ? raw.view : undefined,
+      dark: raw.dark === true,
+    };
+  } catch {
+    return {};
+  }
+}
+
 export default function App() {
-  const [activeTab, setActiveTab2] = useState<TabId>("tidsplan");
-  const [tidsplanView, setTidsplanView] = useState<"gantt" | "list">("gantt");
+  const [activeTab, setActiveTab2] = useState<TabId>(() => loadUi().tab ?? "tidsplan");
+  const [tidsplanView, setTidsplanView] = useState<"gantt" | "list">(() => loadUi().view ?? "gantt");
+  const [dark, setDark] = useState<boolean>(() => loadUi().dark ?? false);
+  const [menu, setMenu] = useState<ContextMenuState | null>(null);
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  useEffect(() => {
+    document.documentElement.classList.toggle("dark", dark);
+    try {
+      localStorage.setItem(UI_KEY, JSON.stringify({ tab: activeTab, view: tidsplanView, dark }));
+    } catch {
+      /* storage unavailable */
+    }
+  }, [activeTab, tidsplanView, dark]);
+  useEffect(() => {
+    const go = (e: Event) => {
+      const id = (e as CustomEvent).detail;
+      if (TAB_IDS.includes(id)) setActiveTab2(id);
+    };
+    window.addEventListener(GOTO_TAB_EVENT, go);
+    return () => window.removeEventListener(GOTO_TAB_EVENT, go);
+  }, []);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  // On phones the Gantt chart is too cramped: show the task list (with dates) instead
+  const [isPhone, setIsPhone] = useState(() => typeof window !== "undefined" && window.matchMedia("(max-width: 639px)").matches);
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 639px)");
+    const on = () => setIsPhone(mq.matches);
+    mq.addEventListener("change", on);
+    return () => mq.removeEventListener("change", on);
+  }, []);
   const [wizardOpen, setWizardOpen] = useState(() => {
     // The guide opens automatically on the very first visit
     try {
@@ -109,6 +137,11 @@ export default function App() {
   // Ctrl/Cmd+Z = undo, Ctrl/Cmd+Shift+Z or Ctrl+Y = redo (not while typing in a field)
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setPaletteOpen((o) => !o);
+        return;
+      }
       if (!(e.ctrlKey || e.metaKey) || isTypingTarget(e.target)) return;
       const key = e.key.toLowerCase();
       if (key === "z" && !e.shiftKey) {
@@ -255,20 +288,6 @@ export default function App() {
     [update, showToast]
   );
 
-  const handleImport = useCallback(
-    (r: ImportResult) => {
-      update((p) => {
-        const tasks = [...p.tasks, ...r.tasks];
-        const trades = [...p.trades, ...r.newTrades];
-        const fresh = new Set(r.newStages.map((s) => s.id));
-        const stages = fresh.size > 0 ? fitStageDates(tasks, trades, p.holidays, p.settings, p.startDate, [...(p.stages || []), ...r.newStages], fresh) : p.stages;
-        return { ...p, tasks, trades, stages };
-      });
-      showToast(`${r.tasks.length} opgaver er indsat${r.warnings.length ? ` (${r.warnings.length} bemærkninger)` : ""}.`, true);
-    },
-    [update, showToast]
-  );
-
   const warnings = useMemo(
     () => findWarnings(calculatedTasks, appState.trades, appState.stages || []),
     [calculatedTasks, appState.trades, appState.stages]
@@ -284,6 +303,33 @@ export default function App() {
       showToast(hasSuccessors ? "Opgaven er slettet - afhængige opgaver er gjort uafhængige." : "Opgaven er slettet.", true);
     },
     [update, showToast]
+  );
+
+  // Right-click on a task bar, label or card opens a small menu
+  useEffect(() => {
+    const onCtx = (e: MouseEvent) => {
+      const el = (e.target as HTMLElement | null)?.closest<HTMLElement>("[data-task-id]");
+      const id = el?.dataset.taskId;
+      const task = id ? stateRef.current.tasks.find((t) => t.id === id) : undefined;
+      if (!task) return;
+      e.preventDefault();
+      setMenu({ x: e.clientX, y: e.clientY, taskId: task.id, title: task.title });
+    };
+    document.addEventListener("contextmenu", onCtx);
+    return () => document.removeEventListener("contextmenu", onCtx);
+  }, []);
+
+  const paletteItems = useMemo<PaletteItem[]>(
+    () => [
+      ...TABS.map((t) => ({ id: t.id, label: t.label, hint: "Fane", kind: "tab" as const })),
+      ...calculatedTasks.map((t) => ({
+        id: t.id,
+        label: t.title,
+        hint: t.calcStart ? new Date(`${t.calcStart}T12:00:00`).toLocaleDateString("da-DK", { day: "numeric", month: "short" }) : "Opgave",
+        kind: "task" as const,
+      })),
+    ],
+    [calculatedTasks]
   );
 
   // Trade CRUD operations
@@ -486,7 +532,32 @@ export default function App() {
         savedAt={saveInfo.savedAt}
         saveFailed={saveInfo.failed}
         backupDue={backupDue}
+        projectName={appState.projectInfo?.projectName || ""}
+        endDate={projectEndDate}
+        dark={dark}
+        onToggleDark={() => setDark((d) => !d)}
+        onSearch={() => setPaletteOpen(true)}
       />
+      {menu && (
+        <ContextMenu
+          menu={menu}
+          onEdit={(id) => setDrawer({ taskId: id })}
+          onDuplicate={handleDuplicateTask}
+          onDelete={handleDeleteTask}
+          onClose={() => setMenu(null)}
+        />
+      )}
+      {paletteOpen && (
+        <CommandPalette
+          items={paletteItems}
+          onClose={() => setPaletteOpen(false)}
+          onPick={(it) => {
+            setPaletteOpen(false);
+            if (it.kind === "tab") setActiveTab2(it.id as TabId);
+            else setDrawer({ taskId: it.id });
+          }}
+        />
+      )}
 
       {/* Main Container Dashboard */}
       <main className="flex-1 max-w-7xl w-full mx-auto p-3 md:p-6 flex flex-col gap-4 md:gap-5">
@@ -502,13 +573,13 @@ export default function App() {
                 {appState.projectInfo?.projectName || "MD Projekt"}
               </h2>
               {appState.projectInfo?.address ? (
-                <p className="text-[10px] md:text-[11px] text-slate-500 font-semibold mt-0.5 whitespace-normal leading-relaxed">
+                <p className="text-xs md:text-xs text-slate-500 font-semibold mt-0.5 whitespace-normal leading-relaxed">
                   {appState.projectInfo.address}
                   {appState.projectInfo.customer ? ` • Kunde: ${appState.projectInfo.customer}` : ""}
                   {appState.projectInfo.manager ? ` • Ansvarlig: ${appState.projectInfo.manager}` : ""}
                 </p>
               ) : (
-                <p className="text-[10px] md:text-[11px] text-slate-450 font-semibold mt-0.5">
+                <p className="text-xs md:text-xs text-slate-450 font-semibold mt-0.5">
                   Projektdetaljer og planlægningsoverblik
                 </p>
               )}
@@ -519,14 +590,14 @@ export default function App() {
         {/* High Density KPI Statistics Metrics */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 md:gap-3 print:hidden">
           <div className="bg-white border border-slate-200 rounded-xl p-3 flex flex-col justify-between shadow-2xs">
-            <span className="text-[8px] md:text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">Total Sagspris</span>
+            <span className="text-xs md:text-xs font-black text-slate-500 block mb-1">Total Sagspris</span>
             <div className="flex items-baseline gap-0.5 md:gap-1 flex-wrap">
               <span className="text-sm md:text-lg font-black font-mono text-slate-900">{projectTotalCost.toLocaleString("da-DK")}</span>
-              <span className="text-[9px] md:text-[10px] font-black text-slate-450 font-mono">kr.</span>
+              <span className="text-xs md:text-xs font-black text-slate-450 font-mono">kr.</span>
             </div>
           </div>
           <div className="bg-white border border-slate-200 rounded-xl p-3 flex flex-col justify-between shadow-2xs">
-            <span className="text-[8px] md:text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">Færdiggørelsesdato</span>
+            <span className="text-xs md:text-xs font-black text-slate-500 block mb-1">Færdiggørelsesdato</span>
             <div className="flex items-baseline gap-1">
               <span className="text-sm md:text-lg font-black text-slate-900 font-mono">
                 {projectEndDate ? new Date(`${projectEndDate}T12:00:00`).toLocaleDateString("da-DK", { day: "numeric", month: "short" }) : "Ingen"}
@@ -534,17 +605,17 @@ export default function App() {
             </div>
           </div>
           <div className="bg-white border border-slate-200 rounded-xl p-3 flex flex-col justify-between shadow-2xs">
-            <span className="text-[8px] md:text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">Opgaver</span>
+            <span className="text-xs md:text-xs font-black text-slate-500 block mb-1">Opgaver</span>
             <div className="flex items-baseline gap-1">
               <span className="text-sm md:text-lg font-black text-slate-900 font-mono">{appState.tasks.length}</span>
-              <span className="text-[9px] md:text-[10px] text-slate-400 font-mono font-black">stk.</span>
+              <span className="text-xs md:text-xs text-slate-500 font-mono font-black">stk.</span>
             </div>
           </div>
           <div className="bg-white border border-slate-200 rounded-xl p-3 flex flex-col justify-between shadow-2xs">
-            <span className="text-[8px] md:text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">Faggrupper</span>
+            <span className="text-xs md:text-xs font-black text-slate-500 block mb-1">Faggrupper</span>
             <div className="flex items-baseline gap-1">
               <span className="text-sm md:text-lg font-black text-slate-900 font-mono">{appState.trades.length}</span>
-              <span className="text-[9px] md:text-[10px] text-slate-400 font-mono font-black">stk.</span>
+              <span className="text-xs md:text-xs text-slate-500 font-mono font-black">stk.</span>
             </div>
           </div>
         </div>
@@ -642,12 +713,13 @@ export default function App() {
             <div className="flex flex-col gap-4">
               <WarningsPanel warnings={warnings} onOpenTask={(id) => setDrawer({ taskId: id })} />
 
+
               {/* Inner Sub-navigation toggle */}
               <div className="flex bg-slate-100/80 p-1.5 rounded-xl self-start max-w-full border border-slate-200/50 shadow-3xs select-none">
                 <button
                   type="button"
                   onClick={() => setTidsplanView("gantt")}
-                  className={`flex items-center gap-2 px-4 py-2 text-xs font-black transition-all cursor-pointer rounded-lg ${
+                  className={`hidden sm:flex items-center gap-2 px-4 py-2 text-xs font-black transition-all cursor-pointer rounded-lg ${
                     tidsplanView === "gantt"
                       ? "bg-white text-slate-900 shadow-xs"
                       : "text-slate-500 hover:text-slate-800 hover:bg-white/40"
@@ -672,7 +744,7 @@ export default function App() {
 
               {/* View Rendering based on selected view mode */}
               <div className="w-full">
-                {tidsplanView === "list" ? (
+                {tidsplanView === "list" || isPhone ? (
                   <TaskList
                     tasks={calculatedTasks}
                     trades={appState.trades}
@@ -683,11 +755,11 @@ export default function App() {
                     onEdit={(id) => setDrawer({ taskId: id })}
                     onDelete={handleDeleteTask}
                     onDuplicate={handleDuplicateTask}
-                    startDate={appState.startDate}
                     onBulkApply={handleBulkApply}
                     onBulkDelete={handleBulkDelete}
-                    onImport={handleImport}
                   />
+                ) : appState.tasks.length === 0 ? (
+                  <EmptyState onTemplate={() => setNewProjectOpen(true)} onFirstTask={() => setDrawer({ taskId: null })} />
                 ) : (
                   <div className="bg-white border border-slate-200 p-3 md:p-5 rounded-2xl shadow-xs">
                     <div className="flex flex-wrap items-center justify-between gap-3 mb-4 px-1">
@@ -696,14 +768,14 @@ export default function App() {
                           <CalendarDays className="w-5 h-5 text-slate-700" />
                           <span>Tidsplan & Gantt-diagram</span>
                         </h3>
-                        <p className="text-[10px] text-slate-400 font-semibold mt-1 leading-normal">
+                        <p className="text-xs text-slate-500 font-semibold mt-1 leading-normal">
                           Træk i midten for at forskyde opgaverne på den rigtige rækkefølge eller træk højre kant for at ændre varigheden.
                         </p>
                       </div>
                       <button
                         type="button"
                         onClick={() => setDrawer({ taskId: null })}
-                        className="bg-slate-900 active:bg-black hover:bg-black text-white font-black text-[10px] md:text-xs py-2 px-3 rounded-lg cursor-pointer transition select-none flex items-center gap-1 shadow-xs min-h-[34px]"
+                        className="bg-slate-900 active:bg-black hover:bg-black text-white font-black text-xs md:text-xs py-2 px-3 rounded-lg cursor-pointer transition select-none flex items-center gap-1 shadow-xs min-h-[34px]"
                       >
                         <PlusCircle className="w-3.5 h-3.5" />
                         <span>Opret ny opgave</span>
@@ -751,15 +823,15 @@ export default function App() {
 
               {/* Workers list */}
               <div className="lg:col-span-7 flex flex-col gap-3">
-                <h3 className="text-[10px] md:text-xs font-bold text-slate-400 uppercase tracking-wider mb-1 px-1">
+                <h3 className="text-xs md:text-xs font-bold text-slate-500 mb-1 px-1">
                   Aktive faggrupper ({appState.trades.length})
                 </h3>
 
                 {appState.trades.length === 0 ? (
-                  <div className="bg-white border border-dashed border-slate-200 p-8 md:p-12 text-center rounded-xl text-xs text-slate-400 flex flex-col items-center justify-center">
+                  <div className="bg-white border border-dashed border-slate-200 p-8 md:p-12 text-center rounded-xl text-xs text-slate-500 flex flex-col items-center justify-center">
                     <UsersRound className="w-10 h-10 text-slate-200 mb-2" />
                     <p className="font-semibold text-slate-500">Ingen faggrupper oprettet</p>
-                    <p className="text-[10px] text-slate-400 mt-1 select-none">
+                    <p className="text-xs text-slate-500 mt-1 select-none">
                       Opret dem til venstre, for at tildele dem dine arbejdsopgaver.
                     </p>
                   </div>
@@ -779,7 +851,7 @@ export default function App() {
                             />
                             <div className="min-w-0">
                               <h4 className="text-xs font-extrabold text-slate-700 leading-none truncate">{tr.name}</h4>
-                              <span className="text-[10px] text-slate-400 font-bold block mt-1.5 leading-tight">
+                              <span className="text-xs text-slate-500 font-bold block mt-1.5 leading-tight">
                                 {tr.isFixedPrice ? (
                                   <span>Fast kontraktkontrakt: {tr.rate.toLocaleString("da-DK")} kr.</span>
                                 ) : (
@@ -789,7 +861,7 @@ export default function App() {
                                 )}
                               </span>
                               {(tr.roles || []).length > 0 && (
-                                <span data-testid="trade-roles" className="text-[10px] text-slate-500 font-semibold block mt-1 leading-tight">
+                                <span data-testid="trade-roles" className="text-xs text-slate-500 font-semibold block mt-1 leading-tight">
                                   Hold: {(tr.roles || []).map((r) => `${r.count} ${r.name.toLowerCase()}`).join(", ")}
                                 </span>
                               )}
@@ -798,7 +870,7 @@ export default function App() {
 
                           <div className="flex items-center justify-between sm:justify-end gap-3 border-t sm:border-t-0 border-slate-100 pt-2 sm:pt-0">
                             <div className="text-right">
-                              <span className="text-[9px] md:text-[10px] bg-slate-100 px-2 py-0.5 rounded font-extrabold text-slate-600 block">
+                              <span className="text-xs md:text-xs bg-slate-100 px-2 py-0.5 rounded font-extrabold text-slate-600 block">
                                 {stats.count} {stats.count === 1 ? "opgave" : "opgaver"}
                               </span>
                             </div>
@@ -806,7 +878,7 @@ export default function App() {
                             <div className="flex gap-1.5">
                               <button
                                 onClick={() => setEditTradeId(tr.id)}
-                                className="p-2 bg-slate-50 hover:bg-slate-100 text-slate-400 hover:text-slate-600 rounded-lg cursor-pointer border-0 transition min-w-[34px] min-h-[34px] flex items-center justify-center"
+                                className="p-2 bg-slate-50 hover:bg-slate-100 text-slate-500 hover:text-slate-600 rounded-lg cursor-pointer border-0 transition min-w-[34px] min-h-[34px] flex items-center justify-center"
                                 title="Rediger"
                               >
                                 <Pencil className="w-3.5 h-3.5" />
@@ -839,7 +911,7 @@ export default function App() {
                 </h3>
                 <button
                   onClick={() => window.print()}
-                  className="flex items-center gap-1 text-[10px] md:text-xs font-extrabold text-slate-600 hover:text-slate-850 bg-slate-50 border border-slate-200 px-3 py-2 rounded-lg cursor-pointer hover:bg-slate-100 active:scale-95 transition shadow-2xs select-none min-h-[36px]"
+                  className="flex items-center gap-1 text-xs md:text-xs font-extrabold text-slate-600 hover:text-slate-850 bg-slate-50 border border-slate-200 px-3 py-2 rounded-lg cursor-pointer hover:bg-slate-100 active:scale-95 transition shadow-2xs select-none min-h-[36px]"
                   title="Gem eller udskriv rapport"
                 >
                   <Printer className="w-4 h-4" />
@@ -849,22 +921,22 @@ export default function App() {
 
               {/* Printable header box */}
               <div className="hidden print:flex flex-col gap-1 mb-6">
-                <span className="text-xs uppercase font-extrabold tracking-wider text-slate-400 leading-none">
+                <span className="text-xs font-extrabold text-slate-500 leading-none">
                   Firma- og Sagsafleveringsrapport
                 </span>
                 <h2 className="text-2xl font-black text-slate-800 tracking-tight leading-none">MD Project Budget</h2>
-                <div className="text-[10px] text-slate-400 mt-1 font-bold">
+                <div className="text-xs text-slate-500 mt-1 font-bold">
                   Udskrevet: {new Date().toLocaleDateString("da-DK")}
                 </div>
               </div>
 
               {/* Overall total cost meter */}
               <div className="p-4 md:p-6 bg-emerald-50 rounded-2xl border border-emerald-100/55 text-center flex flex-col items-center">
-                <span className="text-[9px] md:text-[10px] uppercase font-bold text-slate-400 tracking-wider">Total sagspris</span>
+                <span className="text-xs md:text-xs font-bold text-slate-500">Total sagspris</span>
                 <span className="text-xl md:text-3xl font-black text-emerald-800 tracking-tight mt-1 font-mono">
                   {projectTotalCost.toLocaleString("da-DK")} kr.
                 </span>
-                <div className="text-[11px] md:text-xs text-slate-500 font-bold mt-1 max-w-sm">
+                <div className="text-xs md:text-xs text-slate-500 font-bold mt-1 max-w-sm">
                   Planlagt deadline:{" "}
                   <span className="text-slate-800 font-black">
                     {projectEndDate ? new Date(`${projectEndDate}T12:00:00`).toLocaleDateString("da-DK", { day: "numeric", month: "long", year: "numeric" }) : "Ingen"}
@@ -882,13 +954,13 @@ export default function App() {
                     return (
                       <>
                         <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl">
-                          <span className="text-[9px] uppercase font-black text-slate-400 tracking-widest block mb-1">Slutdato mod baseline</span>
+                          <span className="text-xs font-black text-slate-500 block mb-1">Slutdato mod baseline</span>
                           <span className={`font-black ${tone(dDays ?? 0)}`}>
                             {dDays === null ? "Ingen data" : dDays === 0 ? "Uændret" : `${dDays > 0 ? "+" : ""}${dDays} kalenderdage`}
                           </span>
                         </div>
                         <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl">
-                          <span className="text-[9px] uppercase font-black text-slate-400 tracking-widest block mb-1">Sagspris mod baseline</span>
+                          <span className="text-xs font-black text-slate-500 block mb-1">Sagspris mod baseline</span>
                           <span className={`font-black font-mono ${tone(dCost)}`}>
                             {dCost === 0 ? "Uændret" : `${dCost > 0 ? "+" : ""}${Math.round(dCost).toLocaleString("da-DK")} kr.`}
                           </span>
@@ -901,7 +973,7 @@ export default function App() {
 
               {/* Accumulated cost over time */}
               <div className="flex flex-col gap-2">
-                <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider border-b border-slate-100 pb-1">Omkostninger over tid (S-kurve)</h4>
+                <h4 className="text-xs font-bold text-slate-500 border-b border-slate-100 pb-1">Omkostninger over tid (S-kurve)</h4>
                 <CostCurve tasks={calculatedTasks} baseline={appState.baseline} />
               </div>
 
@@ -911,8 +983,8 @@ export default function App() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5 md:gap-6 mt-1">
                 {/* 1. Cost per trade */}
                 <div className="flex flex-col gap-2.5">
-                  <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider border-b border-slate-100 pb-1 flex items-center gap-1">
-                    <span>👷</span>
+                  <h4 className="text-xs font-bold text-slate-500 border-b border-slate-100 pb-1 flex items-center gap-1">
+                    <HardHat className="w-3.5 h-3.5 shrink-0" />
                     <span>Udgifter pr faggruppe</span>
                   </h4>
                   <div className="flex flex-col gap-2">
@@ -938,8 +1010,8 @@ export default function App() {
 
                 {/* 2. Cost per task */}
                 <div className="flex flex-col gap-2.5">
-                  <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider border-b border-slate-100 pb-1 flex items-center gap-1">
-                    <span>📋</span>
+                  <h4 className="text-xs font-bold text-slate-500 border-b border-slate-100 pb-1 flex items-center gap-1">
+                    <ClipboardList className="w-3.5 h-3.5 shrink-0" />
                     <span>Udgifter pr opgave</span>
                   </h4>
                   <div className="flex flex-col gap-2 max-h-[260px] overflow-y-auto">
@@ -994,7 +1066,7 @@ export default function App() {
       </main>
 
       {/* Minimalistisk Footer */}
-      <footer className="bg-slate-50 border-t border-slate-200/60 py-4 text-center text-xs text-slate-400 select-none print:hidden">
+      <footer className="bg-slate-50 border-t border-slate-200/60 py-4 text-center text-xs text-slate-500 select-none print:hidden">
         <p className="font-medium">
           Udviklet af{" "}
           <a

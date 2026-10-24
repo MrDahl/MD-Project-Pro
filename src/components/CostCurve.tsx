@@ -97,7 +97,7 @@ export function CostCurve({ tasks, baseline }: { tasks: Task[]; baseline?: Basel
         {baseCurve && <polyline points={points(baseCurve.values)} fill="none" stroke="#94a3b8" strokeWidth="2" strokeDasharray="6 4" strokeLinejoin="round" />}
         <polyline points={points(curve.values)} fill="none" stroke="#0f172a" strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />
       </svg>
-      <figcaption className="flex flex-wrap gap-x-5 gap-y-1 text-[11px] font-bold text-slate-500">
+      <figcaption className="flex flex-wrap gap-x-5 gap-y-1 text-xs font-bold text-slate-500">
         <span className="flex items-center gap-1.5">
           <span className="w-5 h-0.5 bg-slate-900 rounded" /> Nuværende plan
         </span>

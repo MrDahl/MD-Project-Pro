@@ -68,14 +68,15 @@ Appen har fem faner:
 
 I **Tidsplan → Opgaver** ligger alle opgaver som kort. **Ny opgave** og **Rediger** åbner et panel i højre side, så du ikke forlader overblikket. Escape lukker.
 
-En opgave har:
+**Formularen er delt i to.** Øverst ligger det, du altid skal bruge: **titel**, **varighed** (*arbejdsdage* eller *timer*, se [kapitel 6](#6-arbejdstider-og-timeplanlægning)), **faggruppe** og **forgængere**. Resten ligger under **Flere indstillinger**, som er foldet sammen. Rediger du en opgave, hvor noget af det er brugt, åbner den af sig selv. Et lille **(?)** ved varighed, forgængere og forskydning forklarer begreberne på én linje, med link til Vidensbasen.
 
-- **Titel og beskrivelse**
-- **Varighed** i *arbejdsdage* eller *timer* (se [kapitel 6](#6-arbejdstider-og-timeplanlægning))
+Under **Flere indstillinger** finder du:
+
+- **Beskrivelse**
+- **Tilbagevendende serviceopgave** og **milepæl**
 - **Fast startdato** (valgfri). Opgaven starter tidligst denne dag.
-- **Faggrupper**, evt. med **bemanding pr. aktivitet**
+- **Underressourcer** (bemanding pr. aktivitet)
 - **Etape** (valgfri)
-- **Forgængere**
 - **Weekend/helligdage:** som standard arbejdes der ikke i weekender og på helligdage. Det kan tillades pr. opgave.
 - **Uvejr:** som standard stopper opgaven under vejrstop. Slå "uafhængig af uvejr" til for indendørsarbejde.
 - **Fremdrift** i procent
@@ -117,10 +118,13 @@ Gantt viser alle opgaver som bjælker i faggruppens farve. Weekender er grønne,
 
 **Flyt og ret**
 
+- **Dobbeltklik** på en bjælke (eller et opgavekort) åbner redigering. **Højreklik** giver *Rediger*, *Dupliker* og *Slet*.
 - Træk i bjælken for at flytte startdatoen (sætter en fast start).
 - Træk i højre kant for at ændre varigheden i dage.
 - Med tastaturet: vælg en bjælke med Tab, piletaster flytter (Shift = 1 uge), **+ / −** ændrer varigheden, Enter åbner detaljer, op/ned skifter opgave.
 - Klik en dag i kalenderhovedet for at tilføje eller fjerne en helligdag eller et vejrstop.
+
+**Værktøjslinjen** er samlet i tre grupper: **Visning** (zoom, fold etaper, afhængigheder), **Gå til** (I dag, Projektstart, Projektslut) og menuen **Del og gem** (PDF, HTML og baseline).
 
 **Visning**
 
@@ -132,7 +136,7 @@ Gantt viser alle opgaver som bjælker i faggruppens farve. Weekender er grønne,
 
 **Baseline**
 
-Tryk **Gem baseline**, når planen er aftalt. Derefter vises den oprindelige plan som tynde skyggebjælker, afvigelsen i dage ved hver opgave, og Økonomi viser ændring i slutdato og sagspris. Tryk igen for at opdatere baseline.
+Vælg **Del og gem → Gem baseline**, når planen er aftalt. Derefter vises den oprindelige plan som tynde skyggebjælker, afvigelsen i dage ved hver opgave, og Økonomi viser ændring i slutdato og sagspris. Tryk igen for at opdatere baseline.
 
 ---
 
@@ -248,7 +252,7 @@ Prisen følger timepris × timer pr. dag (eller klokketimer på timeopgaver), me
 
 ## 10. Print og PDF af hele tidsplanen
 
-Under **Tidsplan** (Gantt) trykker du **Gem som PDF…**. Du får en vektor-PDF med skarp tekst i alle størrelser, velegnet til rulleprinter.
+Under **Tidsplan** (Gantt) vælger du **Del og gem → Gem som PDF…**. Du får en vektor-PDF med skarp tekst i alle størrelser, velegnet til rulleprinter.
 
 | Valg | Muligheder |
 |---|---|
@@ -264,7 +268,7 @@ Gode råd:
 
 - En PDF-side kan højst være ca. 5 m. Bliver arket større, skaleres det automatisk ned. Vælg i så fald *Overblik* eller én etape ad gangen.
 - Timeopgaver vises som dage i PDF'en, men klokkeslæt og timer står i teksten ved bjælken.
-- Der er også **Hent som HTML** til en simpel version, du kan åbne og printe fra browseren.
+- Der er også **Del og gem → Hent som HTML** til en simpel version, du kan åbne og printe fra browseren.
 
 ---
 
@@ -272,7 +276,6 @@ Gode råd:
 
 - **Fold etaper sammen** i Gantt for overblik.
 - **Vælg flere** i opgavelisten og ret etape, faggruppe (tilføj eller skift) eller varighed på alle valgte på én gang, eller slet dem. Alt kan fortrydes.
-- **Indsæt fra Excel:** tryk *Indsæt fra Excel* i opgavelisten, kopiér rækker fra Excel og indsæt. Dialogen viser en forhåndsvisning og eventuelle bemærkninger, inden du tilføjer.
 
 Kolonner genkendes på overskriften:
 
@@ -310,7 +313,8 @@ Projektet gemmes kun i din egen browser. Intet sendes til en server.
 |---|---|
 | Ctrl+Z | Fortryd |
 | Ctrl+Shift+Z / Ctrl+Y | Gentag |
-| Escape | Luk dialog eller sidepanel |
+| Ctrl+K | Søg efter opgave eller fane og hop direkte derhen |
+| Escape | Luk dialog, menu eller sidepanel |
 | Tab | Vælg næste bjælke i Gantt |
 | ← → | Flyt valgt bjælke en dag (Shift: en uge) |
 | + / − | Længere / kortere varighed (timeopgaver: halve timer) |
@@ -318,6 +322,15 @@ Projektet gemmes kun i din egen browser. Intet sendes til en server.
 | ↑ ↓ | Skift til opgaven over / under |
 
 ---
+
+### Små hjælpere
+
+- **Søg (Ctrl+K):** skriv en del af en opgaves navn eller en fane. Piletaster og Enter åbner opgaven eller fanen.
+- **Husker dig:** fane, Gantt/liste, zoom, filtre, afhængighedspile og foldede etaper huskes til næste gang.
+- **Mørk tilstand:** måne-knappen i toppen.
+- **Print liste:** *Opgaver → Print liste* giver en ren udskrift uden knapper.
+- **Mobil og tablet:** på telefonen vises opgaverne som en liste med datoer i stedet for Gantt, og knapper er mindst 44 px.
+- **Tom plan:** er der ingen opgaver, får du store knapper til *Start fra skabelon* og *Opret første opgave*.
 
 ## 14. Spørgsmål og svar
 

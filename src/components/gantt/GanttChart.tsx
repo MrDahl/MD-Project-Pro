@@ -2,7 +2,9 @@ import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useSta
 import type { Task, Trade, Stage, WeatherDelay, Holiday, Baseline, ProjectInfo } from "../../types";
 import { baselineById, endDeviationDays } from "../../utils/baseline";
 import { buildCalendar, dayNumber, dayToStr, isWeekendDay, weekdayOf } from "../../utils/scheduler";
-import { Calendar, Zap, ChevronLeft, ChevronRight, FolderDown, Flame, SlidersHorizontal, ZoomIn, Link2, FileText } from "lucide-react";
+import { Calendar, Zap, ChevronLeft, ChevronRight, FolderDown, Flame, SlidersHorizontal, ZoomIn, Link2, FileText, Snowflake, Lightbulb, Share2, ChevronDown, Bookmark, Trash2 } from "lucide-react";
+import { HelpTip } from "../HelpTip";
+import { usePersistedState } from "../../utils/persist";
 import { todayStr } from "../../utils/dates";
 import { taskLinks } from "../../utils/links";
 import {
@@ -104,9 +106,13 @@ export function GanttChart({
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
   const [detailTask, setDetailTask] = useState<Task | null>(null);
   const [draggingId, setDraggingId] = useState<string | null>(null);
-  const [zoom, setZoom] = useState<Zoom>("day");
-  const [showArrows, setShowArrows] = useState(true);
-  const [collapsedStages, setCollapsedStages] = useState<Set<string>>(() => new Set());
+  const [zoom, setZoom] = usePersistedState<Zoom>("mdppZoom", "day", (r) => (r === "time" || r === "day" || r === "week" || r === "month" ? r : undefined));
+  const [showArrows, setShowArrows] = usePersistedState<boolean>("mdppArrows", true, (r) => (typeof r === "boolean" ? r : undefined));
+  const [collapsedList, setCollapsedList] = usePersistedState<string[]>("mdppCollapsed", [], (r) => (Array.isArray(r) ? r.filter((x) => typeof x === "string") : undefined));
+  const collapsedStages = useMemo(() => new Set(collapsedList), [collapsedList]);
+  const setCollapsedStages = useCallback((v: Set<string> | ((p: Set<string>) => Set<string>)) => {
+    setCollapsedList((prev) => [...(typeof v === "function" ? v(new Set(prev)) : v)]);
+  }, [setCollapsedList]);
   const toggleStage = useCallback(
     (id: string) =>
       setCollapsedStages((prev) => {
@@ -119,6 +125,22 @@ export function GanttChart({
   );
   const [showBaseline, setShowBaseline] = useState(true);
   const [pdfOpen, setPdfOpen] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
+  const shareRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!shareOpen) return;
+    const close = (e: Event) => {
+      if (e instanceof KeyboardEvent && e.key !== "Escape") return;
+      if (e instanceof MouseEvent && shareRef.current?.contains(e.target as Node)) return;
+      setShareOpen(false);
+    };
+    document.addEventListener("mousedown", close);
+    document.addEventListener("keydown", close);
+    return () => {
+      document.removeEventListener("mousedown", close);
+      document.removeEventListener("keydown", close);
+    };
+  }, [shareOpen]);
   const [pdfBusy, setPdfBusy] = useState(false);
   const [pdfError, setPdfError] = useState<string | null>(null);
   const [jumpTo, setJumpTo] = useState<number | null>(null);
@@ -323,6 +345,7 @@ export function GanttChart({
 
   const handlePointerDown = useCallback(
     (e: React.PointerEvent<HTMLDivElement>, task: Task, type: "move" | "resize-right") => {
+      if (e.button !== 0) return; // right-click opens the context menu, not a drag
       e.preventDefault();
       e.stopPropagation();
       e.currentTarget.setPointerCapture(e.pointerId);
@@ -394,11 +417,16 @@ export function GanttChart({
     setDraggingId(null);
 
     // A short click opens the details, a drag changes the schedule
-    if (wasClick) setDetailTask(task);
+    if (wasClick) openDetail(task);
   }, []);
 
   const expandColumn = useCallback(() => setColumnCollapsed(false), []);
-  const openDetail = useCallback((t: Task) => setDetailTask(t), []);
+  // The detail window opens a moment after a click, so a double-click (edit) can cancel it
+  const detailTimer = useRef<number | undefined>(undefined);
+  const openDetail = useCallback((t: Task) => {
+    window.clearTimeout(detailTimer.current);
+    detailTimer.current = window.setTimeout(() => setDetailTask(t), 230);
+  }, []);
 
   // --- Background: weekend stripes via CSS, holidays/weather as a few overlay blocks ---
   const overlays = useMemo(() => {
@@ -601,7 +629,7 @@ export function GanttChart({
           }`}
         >
           {zoom === "week" && weekdayOf(day) === 1 && (
-            <span className="absolute bottom-1 left-0.5 text-[9px] font-black text-slate-600 select-none">{date.getUTCDate()}</span>
+            <span className="absolute bottom-1 left-0.5 text-xs font-black text-slate-600 select-none">{date.getUTCDate()}</span>
           )}
         </div>
       );
@@ -625,19 +653,19 @@ export function GanttChart({
         {timeMode && (
           <div className="absolute bottom-0 inset-x-0 h-3 pointer-events-none">
             {[6, 8, 10, 12, 14, 16].map((h) => (
-              <span key={h} style={{ left: `${((h * 60 - TIME_FROM) / (TIME_TO - TIME_FROM)) * 100}%` }} className="absolute -translate-x-1/2 text-[8px] font-bold text-slate-400">
+              <span key={h} style={{ left: `${((h * 60 - TIME_FROM) / (TIME_TO - TIME_FROM)) * 100}%` }} className="absolute -translate-x-1/2 text-xs font-bold text-slate-500">
                 {h}
               </span>
             ))}
           </div>
         )}
-        <span className="text-[8.5px] uppercase font-black text-slate-400 select-none">{MONTHS_SHORT[date.getUTCMonth()]}</span>
+        <span className="text-[8.5px] font-black text-slate-500 select-none">{MONTHS_SHORT[date.getUTCMonth()]}</span>
         <div className="flex items-center gap-0.5 mt-0.5 select-none font-black">
           <span className={`text-[12px] font-black ${isWe || isHol || isWeather ? "text-slate-900" : "text-slate-800"}`}>
             {date.getUTCDate()}
           </span>
-          {isHol && <span className="text-[10px]" title={holidayName || "Lukkedag"}>🇩🇰</span>}
-          {isWeather && <span className="text-[10px]" title={foundWeather?.label}>❄️</span>}
+          {isHol && <span className="text-xs" title={holidayName || "Lukkedag"}>🇩🇰</span>}
+          {isWeather && <span className="text-xs" title={foundWeather?.label}><Snowflake className="w-3 h-3 text-sky-600" /></span>}
         </div>
       </div>
     );
@@ -656,7 +684,7 @@ export function GanttChart({
       monthLabels.push(
         <div key={`${y}-${m}`} style={{ left }} className="absolute top-0 h-full pointer-events-none">
           {startDay >= minDay && <div className="absolute inset-y-0 left-0 w-px bg-slate-400/60" />}
-          <span className="absolute top-1 left-1 text-[10px] font-black uppercase text-slate-600 whitespace-nowrap select-none">
+          <span className="absolute top-1 left-1 text-xs font-black text-slate-600 whitespace-nowrap select-none">
             {MONTHS_SHORT[m]} {y}
           </span>
         </div>
@@ -775,7 +803,7 @@ export function GanttChart({
           {/* Conditional Sub-selectors based on focusing choice */}
           {filterScope === "stage" && stages && stages.length > 0 && (
             <div className="flex items-center gap-1.5">
-              <span className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wide">Etape:</span>
+              <span className="text-xs text-slate-500 font-extrabold">Etape:</span>
               <select
                 value={selectedStageId}
                 onChange={(e) => setSelectedStageId(e.target.value)}
@@ -792,7 +820,7 @@ export function GanttChart({
 
           {filterScope === "month" && availableMonths.length > 0 && (
             <div className="flex items-center gap-1.5">
-              <span className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wide">Måned:</span>
+              <span className="text-xs text-slate-500 font-extrabold">Måned:</span>
               <select
                 value={selectedMonthStr}
                 onChange={(e) => setSelectedMonthStr(e.target.value)}
@@ -809,7 +837,7 @@ export function GanttChart({
 
           {filterScope === "year" && availableYears.length > 0 && (
             <div className="flex items-center gap-1.5">
-              <span className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wide">År:</span>
+              <span className="text-xs text-slate-500 font-extrabold">År:</span>
               <select
                 value={selectedYearVal}
                 onChange={(e) => setSelectedYearVal(Number(e.target.value))}
@@ -825,132 +853,173 @@ export function GanttChart({
           )}
         </div>
 
-        <button
-          onClick={handleExport}
-          className="px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white font-extrabold text-xs rounded-xl shadow-sm border-0 transition active:scale-95 flex items-center gap-2 cursor-pointer transition-all"
-        >
-          <FolderDown className="w-4 h-4" />
-          <span>Hent som HTML</span>
-        </button>
-        <button
-          onClick={() => setPdfOpen(true)}
-          data-testid="open-pdf"
-          className="px-4 py-2 bg-slate-900 hover:bg-black text-white font-extrabold text-xs rounded-xl shadow-sm border-0 transition active:scale-95 flex items-center gap-2 cursor-pointer"
-        >
-          <FileText className="w-4 h-4" />
-          <span>Gem som PDF…</span>
-        </button>
+        <div className="relative" ref={shareRef}>
+          <button
+            type="button"
+            data-testid="share-menu"
+            aria-haspopup="menu"
+            aria-expanded={shareOpen}
+            onClick={() => setShareOpen(!shareOpen)}
+            className="px-4 py-2.5 min-h-[44px] bg-slate-800 hover:bg-slate-900 text-white font-bold text-sm rounded-xl shadow-sm transition active:scale-95 flex items-center gap-2 cursor-pointer"
+          >
+            <Share2 className="w-4 h-4" />
+            <span>Del og gem</span>
+            <ChevronDown className="w-4 h-4" />
+          </button>
+          {shareOpen && (
+            <div role="menu" className="absolute right-0 top-full mt-1.5 z-50 w-72 bg-white border border-slate-200 shadow-xl rounded-xl p-1.5 flex flex-col">
+              <button
+                type="button"
+                role="menuitem"
+                data-testid="open-pdf"
+                onClick={() => { setShareOpen(false); setPdfOpen(true); }}
+                className="flex items-center gap-2.5 px-3 py-3 min-h-[44px] rounded-lg text-sm font-bold text-slate-800 hover:bg-slate-100 cursor-pointer text-left"
+              >
+                <FileText className="w-4 h-4 shrink-0" />
+                <span>Gem som PDF…</span>
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                data-testid="export-html"
+                onClick={() => { setShareOpen(false); handleExport(); }}
+                className="flex items-center gap-2.5 px-3 py-3 min-h-[44px] rounded-lg text-sm font-bold text-slate-800 hover:bg-slate-100 cursor-pointer text-left"
+              >
+                <FolderDown className="w-4 h-4 shrink-0" />
+                <span>Hent som HTML</span>
+              </button>
+              <div className="my-1 border-t border-slate-100" />
+              <div className="px-3 pt-1 pb-0.5 flex items-center gap-1.5 text-xs font-bold text-slate-500">
+                <span>Baseline</span>
+                <HelpTip label="Hjælp: baseline" text="Et øjebliksbillede af planen. Når du ændrer planen senere, kan du se afvigelsen som en grå skygge bag bjælkerne." />
+              </div>
+              <button
+                type="button"
+                role="menuitem"
+                data-testid="save-baseline"
+                onClick={() => { setShareOpen(false); onSaveBaseline(); }}
+                className="flex items-center gap-2.5 px-3 py-3 min-h-[44px] rounded-lg text-sm font-bold text-slate-800 hover:bg-slate-100 cursor-pointer text-left"
+              >
+                <Bookmark className="w-4 h-4 shrink-0" />
+                <span>{baseline ? "Opdatér baseline" : "Gem baseline"}</span>
+              </button>
+              {baseline && (
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => { setShareOpen(false); onClearBaseline(); }}
+                  className="flex items-center gap-2.5 px-3 py-3 min-h-[44px] rounded-lg text-sm font-bold text-red-700 hover:bg-red-50 cursor-pointer text-left"
+                >
+                  <Trash2 className="w-4 h-4 shrink-0" />
+                  <span>Fjern baseline</span>
+                </button>
+              )}
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* View toolbar: zoom, jump buttons, dependency arrows */}
-      <div className="flex flex-wrap items-center gap-x-5 gap-y-2 bg-sky-50/50 p-2.5 px-4 rounded-xl border border-sky-100/70 shadow-2xs">
-        <div className="flex items-center gap-2" role="group" aria-label="Zoom">
-          <ZoomIn className="w-4 h-4 text-sky-600 shrink-0" />
-          <div className="flex bg-white p-0.5 rounded-lg border border-slate-200">
+      {/* View toolbar: Visning (zoom, folding, arrows) and Gå til (jumps) */}
+      <div className="flex flex-wrap items-center gap-x-6 gap-y-3 bg-sky-50/50 p-3 px-4 rounded-xl border border-sky-100/70 shadow-2xs">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2" role="group" aria-label="Visning">
+          <span className="text-xs font-bold text-slate-600 flex items-center gap-1.5"><ZoomIn className="w-4 h-4 text-sky-600 shrink-0" />Visning</span>
+          <div className="flex bg-white p-0.5 rounded-lg border border-slate-200" role="group" aria-label="Zoom">
             {([["time", "Time"], ["day", "Dag"], ["week", "Uge"], ["month", "Måned"]] as [Zoom, string][]).map(([z, label]) => (
               <button
                 key={z}
                 type="button"
                 aria-pressed={zoom === z}
                 onClick={() => changeZoom(z)}
-                className={`px-2.5 py-1 text-[11px] font-extrabold rounded-md transition cursor-pointer ${
-                  zoom === z ? "bg-sky-600 text-white shadow-xs" : "text-slate-500 hover:text-slate-800"
+                className={`px-3 py-1.5 min-h-[36px] text-sm font-bold rounded-md transition cursor-pointer ${
+                  zoom === z ? "bg-sky-600 text-white shadow-xs" : "text-slate-600 hover:text-slate-900"
                 }`}
               >
                 {label}
               </button>
             ))}
           </div>
+          {visibleStages.length > 0 && (
+            <div className="flex items-center gap-1.5" role="group" aria-label="Etaper">
+              <button
+                type="button"
+                data-testid="collapse-all"
+                onClick={() => setCollapsedStages(new Set(stages.map((s) => s.id)))}
+                className="px-2.5 py-1.5 min-h-[36px] text-sm font-bold rounded-lg bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 cursor-pointer"
+              >
+                Fold etaper sammen
+              </button>
+              <button
+                type="button"
+                data-testid="expand-all"
+                onClick={() => setCollapsedStages(new Set())}
+                disabled={collapsedStages.size === 0}
+                className="px-2.5 py-1.5 min-h-[36px] text-sm font-bold rounded-lg bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 cursor-pointer disabled:opacity-40 disabled:cursor-default"
+              >
+                Fold alle ud
+              </button>
+            </div>
+          )}
+          <label className="flex items-center gap-1.5 text-sm font-bold text-slate-700 cursor-pointer">
+            <input type="checkbox" checked={showArrows} onChange={(e) => setShowArrows(e.target.checked)} className="accent-sky-600 w-4 h-4" />
+            <Link2 className="w-3.5 h-3.5 text-slate-500" />
+            <span>Vis afhængigheder</span>
+          </label>
+          <HelpTip label="Hjælp: afhængigheder" text="Pilene viser, hvilke opgaver der venter på hinanden. Røde bjælker ligger på den kritiske vej: bliver de forsinket, rykker projektets slutdato." />
+          {baseline && (
+            <label className="flex items-center gap-1.5 text-sm font-bold text-slate-700 cursor-pointer">
+              <input type="checkbox" checked={showBaseline} onChange={(e) => setShowBaseline(e.target.checked)} className="accent-sky-600 w-4 h-4" />
+              <span>Vis baseline ({new Date(baseline.savedAt).toLocaleDateString("da-DK")})</span>
+            </label>
+          )}
         </div>
 
-        <div className="flex items-center gap-1.5" role="group" aria-label="Spring til">
+        <div className="flex items-center gap-2" role="group" aria-label="Gå til">
+          <span className="text-xs font-bold text-slate-600">Gå til</span>
           <button
             type="button"
             onClick={() => setJumpTo(today)}
             disabled={!todayInRange}
             title={todayInRange ? "Gå til dags dato" : "I dag ligger uden for tidsplanen"}
-            className="px-2.5 py-1 text-[11px] font-extrabold rounded-lg bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 cursor-pointer disabled:opacity-40 disabled:cursor-default"
+            className="px-2.5 py-1.5 min-h-[36px] text-sm font-bold rounded-lg bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 cursor-pointer disabled:opacity-40 disabled:cursor-default"
           >
             I dag
           </button>
           <button
             type="button"
             onClick={() => setJumpTo(bounds.min)}
-            className="px-2.5 py-1 text-[11px] font-extrabold rounded-lg bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 cursor-pointer"
+            className="px-2.5 py-1.5 min-h-[36px] text-sm font-bold rounded-lg bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 cursor-pointer"
           >
             Projektstart
           </button>
           <button
             type="button"
             onClick={() => setJumpTo(bounds.max)}
-            className="px-2.5 py-1 text-[11px] font-extrabold rounded-lg bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 cursor-pointer"
+            className="px-2.5 py-1.5 min-h-[36px] text-sm font-bold rounded-lg bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 cursor-pointer"
           >
             Projektslut
           </button>
         </div>
 
-        {visibleStages.length > 0 && (
-          <div className="flex items-center gap-1.5" role="group" aria-label="Etaper">
-            <button
-              type="button"
-              data-testid="collapse-all"
-              onClick={() => setCollapsedStages(new Set(stages.map((s) => s.id)))}
-              className="px-2.5 py-1 text-[11px] font-extrabold rounded-lg bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 cursor-pointer"
-            >
-              Fold etaper sammen
-            </button>
-            <button
-              type="button"
-              data-testid="expand-all"
-              onClick={() => setCollapsedStages(new Set())}
-              disabled={collapsedStages.size === 0}
-              className="px-2.5 py-1 text-[11px] font-extrabold rounded-lg bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 cursor-pointer disabled:opacity-40 disabled:cursor-default"
-            >
-              Fold alle ud
-            </button>
-          </div>
-        )}
-
-        <label className="flex items-center gap-1.5 text-[11px] font-extrabold text-slate-600 cursor-pointer">
-          <input type="checkbox" checked={showArrows} onChange={(e) => setShowArrows(e.target.checked)} className="accent-sky-600" />
-          <Link2 className="w-3.5 h-3.5 text-slate-500" />
-          <span>Vis afhængigheder</span>
-        </label>
-
-        <div className="flex items-center gap-2 flex-wrap" role="group" aria-label="Baseline">
-          <button
-            type="button"
-            onClick={onSaveBaseline}
-            title="Gem den nuværende plan som baseline, så du senere kan se afvigelser"
-            className="px-2.5 py-1 text-[11px] font-extrabold rounded-lg bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 cursor-pointer"
-          >
-            {baseline ? "Opdatér baseline" : "Gem baseline"}
-          </button>
-          {baseline && (
-            <>
-              <label className="flex items-center gap-1.5 text-[11px] font-extrabold text-slate-600 cursor-pointer">
-                <input type="checkbox" checked={showBaseline} onChange={(e) => setShowBaseline(e.target.checked)} className="accent-sky-600" />
-                <span>Vis baseline ({new Date(baseline.savedAt).toLocaleDateString("da-DK")})</span>
-              </label>
-              <button type="button" onClick={onClearBaseline} className="text-[11px] font-extrabold text-red-600 hover:underline cursor-pointer">
-                Fjern
-              </button>
-            </>
-          )}
-        </div>
-
-        <div className="flex items-center gap-2 text-[11px] font-semibold text-sky-700/80 leading-tight min-w-0">
+        <div className="hidden lg:flex items-center gap-2 text-xs font-medium text-slate-600 leading-tight min-w-0">
           <Zap className="w-4 h-4 text-sky-500 shrink-0" />
-          <span>
-            Træk bjælker med musen, eller vælg en bjælke (Tab) og brug piletaster, + / − og Enter.
-          </span>
+          <span>Træk bjælker med musen, dobbeltklik for at redigere, højreklik for flere valg.</span>
         </div>
       </div>
 
       {/* Main Gantt scroll wrapper (scrolls in both directions; only nearby rows/columns are rendered) */}
       <div
         ref={scrollRef}
+        data-gantt
         onScroll={handleScroll}
+        onDoubleClick={(e) => {
+          const el = (e.target as HTMLElement).closest<HTMLElement>("[data-task-id]");
+          const task = el && tasks.find((t) => t.id === el.dataset.taskId);
+          if (task) {
+            window.clearTimeout(detailTimer.current);
+            setDetailTask(null);
+            onEditTask(task);
+          }
+        }}
         style={{ maxHeight: "72vh" }}
         className="w-full overflow-auto border border-slate-200 rounded-xl bg-slate-50 shadow-xs relative"
       >
@@ -968,7 +1037,7 @@ export function GanttChart({
                 </button>
               </div>
             ) : (
-              <div className="w-52 shrink-0 sticky left-0 z-40 bg-slate-100 border-r border-slate-250 text-slate-800 px-3.5 py-3 text-xs font-black uppercase tracking-wider flex items-center justify-between shadow-xs">
+              <div className="w-52 shrink-0 sticky left-0 z-40 bg-slate-100 border-r border-slate-250 text-slate-800 px-3.5 py-3 text-xs font-black flex items-center justify-between shadow-xs">
                 <span>Opgave</span>
                 <button
                   onClick={() => setColumnCollapsed(true)}
@@ -1039,9 +1108,9 @@ export function GanttChart({
       </div>
 
       {/* Visual Color Codes Footer Legend */}
-      <div className="flex flex-wrap gap-x-5 gap-y-2.5 text-[11px] font-bold text-slate-500 mt-2 p-3 bg-slate-50 rounded-lg border border-slate-200/55 select-none md:items-center">
+      <div className="flex flex-wrap gap-x-5 gap-y-2.5 text-xs font-bold text-slate-500 mt-2 p-3 bg-slate-50 rounded-lg border border-slate-200/55 select-none md:items-center">
         <div className="flex items-center gap-1.5">
-          <span className="w-3.5 h-3.5 rounded bg-amber-500/10 border border-amber-300 flex items-center justify-center text-[9px] shrink-0">💡</span>
+          <span className="w-3.5 h-3.5 rounded bg-amber-500/10 border border-amber-300 flex items-center justify-center text-xs shrink-0"><Lightbulb className="w-3 h-3 text-amber-600" /></span>
           <span>Tip: Træk bjælken for at rykke startdato. Træk i højre kant for at forlænge varigheden.</span>
         </div>
         <div className="flex items-center gap-1.5">
@@ -1049,7 +1118,7 @@ export function GanttChart({
           <span>I dag</span>
         </div>
         <div className="flex items-center gap-1.5">
-          <span className="text-slate-400 font-black leading-none shrink-0">⤷</span>
+          <span className="text-slate-500 font-black leading-none shrink-0">⤷</span>
           <span>Afhængighed (pil fra forgænger til opgave)</span>
         </div>
         <div className="flex items-center gap-1.5">
@@ -1061,7 +1130,7 @@ export function GanttChart({
           <span>Helligdag</span>
         </div>
         <div className="flex items-center gap-1.5">
-          <span className="w-3.5 h-3.5 bg-sky-100 border border-sky-200/60 rounded flex items-center justify-center text-[8px] tracking-none shrink-0">❄️</span>
+          <span className="w-3.5 h-3.5 bg-sky-100 border border-sky-200/60 rounded flex items-center justify-center text-xs tracking-none shrink-0"><Snowflake className="w-3 h-3 text-sky-600" /></span>
           <span>Vejrspildsdag (Arbejdsstop)</span>
         </div>
         <div className="flex items-center gap-1.5">

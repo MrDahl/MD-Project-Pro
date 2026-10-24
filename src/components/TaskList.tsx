@@ -1,11 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ListChecks, PlusCircle, Search, Layers, CheckSquare, ClipboardPaste } from "lucide-react";
+import { ListChecks, PlusCircle, Search, Layers, CheckSquare, Printer } from "lucide-react";
 import type { Stage, Task, Trade } from "../types";
+import { usePersistedState } from "../utils/persist";
 import { EMPTY_FILTER, filterTasks, isFilterActive, type TaskFilter } from "../utils/taskFilter";
 import { TaskCard } from "./TaskCard";
-import { PasteImportDialog } from "./PasteImportDialog";
 import type { BulkChange } from "../utils/bulk";
-import type { ImportResult } from "../utils/pasteImport";
 
 const PAGE = 100;
 
@@ -19,22 +18,34 @@ interface Props {
   onEdit: (id: string) => void;
   onDelete: (id: string) => void;
   onDuplicate: (id: string) => void;
-  startDate: string;
   onBulkApply: (ids: string[], change: BulkChange) => void;
   onBulkDelete: (ids: string[]) => void;
-  onImport: (result: ImportResult) => void;
 }
 
 const selectCls =
   "p-1.5 px-2.5 rounded-lg border border-slate-200 text-xs font-bold bg-white text-slate-700 cursor-pointer focus:outline-sky-500";
 
-export function TaskList({ tasks, trades, stages, stageById, tradeById, onNew, onEdit, onDelete, onDuplicate, startDate, onBulkApply, onBulkDelete, onImport }: Props) {
-  const [filter, setFilter] = useState<TaskFilter>(EMPTY_FILTER);
-  const [groupByStage, setGroupByStage] = useState(false);
+export function TaskList({ tasks, trades, stages, stageById, tradeById, onNew, onEdit, onDelete, onDuplicate, onBulkApply, onBulkDelete }: Props) {
+  const [filter, setFilter] = usePersistedState<TaskFilter>("mdppListFilter", EMPTY_FILTER, (r) => {
+    const o = r as Partial<TaskFilter> | null;
+    if (!o || typeof o !== "object") return undefined;
+    return {
+      query: "",
+      stageId: typeof o.stageId === "string" ? o.stageId : "",
+      tradeId: typeof o.tradeId === "string" ? o.tradeId : "",
+      criticalOnly: o.criticalOnly === true,
+    };
+  });
+  const [groupByStage, setGroupByStage] = usePersistedState<boolean>("mdppListGroup", false, (r) => (typeof r === "boolean" ? r : undefined));
+  // A remembered filter must not point at a stage or trade that no longer exists
+  useEffect(() => {
+    const badStage = filter.stageId && filter.stageId !== "none" && !stages.some((s) => s.id === filter.stageId);
+    const badTrade = filter.tradeId && !trades.some((t) => t.id === filter.tradeId);
+    if (badStage || badTrade) setFilter({ ...filter, stageId: badStage ? "" : filter.stageId, tradeId: badTrade ? "" : filter.tradeId });
+  }, [filter, stages, trades, setFilter]);
   const [limit, setLimit] = useState(PAGE);
   const [selectMode, setSelectMode] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
-  const [pasteOpen, setPasteOpen] = useState(false);
   const toggleSelect = useCallback(
     (id: string) =>
       setSelected((prev) => {
@@ -83,7 +94,7 @@ export function TaskList({ tasks, trades, stages, stageById, tradeById, onNew, o
     <div className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center gap-2 bg-white border border-slate-200 rounded-xl p-3 shadow-2xs">
         <div className="relative flex-1 min-w-[180px]">
-          <Search className="w-4 h-4 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+          <Search className="w-4 h-4 text-slate-500 absolute left-2.5 top-1/2 -translate-y-1/2" />
           <input
             type="search"
             value={filter.query}
@@ -122,18 +133,18 @@ export function TaskList({ tasks, trades, stages, stageById, tradeById, onNew, o
       </div>
 
       <div className="flex items-center justify-between gap-2 px-1">
-        <h3 className="text-[10px] md:text-xs font-bold text-slate-400 uppercase tracking-wider" data-testid="task-count">
+        <h3 className="text-xs md:text-xs font-bold text-slate-500" data-testid="task-count">
           {active ? `Viser ${items.length} af ${tasks.length} opgaver` : `Opgaver (${tasks.length})`}
         </h3>
         <div className="flex items-center gap-2">
         <button
           type="button"
-          data-testid="open-paste"
-          onClick={() => setPasteOpen(true)}
-          className="bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 font-extrabold text-xs py-2 px-3 rounded-lg cursor-pointer flex items-center gap-1 min-h-[34px]"
+          data-testid="print-list"
+          onClick={() => window.print()}
+          className="border font-extrabold text-xs py-2 px-3 rounded-lg cursor-pointer flex items-center gap-1 min-h-[34px] bg-white hover:bg-slate-100 border-slate-200 text-slate-700 print:hidden"
         >
-          <ClipboardPaste className="w-3.5 h-3.5" />
-          <span>Indsæt fra Excel</span>
+          <Printer className="w-3.5 h-3.5" />
+          <span>Print liste</span>
         </button>
         <button
           type="button"
@@ -175,24 +186,13 @@ export function TaskList({ tasks, trades, stages, stageById, tradeById, onNew, o
         />
       )}
 
-      {pasteOpen && (
-        <PasteImportDialog
-          trades={trades}
-          stages={stages}
-          startDate={startDate}
-          onImport={(r) => {
-            onImport(r);
-            setPasteOpen(false);
-          }}
-          onClose={() => setPasteOpen(false)}
-        />
-      )}
+
 
       {tasks.length === 0 ? (
-        <div className="bg-white border border-dashed border-slate-200 p-8 md:p-12 text-center rounded-xl text-xs text-slate-400 flex flex-col items-center justify-center">
+        <div className="bg-white border border-dashed border-slate-200 p-8 md:p-12 text-center rounded-xl text-xs text-slate-500 flex flex-col items-center justify-center">
           <ListChecks className="w-10 h-10 text-slate-200 mb-2" />
           <p className="font-semibold text-slate-500">Intet planlagt endnu</p>
-          <p className="text-[10px] text-slate-400 mt-1 max-w-xs leading-relaxed">Tryk på "Ny opgave" og angiv faggrupper og varighed for at se dem her.</p>
+          <p className="text-xs text-slate-500 mt-1 max-w-xs leading-relaxed">Tryk på "Ny opgave" og angiv faggrupper og varighed for at se dem her.</p>
         </div>
       ) : items.length === 0 ? (
         <div className="bg-white border border-dashed border-slate-200 p-8 text-center rounded-xl text-xs text-slate-500 font-semibold">
@@ -206,7 +206,7 @@ export function TaskList({ tasks, trades, stages, stageById, tradeById, onNew, o
                 <h4 className="flex items-center gap-1.5 text-xs font-black text-slate-700 mt-2 px-1">
                   <Layers className="w-3.5 h-3.5" style={{ color: g.stage?.color ?? "#94a3b8" }} />
                   {g.stage ? g.stage.name : "Uden etape"}
-                  <span className="text-slate-400 font-bold">({g.rows.length})</span>
+                  <span className="text-slate-500 font-bold">({g.rows.length})</span>
                 </h4>
               )}
               {g.rows.map(({ task, number }) => (
@@ -269,10 +269,10 @@ function BulkBar({ count, total, trades, stages, onSelectAll, onClear, onApply, 
       <span className="text-xs font-black text-sky-900" data-testid="bulk-count">
         {count} valgt
       </span>
-      <button type="button" onClick={onSelectAll} className="text-[11px] font-extrabold text-sky-700 hover:underline cursor-pointer">
+      <button type="button" onClick={onSelectAll} className="text-xs font-extrabold text-sky-700 hover:underline cursor-pointer">
         Vælg alle {total}
       </button>
-      <button type="button" onClick={onClear} disabled={off} className="text-[11px] font-extrabold text-sky-700 hover:underline cursor-pointer disabled:opacity-40">
+      <button type="button" onClick={onClear} disabled={off} className="text-xs font-extrabold text-sky-700 hover:underline cursor-pointer disabled:opacity-40">
         Fravælg
       </button>
       <span className="w-px h-5 bg-sky-200 mx-1" />
@@ -318,7 +318,7 @@ function BulkBar({ count, total, trades, stages, onSelectAll, onClear, onApply, 
             onApply({ duration: Number(days) });
             setDays("");
           }}
-          className="px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 text-[11px] font-extrabold text-slate-700 hover:bg-slate-100 cursor-pointer disabled:opacity-40"
+          className="px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 text-xs font-extrabold text-slate-700 hover:bg-slate-100 cursor-pointer disabled:opacity-40"
         >
           Sæt varighed
         </button>
@@ -330,11 +330,11 @@ function BulkBar({ count, total, trades, stages, onSelectAll, onClear, onApply, 
         onClick={() => {
           if (window.confirm(`Slet ${count} opgaver? Det kan fortrydes med Fortryd.`)) onDelete();
         }}
-        className="px-2.5 py-1.5 rounded-lg bg-red-50 border border-red-200 text-[11px] font-extrabold text-red-700 hover:bg-red-100 cursor-pointer disabled:opacity-40"
+        className="px-2.5 py-1.5 rounded-lg bg-red-50 border border-red-200 text-xs font-extrabold text-red-700 hover:bg-red-100 cursor-pointer disabled:opacity-40"
       >
         Slet valgte
       </button>
-      <button type="button" onClick={onDone} className="ml-auto px-3 py-1.5 rounded-lg bg-sky-600 text-white text-[11px] font-extrabold hover:bg-sky-700 cursor-pointer">
+      <button type="button" onClick={onDone} className="ml-auto px-3 py-1.5 rounded-lg bg-sky-600 text-white text-xs font-extrabold hover:bg-sky-700 cursor-pointer">
         Færdig
       </button>
     </div>

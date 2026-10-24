@@ -84,12 +84,12 @@ export function TradeForm({ trades, editTradeId, onSave, onCancel }: TradeFormPr
     <form onSubmit={handleSubmit} className="bg-white border border-slate-100 rounded-xl p-5 shadow-xs flex flex-col gap-4 select-none">
       <h3 className="text-base font-bold text-slate-800 border-b border-slate-100 pb-2 flex items-center gap-1.5">
         <Plus className="w-5 h-5 text-slate-750" />
-        <span>{editTradeId ? "Rediger Faggruppe / Resurse" : "Opret Ny Faggruppe / Resurse"}</span>
+        <span>{editTradeId ? "Rediger faggruppe" : "Opret ny faggruppe"}</span>
       </h3>
 
       {/* Row 1: Name */}
       <div className="flex flex-col gap-1">
-        <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Faggruppe / Resurse navn</label>
+        <label className="text-xs font-bold text-slate-500">Navn på faggruppe</label>
         <input
           type="text"
           value={name}
@@ -113,8 +113,8 @@ export function TradeForm({ trades, editTradeId, onSave, onCancel }: TradeFormPr
 
       {/* Row 3: Standard Rate Expense */}
       <div className="flex flex-col gap-1">
-        <label className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
-          <Coins className="w-3.5 h-3.5 text-slate-400" />
+        <label className="text-xs font-bold text-slate-500 flex items-center gap-1">
+          <Coins className="w-3.5 h-3.5 text-slate-500" />
           <span>{isFixedPrice ? "Fast pris pr. tilknyttet opgave (kr.)" : roles.length > 0 ? "Standard timepris (bruges når en opgave ikke er bemandet)" : "Standard timepris (kr./t)"}</span>
         </label>
         <input
@@ -132,7 +132,7 @@ export function TradeForm({ trades, editTradeId, onSave, onCancel }: TradeFormPr
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-slate-50 p-3.5 rounded-lg border border-slate-100">
           <div className="flex flex-col gap-1">
             <label className="text-xs font-bold text-slate-500 flex items-center gap-1">
-              <Percent className="w-3.5 h-3.5 text-slate-400" />
+              <Percent className="w-3.5 h-3.5 text-slate-500" />
               <span>Weekend-tillæg i %</span>
             </label>
             <input
@@ -148,7 +148,7 @@ export function TradeForm({ trades, editTradeId, onSave, onCancel }: TradeFormPr
 
           <div className="flex flex-col gap-1">
             <label className="text-xs font-bold text-slate-500 flex items-center gap-1">
-              <Percent className="w-3.5 h-3.5 text-slate-400" />
+              <Percent className="w-3.5 h-3.5 text-slate-500" />
               <span>Helligdags-tillæg i %</span>
             </label>
             <input
@@ -166,7 +166,7 @@ export function TradeForm({ trades, editTradeId, onSave, onCancel }: TradeFormPr
 
       {!isFixedPrice && (
         <div className="flex flex-col gap-2">
-          <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Arbejdstid for denne faggruppe</label>
+          <label className="text-xs font-bold text-slate-500">Arbejdstid for denne faggruppe</label>
           <WorkWeekEditor week={workWeek} onChange={setWorkWeek} plainLabel="Som projektet" />
         </div>
       )}
@@ -175,8 +175,8 @@ export function TradeForm({ trades, editTradeId, onSave, onCancel }: TradeFormPr
 
       {/* Row 5: Preset colors selections */}
       <div className="flex flex-col gap-1.5">
-        <label className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
-          <Palette className="w-3.5 h-3.5 text-slate-400" />
+        <label className="text-xs font-bold text-slate-500 flex items-center gap-1">
+          <Palette className="w-3.5 h-3.5 text-slate-500" />
           <span>Vælg farve til tidsplan</span>
         </label>
         <div className="flex flex-wrap gap-2 bg-slate-50 p-2.5 rounded-lg border border-slate-100 justify-between items-center">
@@ -211,7 +211,7 @@ export function TradeForm({ trades, editTradeId, onSave, onCancel }: TradeFormPr
           className="flex-1 bg-slate-700 hover:bg-slate-800 active:bg-slate-900 text-white text-xs font-extrabold py-3 rounded-lg flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
         >
           <Save className="w-4 h-4" />
-          <span>{editTradeId ? "Opdater Resurse" : "Tilføj Resurse"}</span>
+          <span>{editTradeId ? "Opdater faggruppe" : "Tilføj faggruppe"}</span>
         </button>
 
         {editTradeId && (

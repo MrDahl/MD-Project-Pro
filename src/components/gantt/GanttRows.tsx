@@ -73,11 +73,11 @@ export const GanttStageRow = memo(function GanttStageRow({
               {collapsed ? <ChevronRight className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
             </button>
             <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: stage.color }} />
-            <span className="text-[11px] font-black uppercase tracking-tight text-slate-800 leading-tight truncate">
+            <span className="text-xs font-black tracking-tight text-slate-800 leading-tight truncate">
               {stage.name}
             </span>
           </div>
-          <span className="text-[8px] font-bold text-slate-400 mt-1 pl-4 uppercase tracking-widest leading-none">
+          <span className="text-xs font-bold text-slate-500 mt-1 pl-4 leading-none">
             {collapsed ? `${taskCount} opgaver skjult` : "Etape / Fase"}
           </span>
         </div>
@@ -95,7 +95,7 @@ export const GanttStageRow = memo(function GanttStageRow({
             }}
             className="absolute h-9 rounded-lg border-2 border-dashed z-10 flex items-center px-3 select-none overflow-hidden"
           >
-            <span className="text-[10px] font-bold tracking-wider uppercase truncate flex items-center gap-1">
+            <span className="text-xs font-bold truncate flex items-center gap-1">
               <Layers className="w-3 h-3 shrink-0" />
               <span>{stage.name}</span>
             </span>
@@ -186,23 +186,24 @@ export const GanttTaskRow = memo(function GanttTaskRow({
           className="w-11 shrink-0 border-r border-slate-250 h-full flex items-center justify-center cursor-pointer hover:bg-slate-100 sticky left-0 bg-white z-20 shadow-xs"
           title="Klik for at udvide kolonne"
         >
-          <span className="text-[11px] font-black text-slate-600">{number}</span>
+          <span className="text-xs font-black text-slate-600">{number}</span>
         </div>
       ) : (
         <div
+          data-task-id={task.id}
           onClick={() => onOpenDetail(task)}
           className="w-52 shrink-0 border-r border-slate-250 p-3 h-full flex flex-col justify-center cursor-pointer hover:bg-slate-50 transition sticky left-0 bg-white z-20 shadow-xs"
           title="Klik for at se opgavedetaljer"
         >
           <div className="flex items-center gap-1.5 min-w-0">
-            <span className="text-xs font-extrabold text-slate-400 shrink-0">{number}.</span>
-            <span className={`text-[11px] font-black leading-tight truncate ${task.isCritical ? "text-red-650" : "text-slate-700"}`}>
+            <span className="text-xs font-extrabold text-slate-500 shrink-0">{number}.</span>
+            <span className={`text-xs font-black leading-tight truncate ${task.isCritical ? "text-red-650" : "text-slate-700"}`}>
               {task.title}
             </span>
             {task.isCritical && <Flame className="w-3.5 h-3.5 text-red-500 fill-red-500 shrink-0 inline ml-1" />}
           </div>
           <div className="flex items-center gap-1.5 flex-wrap mt-1">
-            <span className="text-[9px] text-slate-400 font-bold truncate leading-none">
+            <span className="text-xs text-slate-500 font-bold truncate leading-none">
               {task.tradeIds && task.tradeIds.length > 0
                 ? task.tradeIds
                     .map((tid) => tradeById.get(tid)?.name || "")
@@ -212,14 +213,14 @@ export const GanttTaskRow = memo(function GanttTaskRow({
             </span>
             {stage && (
               <span
-                className="text-[8px] font-black uppercase tracking-wider px-1 py-0.5 rounded border leading-none shrink-0"
+                className="text-xs font-black px-1 py-0.5 rounded border leading-none shrink-0"
                 style={{ backgroundColor: `${stage.color}15`, color: stage.color, borderColor: `${stage.color}35` }}
               >
                 {stage.name}
               </span>
             )}
             {task.isRecurring && (
-              <span className="text-[8px] font-black uppercase tracking-wider px-1 py-0.5 rounded border leading-none shrink-0 bg-blue-50 text-blue-600 border-blue-200">
+              <span className="text-xs font-black px-1 py-0.5 rounded border leading-none shrink-0 bg-blue-50 text-blue-600 border-blue-200">
                 Gentagende
               </span>
             )}
@@ -253,6 +254,7 @@ export const GanttTaskRow = memo(function GanttTaskRow({
           return (
             <div
               key={sIdx}
+              data-task-id={task.id}
               style={{ left: `${leftPx}px`, width: `${widthPx}px`, background: multiColorGradient(task.tradeIds, tradeById) }}
               onPointerDown={(e) => onPointerDown(e, task, "move")}
               onPointerMove={onPointerMove}
@@ -281,7 +283,7 @@ export const GanttTaskRow = memo(function GanttTaskRow({
               {taskProgress > 0 && <div style={{ width: `${taskProgress}%` }} className="absolute inset-y-0 left-0 bg-black/25 z-0" />}
 
               {taskProgress > 0 && (
-                <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[9px] font-black text-white/90 z-10 select-none bg-black/15 px-1 rounded">
+                <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs font-black text-white/90 z-10 select-none bg-black/15 px-1 rounded">
                   {taskProgress}%
                 </span>
               )}
@@ -325,6 +327,7 @@ export const GanttTaskRow = memo(function GanttTaskRow({
             const leftPx = (startDay - minDay) * colW + colW / 2 - 10; // centered in the column
             return (
               <div
+                data-task-id={task.id}
                 style={{ left: `${leftPx}px`, width: "20px", height: "20px" }}
                 onClick={() => onOpenDetail(task)}
                 className={`absolute rotate-45 z-15 flex items-center justify-center border border-white shadow-md cursor-pointer select-none transition hover:scale-110 active:scale-95 ${
@@ -332,7 +335,7 @@ export const GanttTaskRow = memo(function GanttTaskRow({
                 }`}
                 title={`${task.title} (Milepæl d. ${task.calcStart})`}
               >
-                <div className="-rotate-45 text-[9px] text-white font-black pb-0.5">♦</div>
+                <div className="-rotate-45 text-xs text-white font-black pb-0.5">♦</div>
               </div>
             );
           })()}
@@ -355,7 +358,7 @@ export const GanttTaskRow = memo(function GanttTaskRow({
                   borderColor: `${colorHex}30`,
                 }}
                 onClick={() => onOpenDetail(task)}
-                className="absolute rounded-full flex items-center justify-center text-white z-10 border shadow-xs cursor-pointer select-none active:scale-95 transition-all text-[11px] font-semibold"
+                className="absolute rounded-full flex items-center justify-center text-white z-10 border shadow-xs cursor-pointer select-none active:scale-95 transition-all text-xs font-semibold"
                 title={`${task.title} - Gentagelse d. ${new Date(`${occDate}T12:00:00`).toLocaleDateString("da-DK")}`}
               >
                 {size >= 16 ? "↻" : null}
@@ -367,10 +370,10 @@ export const GanttTaskRow = memo(function GanttTaskRow({
         {endCol >= 0 && (
           <div
             style={{ left: `${(endCol + 1) * colW + 8}px` }}
-            className="absolute text-[10px] font-black text-slate-700 whitespace-nowrap z-15 pointer-events-none drop-shadow-xs flex items-center gap-1.5 bg-white/90 border border-slate-200/50 py-1 px-2.5 rounded-full shadow-2xs"
+            className="absolute text-xs font-black text-slate-700 whitespace-nowrap z-15 pointer-events-none drop-shadow-xs flex items-center gap-1.5 bg-white/90 border border-slate-200/50 py-1 px-2.5 rounded-full shadow-2xs"
           >
             <span className={`font-black ${task.isCritical ? "text-red-650" : "text-slate-800"}`}>{task.title}</span>
-            <span className="text-slate-400 font-bold">({task.durationHours ? `${task.durationHours.toLocaleString("da-DK")}t` : `${task.duration}d`})</span>
+            <span className="text-slate-500 font-bold">({task.durationHours ? `${task.durationHours.toLocaleString("da-DK")}t` : `${task.duration}d`})</span>
             {deviation !== null && deviation !== undefined && deviation !== 0 && (
               <span className={`font-black ${deviation > 0 ? "text-red-600" : "text-emerald-600"}`} title="Afvigelse fra baseline (kalenderdage)">
                 {deviation > 0 ? `+${deviation}` : deviation}d

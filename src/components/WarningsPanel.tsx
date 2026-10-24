@@ -31,14 +31,14 @@ export function WarningsPanel({ warnings, onOpenTask }: { warnings: PlanWarning[
               <button
                 type="button"
                 onClick={() => onOpenTask(w.taskIds[0])}
-                className="text-left text-[11px] font-semibold leading-snug hover:underline cursor-pointer"
+                className="text-left text-xs font-semibold leading-snug hover:underline cursor-pointer"
               >
                 {w.message}
               </button>
             </li>
           ))}
           {warnings.length > shown.length && (
-            <li className="text-[11px] font-bold text-amber-700">… og {warnings.length - shown.length} flere</li>
+            <li className="text-xs font-bold text-amber-700">… og {warnings.length - shown.length} flere</li>
           )}
         </ul>
       )}

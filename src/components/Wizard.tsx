@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { defaultStageDates, industryHolidayDays, nextMonday } from "../utils/dates";
 import { Trade, Stage, ProjectInfo, Settings } from "../types";
-import { Building, Check, ArrowRight, ArrowLeft, Clock, MapPin, Briefcase } from "lucide-react";
+import { Building, Check, ArrowRight, ArrowLeft, Clock, MapPin, Briefcase, Building2, CalendarDays, Layers, HardHat, Pin, Rocket } from "lucide-react";
 
 interface WizardProps {
   onComplete: (completedData: {
@@ -210,15 +210,15 @@ export function Wizard({ onComplete, isOpen, onCancel }: WizardProps) {
         <div className="bg-slate-800 text-white px-6 py-5 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-lg bg-slate-700 flex items-center justify-center text-slate-100 font-extrabold text-sm border border-slate-600/40">
-              📌
+              <Pin className="w-4 h-4" />
             </div>
             <div>
               <h2 className="text-sm font-black tracking-tight mb-0">Opsætningsvejledning</h2>
-              <p className="text-[10px] text-slate-450 font-bold leading-none mt-1">Konfigurer dit næste byggeprojekt trin-for-trin</p>
+              <p className="text-xs text-slate-450 font-bold leading-none mt-1">Konfigurer dit næste byggeprojekt trin-for-trin</p>
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <div className="text-right text-xs font-mono font-bold text-slate-400">
+            <div className="text-right text-xs font-mono font-bold text-slate-500">
               Trin {step} af {totalSteps}
             </div>
             {onCancel && (
@@ -253,7 +253,7 @@ export function Wizard({ onComplete, isOpen, onCancel }: WizardProps) {
           {step === 1 && (
             <div className="flex flex-col gap-4 animate-fadeIn">
               <div className="flex gap-3 mb-2">
-                <span className="text-2xl">🏗️</span>
+                <Building2 className="w-7 h-7 text-slate-600 shrink-0" />
                 <div>
                   <h3 className="text-sm font-black text-slate-800">Projektets grundsten</h3>
                   <p className="text-xs text-slate-500 mt-1">Giv din nye sag en overskuelig identitet og juster arbejdstimer pr. dag.</p>
@@ -262,7 +262,7 @@ export function Wizard({ onComplete, isOpen, onCancel }: WizardProps) {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="flex flex-col gap-1 sm:col-span-2">
-                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Projekt / Sagsnavn</label>
+                  <label className="text-xs font-bold text-slate-500">Projekt / Sagsnavn</label>
                   <div className="relative">
                     <input
                       type="text"
@@ -272,12 +272,12 @@ export function Wizard({ onComplete, isOpen, onCancel }: WizardProps) {
                       placeholder="F.eks. Renovering Hovedgade eller Ny Skole..."
                       required
                     />
-                    <Building className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
+                    <Building className="w-4 h-4 text-slate-500 absolute left-3 top-3" />
                   </div>
                 </div>
 
                 <div className="flex flex-col gap-1">
-                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Adresse / Byggeplads</label>
+                  <label className="text-xs font-bold text-slate-500">Adresse / Byggeplads</label>
                   <div className="relative">
                     <input
                       type="text"
@@ -286,12 +286,12 @@ export function Wizard({ onComplete, isOpen, onCancel }: WizardProps) {
                       onChange={(e) => setAddress(e.target.value)}
                       placeholder="Vejnavn og nummer"
                     />
-                    <MapPin className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
+                    <MapPin className="w-4 h-4 text-slate-500 absolute left-3 top-3" />
                   </div>
                 </div>
 
                 <div className="flex flex-col gap-1">
-                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Bygherre / Kunde</label>
+                  <label className="text-xs font-bold text-slate-500">Bygherre / Kunde</label>
                   <div className="relative">
                     <input
                       type="text"
@@ -300,12 +300,12 @@ export function Wizard({ onComplete, isOpen, onCancel }: WizardProps) {
                       onChange={(e) => setCustomer(e.target.value)}
                       placeholder="F.eks. Aarhus Kommune..."
                     />
-                    <Briefcase className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
+                    <Briefcase className="w-4 h-4 text-slate-500 absolute left-3 top-3" />
                   </div>
                 </div>
 
                 <div className="flex flex-col gap-1">
-                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Tildelt Sagsleder</label>
+                  <label className="text-xs font-bold text-slate-500">Tildelt Sagsleder</label>
                   <input
                     type="text"
                     className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs font-semibold text-slate-700 outline-none focus:border-slate-400"
@@ -316,8 +316,8 @@ export function Wizard({ onComplete, isOpen, onCancel }: WizardProps) {
                 </div>
 
                 <div className="flex flex-col gap-1">
-                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
-                    <Clock className="w-3.5 h-3.5 text-slate-400" />
+                  <label className="text-xs font-bold text-slate-500 flex items-center gap-1.5">
+                    <Clock className="w-3.5 h-3.5 text-slate-500" />
                     <span>Daglige arbejdstimer pr. mand</span>
                   </label>
                   <input
@@ -329,7 +329,7 @@ export function Wizard({ onComplete, isOpen, onCancel }: WizardProps) {
                     placeholder="f.eks. 7.4"
                     required
                   />
-                  <span className="text-[9px] text-slate-400 font-medium">Standard overenskomst er 7,4 / 37 timers arbejdsuge.</span>
+                  <span className="text-xs text-slate-500 font-medium">Standard overenskomst er 7,4 / 37 timers arbejdsuge.</span>
                 </div>
               </div>
             </div>
@@ -339,7 +339,7 @@ export function Wizard({ onComplete, isOpen, onCancel }: WizardProps) {
           {step === 2 && (
             <div className="flex flex-col gap-4 animate-fadeIn">
               <div className="flex gap-3 mb-2">
-                <span className="text-2xl">📅</span>
+                <CalendarDays className="w-7 h-7 text-slate-600 shrink-0" />
                 <div>
                   <h3 className="text-sm font-black text-slate-800">Projektets start & tidsrum</h3>
                   <p className="text-xs text-slate-500 mt-1">Vælg den officielle startdato og mærk eventuelle helligdage eller ferielukninger.</p>
@@ -348,7 +348,7 @@ export function Wizard({ onComplete, isOpen, onCancel }: WizardProps) {
 
               <div className="flex flex-col gap-4">
                 <div className="flex flex-col gap-1">
-                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Officiel Startdato</label>
+                  <label className="text-xs font-bold text-slate-500">Officiel Startdato</label>
                   <input
                     type="date"
                     className="w-full sm:w-1/2 bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs font-bold text-slate-700 outline-none focus:border-slate-400"
@@ -359,7 +359,7 @@ export function Wizard({ onComplete, isOpen, onCancel }: WizardProps) {
                     }}
                     required
                   />
-                  <span className="text-[10px] text-slate-400 font-medium mt-1">Dine tildelte opgaver i Gantt-diagrammet vil automatisk blive kaskade-beregnet i forhold til denne dato.</span>
+                  <span className="text-xs text-slate-500 font-medium mt-1">Dine tildelte opgaver i Gantt-diagrammet vil automatisk blive kaskade-beregnet i forhold til denne dato.</span>
                 </div>
 
                 {/* Automation summer holiday block */}
@@ -373,7 +373,7 @@ export function Wizard({ onComplete, isOpen, onCancel }: WizardProps) {
                   />
                   <label htmlFor="summer-hol-cb" className="cursor-pointer select-none">
                     <span className="text-xs font-bold text-slate-800 block">Konfigurer industrisommerferien automatisk? (3 uger)</span>
-                    <span className="text-[10px] text-slate-500 block mt-1 leading-normal">
+                    <span className="text-xs text-slate-500 block mt-1 leading-normal">
                       Sætter uge 29, 30 og 31 (mandag-fredag) i startdatoens år som lukkedage. Systemet beregner automatisk udenom disse, medmindre du eksplicit vælger weekendarbejde.
                     </span>
                   </label>
@@ -391,9 +391,9 @@ export function Wizard({ onComplete, isOpen, onCancel }: WizardProps) {
                   <label htmlFor="danish-hol-cb" className="cursor-pointer select-none w-full">
                     <span className="text-xs font-bold text-slate-800 block flex items-center justify-between gap-2">
                       <span>Automatisk indlæsning af de danske helligdage (kalendarium.dk)</span>
-                      <span className="text-[9px] bg-purple-100 text-purple-850 px-1.5 py-0.5 rounded-full font-black uppercase">Anbefalet</span>
+                      <span className="text-xs bg-purple-100 text-purple-850 px-1.5 py-0.5 rounded-full font-black">Anbefalet</span>
                     </span>
-                    <span className="text-[10px] text-slate-500 block mt-1 leading-normal">
+                    <span className="text-xs text-slate-500 block mt-1 leading-normal">
                       Henter automatisk alle officielle danske helligdage som skærtorsdag, langfredag, påskedag, 2. påskedag, Kr. himmelfart, pinsedag, 2. pinsedag, grundlovsdag, jul m.fl. for dit projektår.
                     </span>
                   </label>
@@ -401,7 +401,7 @@ export function Wizard({ onComplete, isOpen, onCancel }: WizardProps) {
 
                 {/* Custom Holidays list configuration inline */}
                 <div className="flex flex-col gap-2 mt-2">
-                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Manuelt tilføj øvrige fridage / lukkedage (valgfrit)</label>
+                  <label className="text-xs font-bold text-slate-500">Manuelt tilføj øvrige fridage / lukkedage (valgfrit)</label>
                   <div className="flex gap-2">
                     <input
                       type="date"
@@ -422,12 +422,12 @@ export function Wizard({ onComplete, isOpen, onCancel }: WizardProps) {
                   {customHolidays.length > 0 && (
                     <div className="flex flex-wrap gap-1.5 mt-2 p-2 bg-slate-50 rounded-lg border border-slate-100">
                       {customHolidays.map(h => (
-                        <span key={h} className="inline-flex items-center gap-1.5 bg-white border border-slate-200 text-[10px] font-bold text-slate-600 px-2 py-1 rounded-md">
+                        <span key={h} className="inline-flex items-center gap-1.5 bg-white border border-slate-200 text-xs font-bold text-slate-600 px-2 py-1 rounded-md">
                           <span>{new Date(`${h}T12:00:00`).toLocaleDateString("da-DK")}</span>
                           <button
                             type="button"
                             onClick={() => removeCustomHoliday(h)}
-                            className="text-slate-400 hover:text-red-500 font-bold border-0 bg-transparent text-xs p-0 leading-none cursor-pointer"
+                            className="text-slate-500 hover:text-red-500 font-bold border-0 bg-transparent text-xs p-0 leading-none cursor-pointer"
                           >
                             ×
                           </button>
@@ -444,7 +444,7 @@ export function Wizard({ onComplete, isOpen, onCancel }: WizardProps) {
           {step === 3 && (
             <div className="flex flex-col gap-4 animate-fadeIn">
               <div className="flex gap-3 mb-2">
-                <span className="text-2xl">🧱</span>
+                <Layers className="w-7 h-7 text-slate-600 shrink-0" />
                 <div>
                   <h3 className="text-sm font-black text-slate-800">Projektetaper</h3>
                   <p className="text-xs text-slate-500 mt-1">Dine overordnede milepæle danner rammerne og viser sig som smukke baggrundsbjælker på Gantt-kortet.</p>
@@ -471,19 +471,19 @@ export function Wizard({ onComplete, isOpen, onCancel }: WizardProps) {
                   {includeEtaper.prep && (
                     <div className="grid grid-cols-2 gap-3 mt-3">
                       <div>
-                        <label className="text-[9px] font-bold text-slate-400 uppercase">Startdato</label>
+                        <label className="text-xs font-bold text-slate-500">Startdato</label>
                         <input
                           type="date"
-                          className="w-full bg-white border border-slate-200 rounded p-1 text-[11px] font-bold"
+                          className="w-full bg-white border border-slate-200 rounded p-1 text-xs font-bold"
                           value={stageDates.prepStartDate}
                           onChange={(e) => setStageDates({ ...stageDates, prepStartDate: e.target.value })}
                         />
                       </div>
                       <div>
-                        <label className="text-[9px] font-bold text-slate-400 uppercase">Slutdato</label>
+                        <label className="text-xs font-bold text-slate-500">Slutdato</label>
                         <input
                           type="date"
-                          className="w-full bg-white border border-slate-200 rounded p-1 text-[11px] font-bold"
+                          className="w-full bg-white border border-slate-200 rounded p-1 text-xs font-bold"
                           value={stageDates.prepEndDate}
                           onChange={(e) => setStageDates({ ...stageDates, prepEndDate: e.target.value })}
                         />
@@ -509,19 +509,19 @@ export function Wizard({ onComplete, isOpen, onCancel }: WizardProps) {
                   {includeEtaper.raw && (
                     <div className="grid grid-cols-2 gap-3 mt-3">
                       <div>
-                        <label className="text-[9px] font-bold text-slate-400 uppercase">Startdato</label>
+                        <label className="text-xs font-bold text-slate-500">Startdato</label>
                         <input
                           type="date"
-                          className="w-full bg-white border border-slate-200 rounded p-1 text-[11px] font-bold"
+                          className="w-full bg-white border border-slate-200 rounded p-1 text-xs font-bold"
                           value={stageDates.rawStartDate}
                           onChange={(e) => setStageDates({ ...stageDates, rawStartDate: e.target.value })}
                         />
                       </div>
                       <div>
-                        <label className="text-[9px] font-bold text-slate-400 uppercase">Slutdato</label>
+                        <label className="text-xs font-bold text-slate-500">Slutdato</label>
                         <input
                           type="date"
-                          className="w-full bg-white border border-slate-200 rounded p-1 text-[11px] font-bold"
+                          className="w-full bg-white border border-slate-200 rounded p-1 text-xs font-bold"
                           value={stageDates.rawEndDate}
                           onChange={(e) => setStageDates({ ...stageDates, rawEndDate: e.target.value })}
                         />
@@ -547,19 +547,19 @@ export function Wizard({ onComplete, isOpen, onCancel }: WizardProps) {
                   {includeEtaper.finish && (
                     <div className="grid grid-cols-2 gap-3 mt-3">
                       <div>
-                        <label className="text-[9px] font-bold text-slate-400 uppercase">Startdato</label>
+                        <label className="text-xs font-bold text-slate-500">Startdato</label>
                         <input
                           type="date"
-                          className="w-full bg-white border border-slate-200 rounded p-1 text-[11px] font-bold"
+                          className="w-full bg-white border border-slate-200 rounded p-1 text-xs font-bold"
                           value={stageDates.finishStartDate}
                           onChange={(e) => setStageDates({ ...stageDates, finishStartDate: e.target.value })}
                         />
                       </div>
                       <div>
-                        <label className="text-[9px] font-bold text-slate-400 uppercase">Slutdato</label>
+                        <label className="text-xs font-bold text-slate-500">Slutdato</label>
                         <input
                           type="date"
-                          className="w-full bg-white border border-slate-200 rounded p-1 text-[11px] font-bold"
+                          className="w-full bg-white border border-slate-200 rounded p-1 text-xs font-bold"
                           value={stageDates.finishEndDate}
                           onChange={(e) => setStageDates({ ...stageDates, finishEndDate: e.target.value })}
                         />
@@ -575,15 +575,15 @@ export function Wizard({ onComplete, isOpen, onCancel }: WizardProps) {
           {step === 4 && (
             <div className="flex flex-col gap-4 animate-fadeIn">
               <div className="flex gap-3 mb-2">
-                <span className="text-2xl">👷</span>
+                <HardHat className="w-7 h-7 text-slate-600 shrink-0" />
                 <div>
                   <h3 className="text-sm font-black text-slate-800">Standard faggrupper / svende</h3>
-                  <p className="text-xs text-slate-500 mt-1">Vælg, hvilke resurser I har til rådighed på denne sag til at starte med.</p>
+                  <p className="text-xs text-slate-500 mt-1">Vælg, hvilke faggrupper I har til rådighed på denne sag til at starte med.</p>
                 </div>
               </div>
 
               <div className="flex flex-col gap-2 bg-slate-50 p-4 rounded-xl border border-slate-200">
-                <p className="text-[11px] text-slate-500 font-bold mb-2">Forudbyg dit sjak (I kan redigere timetakster og weekendregler løbende under Faggrupper):</p>
+                <p className="text-xs text-slate-500 font-bold mb-2">Forudbyg dit sjak (I kan redigere timetakster og weekendregler løbende under Faggrupper):</p>
                 
                 {/* Trade 1: Carpenter */}
                 <label className="flex items-center justify-between p-2.5 bg-white rounded-lg border border-slate-200 cursor-pointer hover:bg-slate-50/50 select-none">
@@ -597,7 +597,7 @@ export function Wizard({ onComplete, isOpen, onCancel }: WizardProps) {
                     <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: "#8b5cf6" }} />
                     <span className="text-xs font-bold text-slate-700">Tømrer (Svend)</span>
                   </div>
-                  <span className="text-[10px] text-slate-400 font-mono font-bold">Takst: 320 kr/t</span>
+                  <span className="text-xs text-slate-500 font-mono font-bold">Takst: 320 kr/t</span>
                 </label>
 
                 {/* Trade 2: Electrician */}
@@ -612,7 +612,7 @@ export function Wizard({ onComplete, isOpen, onCancel }: WizardProps) {
                     <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: "#3b82f6" }} />
                     <span className="text-xs font-bold text-slate-700">Elektriker (Mester)</span>
                   </div>
-                  <span className="text-[10px] text-slate-400 font-mono font-bold">Takst: 345 kr/t</span>
+                  <span className="text-xs text-slate-500 font-mono font-bold">Takst: 345 kr/t</span>
                 </label>
 
                 {/* Trade 3: Plumber */}
@@ -627,7 +627,7 @@ export function Wizard({ onComplete, isOpen, onCancel }: WizardProps) {
                     <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: "#10b981" }} />
                     <span className="text-xs font-bold text-slate-700">VVS-installatør</span>
                   </div>
-                  <span className="text-[10px] text-slate-400 font-mono font-bold">Takst: 360 kr/t</span>
+                  <span className="text-xs text-slate-500 font-mono font-bold">Takst: 360 kr/t</span>
                 </label>
 
                 {/* Trade 4: Ground Concrete */}
@@ -642,7 +642,7 @@ export function Wizard({ onComplete, isOpen, onCancel }: WizardProps) {
                     <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: "#ec4899" }} />
                     <span className="text-xs font-bold text-slate-700">Jord & Beton</span>
                   </div>
-                  <span className="text-[10px] text-slate-400 font-mono font-bold">Takst: 380 kr/t</span>
+                  <span className="text-xs text-slate-500 font-mono font-bold">Takst: 380 kr/t</span>
                 </label>
 
                 {/* Trade 5: Machine Rent */}
@@ -657,7 +657,7 @@ export function Wizard({ onComplete, isOpen, onCancel }: WizardProps) {
                     <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: "#f97316" }} />
                     <span className="text-xs font-bold text-slate-700">Leje af Gravemaskine (Fast pris)</span>
                   </div>
-                  <span className="text-[10px] text-slate-400 font-mono font-bold">Sats: 4500 kr. pr opg.</span>
+                  <span className="text-xs text-slate-500 font-mono font-bold">Sats: 4500 kr. pr opg.</span>
                 </label>
               </div>
             </div>
@@ -667,7 +667,7 @@ export function Wizard({ onComplete, isOpen, onCancel }: WizardProps) {
           {step === 5 && (
             <div className="flex flex-col gap-4 text-center items-center py-4 animate-fadeIn">
               <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center text-3xl mb-2 animate-bounce">
-                🚀
+                <Rocket className="w-8 h-8 text-slate-600" />
               </div>
               <h3 className="text-base font-black text-slate-800">Dit byggeprojekt er klar!</h3>
               <p className="text-xs text-slate-500 max-w-md leading-relaxed mt-1">
@@ -675,7 +675,7 @@ export function Wizard({ onComplete, isOpen, onCancel }: WizardProps) {
               </p>
 
               <div className="bg-slate-50 rounded-xl p-4 text-left border border-slate-250 text-xs text-slate-650 max-w-md mt-2 flex flex-col gap-2.5">
-                <span className="font-extrabold text-slate-800 block">💡 3 Hurtige tips til din planlægning:</span>
+                <span className="font-extrabold text-slate-800 block">3 hurtige tips til din planlægning:</span>
                 <p>
                   1. **Opret dine opgaver** udefra varighed og knyt dem til et sjak (faggruppe) for at automatisk udregne arbejdstidslønninger.
                 </p>

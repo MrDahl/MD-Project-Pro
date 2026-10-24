@@ -21,6 +21,8 @@ interface TaskCardProps {
 export const TaskCard = memo(function TaskCard({ task: t, number, stageById, tradeById, onEdit, onDelete, onDuplicate, selectMode, selected, onToggleSelect }: TaskCardProps) {
   return (
     <div
+      data-task-id={t.id}
+      onDoubleClick={selectMode ? undefined : (e) => { if (!(e.target as HTMLElement).closest("button, a, input, select")) onEdit(t.id); }}
       style={{ contentVisibility: "auto", containIntrinsicSize: "auto 170px" }}
       className={`bg-white border p-4 rounded-xl flex flex-col gap-3 shadow-2xs hover:shadow-xs transition relative ${
         t.isCritical ? "border-l-4 border-l-red-500 ring-1 ring-red-500/10" : "border-slate-200"
@@ -28,7 +30,7 @@ export const TaskCard = memo(function TaskCard({ task: t, number, stageById, tra
       onClick={selectMode ? () => onToggleSelect?.(t.id) : undefined}
     >
       {selectMode && (
-        <label className="absolute top-3 right-3 z-10 flex items-center gap-1.5 text-[10px] font-extrabold text-slate-500 cursor-pointer">
+        <label className="absolute top-3 right-3 z-10 flex items-center gap-1.5 text-xs font-extrabold text-slate-500 cursor-pointer">
           <input
             type="checkbox"
             data-testid="select-task"
@@ -46,7 +48,7 @@ export const TaskCard = memo(function TaskCard({ task: t, number, stageById, tra
               {number}. {t.title}
             </h4>
             {t.isCritical && (
-              <span className="bg-red-50 border border-red-200 text-red-700 font-extrabold text-[8px] md:text-[9px] px-2 py-0.5 rounded-full flex items-center gap-0.5">
+              <span className="bg-red-50 border border-red-200 text-red-700 font-extrabold text-xs md:text-xs px-2 py-0.5 rounded-full flex items-center gap-0.5">
                 <Flame className="w-2.5 h-2.5 text-red-500 fill-red-500 shrink-0" />
                 <span>Kritisk</span>
               </span>
@@ -60,7 +62,7 @@ export const TaskCard = memo(function TaskCard({ task: t, number, stageById, tra
               if (!stg) return null;
               return (
                 <span
-                  className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg text-[9px] font-extrabold leading-tight shadow-3xs"
+                  className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg text-xs font-extrabold leading-tight shadow-3xs"
                   style={{
                     backgroundColor: `${stg.color}12`,
                     color: stg.color,
@@ -75,20 +77,20 @@ export const TaskCard = memo(function TaskCard({ task: t, number, stageById, tra
             })()}
 
             {t.isRecurring && (
-              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg text-[9px] font-extrabold leading-tight bg-slate-50 text-slate-750 border border-slate-200 shadow-3xs">
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg text-xs font-extrabold leading-tight bg-slate-50 text-slate-750 border border-slate-200 shadow-3xs">
                 <span className="inline-flex rounded-full h-1.5 w-1.5 bg-slate-500"></span>
                 <span>Tjeneste: Gentages hver {t.recurringInterval} dag</span>
               </span>
             )}
           </div>
 
-          {t.desc && <p className="text-[11px] md:text-xs text-slate-450 mt-2.5 font-medium leading-normal">{t.desc}</p>}
+          {t.desc && <p className="text-xs md:text-xs text-slate-450 mt-2.5 font-medium leading-normal">{t.desc}</p>}
         </div>
 
         <div className={`flex gap-1 shrink-0 ${selectMode ? "invisible" : ""}`}>
           <button
             onClick={() => onEdit(t.id)}
-            className="p-2 bg-slate-50 hover:bg-slate-100 text-slate-400 hover:text-slate-600 rounded-lg cursor-pointer border border-slate-100 transition active:scale-95 min-h-[36px] min-w-[36px] flex items-center justify-center"
+            className="p-2 bg-slate-50 hover:bg-slate-100 text-slate-500 hover:text-slate-600 rounded-lg cursor-pointer border border-slate-100 transition active:scale-95 min-h-[36px] min-w-[36px] flex items-center justify-center"
             title="Rediger"
             aria-label="Rediger opgave"
           >
@@ -96,7 +98,7 @@ export const TaskCard = memo(function TaskCard({ task: t, number, stageById, tra
           </button>
           <button
             onClick={() => onDuplicate(t.id)}
-            className="p-2 bg-slate-50 hover:bg-slate-100 text-slate-400 hover:text-slate-600 rounded-lg cursor-pointer border border-slate-100 transition active:scale-95 min-h-[36px] min-w-[36px] flex items-center justify-center"
+            className="p-2 bg-slate-50 hover:bg-slate-100 text-slate-500 hover:text-slate-600 rounded-lg cursor-pointer border border-slate-100 transition active:scale-95 min-h-[36px] min-w-[36px] flex items-center justify-center"
             title="Dupliker"
             aria-label="Dupliker opgave"
           >
@@ -114,35 +116,35 @@ export const TaskCard = memo(function TaskCard({ task: t, number, stageById, tra
       </div>
 
       {clockText(t) && (
-        <div className="text-[10px] font-bold text-slate-500" data-testid="card-clock">
+        <div className="text-xs font-bold text-slate-500" data-testid="card-clock">
           {durationText(t)} &middot; {clockText(t)}
         </div>
       )}
 
       {/* Calendar info card */}
-      <div className="grid grid-cols-2 bg-slate-50 border border-slate-100 p-2 rounded-lg text-[10px] font-bold text-slate-600 gap-2">
+      <div className="grid grid-cols-2 bg-slate-50 border border-slate-100 p-2 rounded-lg text-xs font-bold text-slate-600 gap-2">
         <div>
-          <span className="text-slate-400 text-[8px] uppercase tracking-wider block leading-none mb-1">
+          <span className="text-slate-500 text-xs block leading-none mb-1">
             {t.isRecurring ? "Første udførelse" : "Startdato"}
           </span>
           <span className="block truncate font-mono">
-            {t.isRecurring ? "↻ " : "🏁 "}
+            {t.isRecurring ? "↻ " : ""}
             {t.calcStart ? new Date(`${t.calcStart}T12:00:00`).toLocaleDateString("da-DK") : "Afventer"}
           </span>
         </div>
         <div className="text-right">
-          <span className="text-slate-400 text-[8px] uppercase tracking-wider block leading-none mb-1">
+          <span className="text-slate-500 text-xs block leading-none mb-1">
             {t.isRecurring ? "Sidste udførelse (Beregnet)" : "Slutdato"}
           </span>
           <span className="block truncate font-mono">
-            {t.isRecurring ? `✓ (${(t.occurrences || []).length} gentagelser)` : "🏆 "}
+            {t.isRecurring ? `✓ (${(t.occurrences || []).length} gentagelser)` : ""}
             {t.calcEnd ? new Date(`${t.calcEnd}T12:00:00`).toLocaleDateString("da-DK") : "Afventer"}
           </span>
         </div>
       </div>
 
       {/* Badges resources and pricing inside the card */}
-      <div className="flex justify-between items-center mt-0.5 flex-wrap gap-2 text-[10px]">
+      <div className="flex justify-between items-center mt-0.5 flex-wrap gap-2 text-xs">
         <div className="flex gap-1 flex-wrap">
           {(t.tradeIds || []).map((tid) => {
             const tr = tradeById.get(tid);
@@ -150,7 +152,7 @@ export const TaskCard = memo(function TaskCard({ task: t, number, stageById, tra
             return (
               <span
                 key={tr.id}
-                className="px-2 py-0.5 rounded-full font-bold border shrink-0 text-[10px]"
+                className="px-2 py-0.5 rounded-full font-bold border shrink-0 text-xs"
                 style={{
                   backgroundColor: `${tr.color}15`,
                   color: tr.color,
@@ -162,7 +164,7 @@ export const TaskCard = memo(function TaskCard({ task: t, number, stageById, tra
             );
           })}
           {(t.tradeIds || []).length === 0 && (
-            <span className="text-slate-400 font-medium">Ingen faggrupper</span>
+            <span className="text-slate-500 font-medium">Ingen faggrupper</span>
           )}
         </div>
 
@@ -171,7 +173,7 @@ export const TaskCard = memo(function TaskCard({ task: t, number, stageById, tra
         </div>
       </div>
       {(t.assignments || []).length > 0 && (
-        <div className="text-[10px] text-slate-500 font-semibold leading-snug" data-testid="card-crew">
+        <div className="text-xs text-slate-500 font-semibold leading-snug" data-testid="card-crew">
           {(t.assignments || [])
             .map((a) => {
               const roles = tradeById.get(a.tradeId)?.roles || [];

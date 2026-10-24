@@ -41,7 +41,7 @@ export function DayActionModal({
               <div className="bg-slate-900 px-4 py-3 flex justify-between items-center text-white">
                 <div className="flex items-center gap-2">
                   <Calendar className="w-4 h-4 text-slate-300" />
-                  <span className="text-xs font-black uppercase tracking-wider">
+                  <span className="text-xs font-black">
                     Valg for {new Date(`${date}T12:00:00`).toLocaleDateString("da-DK", { day: "numeric", month: "long" })}
                   </span>
                 </div>
@@ -80,7 +80,7 @@ export function DayActionModal({
                 {dayActionType === "holiday" ? (
                   <div className="flex flex-col gap-3">
                     <div className="flex flex-col gap-1">
-                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Navngiv lukkedag / ferie</label>
+                      <label className="text-xs font-bold text-slate-500">Navngiv lukkedag / ferie</label>
                       <input
                         type="text"
                         value={dayHolidayName}
@@ -92,7 +92,7 @@ export function DayActionModal({
 
                     {holidays.some((h) => h.date === date) ? (
                       <div className="flex flex-col gap-2">
-                        <div className="text-[10px] text-purple-700 bg-purple-50 p-2 rounded-lg font-bold border border-purple-100 flex items-center gap-1.5">
+                        <div className="text-xs text-purple-700 bg-purple-50 p-2 rounded-lg font-bold border border-purple-100 flex items-center gap-1.5">
                           <ShieldCheck className="w-4 h-4" />
                           <span>Denne dag er en registreret lukkedag ({holidays.find(h => h.date === date)?.name}).</span>
                         </div>
@@ -126,7 +126,7 @@ export function DayActionModal({
                 ) : (
                   <div className="flex flex-col gap-3">
                     <div className="flex flex-col gap-1">
-                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Navngiv vejrforhold</label>
+                      <label className="text-xs font-bold text-slate-500">Navngiv vejrforhold</label>
                       <input
                         type="text"
                         value={dayWeatherLabel}
@@ -137,7 +137,7 @@ export function DayActionModal({
                     </div>
 
                     <div className="flex flex-col gap-1">
-                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Slutdato for vejrforhold</label>
+                      <label className="text-xs font-bold text-slate-500">Slutdato for vejrforhold</label>
                       <input
                         type="date"
                         value={dayWeatherEnd}
@@ -149,7 +149,7 @@ export function DayActionModal({
 
                     {weatherDelays.some((wd) => date >= wd.startDate && date <= wd.endDate) ? (
                       <div className="flex flex-col gap-2">
-                        <div className="text-[10px] text-sky-700 bg-sky-50 p-2 rounded-lg font-bold border border-sky-100 flex items-center gap-1.5">
+                        <div className="text-xs text-sky-700 bg-sky-50 p-2 rounded-lg font-bold border border-sky-100 flex items-center gap-1.5">
                           <CloudLightning className="w-4 h-4" />
                           <span>Vejrspildsdag aktiv på denne dato.</span>
                         </div>

@@ -20,11 +20,11 @@ export function CrewEditor({ trades, assignments, onChange }: Props) {
   return (
     <div className="flex flex-col gap-3 bg-slate-50 p-3 rounded-lg border border-slate-200" data-testid="crew-editor">
       <div>
-        <label className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
-          <HardHat className="w-3.5 h-3.5 text-slate-400" />
+        <label className="text-xs font-bold text-slate-500 flex items-center gap-1">
+          <HardHat className="w-3.5 h-3.5 text-slate-500" />
           <span>Bemanding pr. aktivitet</span>
         </label>
-        <p className="text-[10px] text-slate-400 font-medium leading-relaxed mt-1">
+        <p className="text-xs text-slate-500 font-medium leading-relaxed mt-1">
           Del opgaven op i aktiviteter og vælg hvem der udfører dem. Prisen beregnes ud fra rollernes timepriser i stedet for faggruppens standardtakst.
         </p>
       </div>
@@ -33,7 +33,7 @@ export function CrewEditor({ trades, assignments, onChange }: Props) {
         const list = assignments.filter((a) => a.tradeId === tr.id);
         return (
           <div key={tr.id} className="flex flex-col gap-2">
-            <div className="text-[11px] font-black text-slate-700 flex items-center gap-1.5">
+            <div className="text-xs font-black text-slate-700 flex items-center gap-1.5">
               <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: tr.color }} />
               {tr.name}
             </div>
@@ -67,7 +67,7 @@ export function CrewEditor({ trades, assignments, onChange }: Props) {
                       className={`${input} w-16`}
                     />
                   )}
-                  <button type="button" aria-label="Fjern aktivitet" onClick={() => onChange(assignments.filter((x) => x.id !== a.id))} className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 cursor-pointer">
+                  <button type="button" aria-label="Fjern aktivitet" onClick={() => onChange(assignments.filter((x) => x.id !== a.id))} className="p-1.5 rounded-lg text-slate-500 hover:text-red-600 hover:bg-red-50 cursor-pointer">
                     <Trash2 className="w-4 h-4" />
                   </button>
                 </div>
@@ -90,7 +90,7 @@ export function CrewEditor({ trades, assignments, onChange }: Props) {
                           </option>
                         ))}
                       </select>
-                      {role && c.count > role.count && <span className="text-[10px] font-bold text-amber-600">kun {role.count} ansat</span>}
+                      {role && c.count > role.count && <span className="text-xs font-bold text-amber-600">kun {role.count} ansat</span>}
                       <button type="button" aria-label="Fjern person" onClick={() => patch(a.id, { crew: a.crew.filter((_, i) => i !== ci) })} className="p-1 rounded text-slate-300 hover:text-red-500 cursor-pointer">
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
@@ -101,11 +101,11 @@ export function CrewEditor({ trades, assignments, onChange }: Props) {
                   <button
                     type="button"
                     onClick={() => patch(a.id, { crew: [...a.crew, { roleId: tr.roles![0].id, count: 1 }] })}
-                    className="text-[10px] font-extrabold text-sky-700 hover:text-sky-900 flex items-center gap-1 cursor-pointer"
+                    className="text-xs font-extrabold text-sky-700 hover:text-sky-900 flex items-center gap-1 cursor-pointer"
                   >
                     <Plus className="w-3 h-3" /> Tilføj person
                   </button>
-                  <span className="text-[10px] font-bold text-slate-400">
+                  <span className="text-xs font-bold text-slate-500">
                     {a.hours !== undefined
                       ? `${Math.round(crewHourly(a, tr.roles) * a.hours).toLocaleString("da-DK")} kr. i alt`
                       : `${Math.round(crewHourly(a, tr.roles) * ((a.percent ?? 100) / 100)).toLocaleString("da-DK")} kr./t`}
@@ -117,7 +117,7 @@ export function CrewEditor({ trades, assignments, onChange }: Props) {
               type="button"
               data-testid="add-assignment"
               onClick={() => onChange([...assignments, { id: newId("asg"), tradeId: tr.id, label: "", crew: [{ roleId: tr.roles![0].id, count: 1 }], percent: 100 }])}
-              className="self-start px-3 py-1.5 rounded-lg bg-white border border-slate-200 hover:bg-slate-100 text-[11px] font-extrabold text-slate-700 flex items-center gap-1 cursor-pointer"
+              className="self-start px-3 py-1.5 rounded-lg bg-white border border-slate-200 hover:bg-slate-100 text-xs font-extrabold text-slate-700 flex items-center gap-1 cursor-pointer"
             >
               <Plus className="w-3.5 h-3.5" /> Tilføj aktivitet
             </button>

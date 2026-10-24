@@ -55,7 +55,7 @@ export function PdfExportDialog({ input, hasBaseline, busy, error, onExport, onC
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <label className="flex flex-col gap-1 text-[10px] font-black uppercase tracking-wider text-slate-400">
+          <label className="flex flex-col gap-1 text-xs font-black text-slate-500">
             Omfang
             <select aria-label="Omfang" value={opts.scope} onChange={(e) => set({ scope: e.target.value })} className={field}>
               <option value="all">Hele projektet</option>
@@ -67,7 +67,7 @@ export function PdfExportDialog({ input, hasBaseline, busy, error, onExport, onC
             </select>
           </label>
 
-          <label className="flex flex-col gap-1 text-[10px] font-black uppercase tracking-wider text-slate-400">
+          <label className="flex flex-col gap-1 text-xs font-black text-slate-500">
             Papir
             <select aria-label="Papir" value={opts.paper} onChange={(e) => set({ paper: e.target.value as Paper })} className={field}>
               <option value="auto">Automatisk størrelse (ét stort ark)</option>
@@ -80,7 +80,7 @@ export function PdfExportDialog({ input, hasBaseline, busy, error, onExport, onC
           </label>
 
           {opts.paper === "auto" ? (
-            <label className="flex flex-col gap-1 text-[10px] font-black uppercase tracking-wider text-slate-400">
+            <label className="flex flex-col gap-1 text-xs font-black text-slate-500">
               Detaljegrad
               <select aria-label="Detaljegrad" value={opts.dayWidth} onChange={(e) => set({ dayWidth: Number(e.target.value) })} className={field}>
                 <option value={5}>Detaljeret (5 mm pr. dag)</option>
@@ -89,7 +89,7 @@ export function PdfExportDialog({ input, hasBaseline, busy, error, onExport, onC
               </select>
             </label>
           ) : (
-            <label className="flex flex-col gap-1 text-[10px] font-black uppercase tracking-wider text-slate-400">
+            <label className="flex flex-col gap-1 text-xs font-black text-slate-500">
               Retning
               <select aria-label="Retning" value={opts.portrait ? "p" : "l"} onChange={(e) => set({ portrait: e.target.value === "p" })} className={field}>
                 <option value="l">Liggende</option>
@@ -98,7 +98,7 @@ export function PdfExportDialog({ input, hasBaseline, busy, error, onExport, onC
             </label>
           )}
 
-          <label className="flex flex-col gap-1 text-[10px] font-black uppercase tracking-wider text-slate-400">
+          <label className="flex flex-col gap-1 text-xs font-black text-slate-500">
             Opgaver pr. side (maks)
             <select aria-label="Opgaver pr. side" value={opts.maxTasks} onChange={(e) => set({ maxTasks: Number(e.target.value) })} className={field}>
               <option value={300}>300</option>

@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Settings, ProjectInfo, Stage, WeatherDelay, Holiday, WeekSchedule } from "../types";
 import { WorkWeekEditor } from "./WorkWeekEditor";
-import { Calendar, Clock, Plus, Trash2, CalendarX, Info, FileText, MapPin, User, Building, Layers, CloudSnow } from "lucide-react";
+import { Calendar, Clock, Plus, Trash2, CalendarX, Info, FileText, MapPin, User, Building, Layers, CloudSnow, Snowflake } from "lucide-react";
 
 interface ProjectSettingsProps {
   startDate: string;
@@ -111,7 +111,7 @@ export function ProjectSettings({
         </h3>
 
         <div className="flex flex-col gap-1">
-          <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Projektets navn</label>
+          <label className="text-xs font-bold text-slate-500">Projektets navn</label>
           <input
             type="text"
             value={projectInfo.projectName || ""}
@@ -122,7 +122,7 @@ export function ProjectSettings({
         </div>
 
         <div className="flex flex-col gap-1">
-          <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
+          <label className="text-xs font-bold text-slate-500 flex items-center gap-1">
             <MapPin className="w-3.5 h-3.5 text-slate-450" />
             <span>Adresse</span>
           </label>
@@ -136,7 +136,7 @@ export function ProjectSettings({
         </div>
 
         <div className="flex flex-col gap-1">
-          <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
+          <label className="text-xs font-bold text-slate-500 flex items-center gap-1">
             <Building className="w-3.5 h-3.5 text-slate-450" />
             <span>Kunde</span>
           </label>
@@ -150,7 +150,7 @@ export function ProjectSettings({
         </div>
 
         <div className="flex flex-col gap-1">
-          <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
+          <label className="text-xs font-bold text-slate-500 flex items-center gap-1">
             <User className="w-3.5 h-3.5 text-slate-450" />
             <span>Projektansvarlig</span>
           </label>
@@ -172,21 +172,21 @@ export function ProjectSettings({
         </h3>
 
         <div className="flex flex-col gap-1">
-          <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Projektets startdato</label>
+          <label className="text-xs font-bold text-slate-500">Projektets startdato</label>
           <input
             type="date"
             value={startDate}
             onChange={(e) => onUpdateStartDate(e.target.value)}
             className="bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs font-bold text-slate-700 outline-none focus:border-slate-500"
           />
-          <span className="text-[10px] text-slate-400 font-medium">
+          <span className="text-xs text-slate-500 font-medium">
             Tidsplanen vil automatisk kaskadeskubbe til højre med start herfra.
           </span>
         </div>
 
         <div className="flex flex-col gap-1">
-          <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
-            <Clock className="w-3.5 h-3.5 text-slate-400" />
+          <label className="text-xs font-bold text-slate-500 flex items-center gap-1">
+            <Clock className="w-3.5 h-3.5 text-slate-500" />
             <span>Standard arbejdstimer pr. dag</span>
           </label>
           <input
@@ -200,7 +200,7 @@ export function ProjectSettings({
             max={24}
             required
           />
-          <span className="text-[10px] text-slate-400 font-medium">
+          <span className="text-xs text-slate-500 font-medium">
             Bruges til at udregne dagsprisen for faggrupper (Standard er en 7.4 timers overenskomst).
           </span>
         </div>
@@ -212,12 +212,12 @@ export function ProjectSettings({
           ownLabel="Detaljeret: klokkeslæt og pauser pr. ugedag"
         />
         {settings.workWeek && (
-          <span className="text-[10px] text-slate-400 font-medium">
+          <span className="text-xs text-slate-500 font-medium">
             Gennemsnit man-fre: {settings.workHoursPerDay.toLocaleString("da-DK", { maximumFractionDigits: 2 })} t/dag. Faggrupper og roller kan have deres egne arbejdstider under Faggrupper.
           </span>
         )}
 
-        <div className="bg-amber-50 rounded-lg p-3 border border-amber-100/50 flex gap-2 text-[10px] font-medium text-amber-900 mt-2">
+        <div className="bg-amber-50 rounded-lg p-3 border border-amber-100/50 flex gap-2 text-xs font-medium text-amber-900 mt-2">
           <Info className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
           <p className="leading-relaxed">
             Bemærk! Hvis du ændrer arbejdstimerne, genberegnes alle timebaserede lønudgifter i faggrupperne øjeblikkeligt i budgettet.
@@ -261,12 +261,12 @@ export function ProjectSettings({
 
         {/* Holidays scrolling list */}
         <div className="flex flex-col gap-2">
-          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+          <span className="text-xs font-bold text-slate-500">
             Registrerede lukkedage ({holidays.length}):
           </span>
 
           {holidays.length === 0 ? (
-            <div className="text-center py-10 border border-dashed border-slate-200 rounded-lg text-[11px] text-slate-400">
+            <div className="text-center py-10 border border-dashed border-slate-200 rounded-lg text-xs text-slate-500">
               Der er endnu ikke angivet nogen helligdage eller lukkedage i systemet.
             </div>
           ) : (
@@ -289,14 +289,14 @@ export function ProjectSettings({
                     >
                       <div className="flex flex-col gap-0.5">
                         <span className="font-extrabold text-slate-800">{itemName}</span>
-                        <span className="text-[10px] text-slate-400 font-mono mt-0.5">
+                        <span className="text-xs text-slate-500 font-mono mt-0.5">
                           {formatDateLabel(itemDate)}
                         </span>
                       </div>
                       <button
                         onClick={() => onDeleteHoliday(holidays.indexOf(h))}
                         type="button"
-                        className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 active:scale-95 transition cursor-pointer rounded-lg border-0"
+                        className="p-1.5 text-slate-500 hover:text-red-500 hover:bg-red-50 active:scale-95 transition cursor-pointer rounded-lg border-0"
                         title="Slet lukkedag"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
@@ -316,13 +316,13 @@ export function ProjectSettings({
           <span>Etaper & Projektfaser</span>
         </h3>
         
-        <p className="text-[11px] text-slate-500 leading-relaxed -mt-1">
+        <p className="text-xs text-slate-500 leading-relaxed -mt-1">
           Etaper danner projektets overordnede tidsmæssige grundpiller på Gantt-målestokken og er uafhængige af opgavernes automatiske forskydninger.
         </p>
 
         <form onSubmit={handleCreateStage} className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 bg-slate-50 p-4 rounded-xl border border-slate-200">
           <div className="flex flex-col gap-1 sm:col-span-2">
-            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Etapens Navn</label>
+            <label className="text-xs font-bold text-slate-500">Etapens Navn</label>
             <input
               type="text"
               value={stageName}
@@ -334,7 +334,7 @@ export function ProjectSettings({
           </div>
 
           <div className="flex flex-col gap-1">
-            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Startdato</label>
+            <label className="text-xs font-bold text-slate-500">Startdato</label>
             <input
               type="date"
               value={stageStart}
@@ -345,7 +345,7 @@ export function ProjectSettings({
           </div>
 
           <div className="flex flex-col gap-1">
-            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Slutdato</label>
+            <label className="text-xs font-bold text-slate-500">Slutdato</label>
             <input
               type="date"
               value={stageEnd}
@@ -356,14 +356,14 @@ export function ProjectSettings({
           </div>
 
           <div className="flex flex-col gap-1 sm:col-span-3">
-            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Vælg Farvekode</label>
+            <label className="text-xs font-bold text-slate-500">Vælg Farvekode</label>
             <div className="flex items-center gap-1.5 flex-wrap mt-1">
               {PRESET_COLORS.map((col) => (
                 <button
                   key={col.hex}
                   type="button"
                   onClick={() => setStageColor(col.hex)}
-                  className={`px-2.5 py-1.5 rounded-lg border text-[10px] font-extrabold flex items-center gap-1 cursor-pointer transition ${
+                  className={`px-2.5 py-1.5 rounded-lg border text-xs font-extrabold flex items-center gap-1 cursor-pointer transition ${
                     stageColor === col.hex
                       ? "border-slate-800 bg-slate-900 text-white"
                       : "border-slate-200 bg-white text-slate-600 hover:bg-slate-55"
@@ -388,12 +388,12 @@ export function ProjectSettings({
         </form>
 
         <div className="flex flex-col gap-2">
-          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+          <span className="text-xs font-bold text-slate-500">
             Oprettede Projektetaper / Faser ({stages.length}):
           </span>
 
           {stages.length === 0 ? (
-            <div className="text-center py-8 border border-dashed border-slate-200 rounded-lg text-[11px] text-slate-400">
+            <div className="text-center py-8 border border-dashed border-slate-200 rounded-lg text-xs text-slate-500">
               Der er endnu ikke oprettet nogen etaper. Brug formularen ovenfor til at tilføje jeres projektfaser med faste tidsintervaller.
             </div>
           ) : (
@@ -407,7 +407,7 @@ export function ProjectSettings({
                     <span className="w-3 h-3 rounded-full shrink-0 mt-1" style={{ backgroundColor: stg.color }} />
                     <div className="min-w-0">
                       <h4 className="font-bold text-slate-800 leading-tight truncate">{stg.name}</h4>
-                      <p className="text-[10px] text-slate-500 mt-1 font-semibold flex items-center gap-1 font-mono">
+                      <p className="text-xs text-slate-500 mt-1 font-semibold flex items-center gap-1 font-mono">
                         <span>{formatDateLabel(stg.startDate)}</span>
                         <span>-</span>
                         <span>{formatDateLabel(stg.endDate)}</span>
@@ -416,7 +416,7 @@ export function ProjectSettings({
                   </div>
                   <button
                     onClick={() => onDeleteStage(stg.id)}
-                    className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg border-0 cursor-pointer transition active:scale-95"
+                    className="p-1.5 text-slate-500 hover:text-red-500 hover:bg-red-50 rounded-lg border-0 cursor-pointer transition active:scale-95"
                     title="Slet etape"
                   >
                     <Trash2 className="w-4 h-4" />
@@ -435,7 +435,7 @@ export function ProjectSettings({
           <span>Vejrlig & Force Majeure (Vejrspildsdage)</span>
         </h3>
 
-        <p className="text-[11px] text-slate-500 leading-relaxed -mt-1">
+        <p className="text-xs text-slate-500 leading-relaxed -mt-1">
           Brug denne formular til at tildele vejrspildsdage eller andre uforudsete force majeure-betingelser (f.eks. dyb frost, skybrud, stormvejr). 
           Tidsplanen vil automatisk forskyde berørte udendørs- eller generiske arbejdsopgaver omkring disse datoer, og markere dem i Gantt-diagrammet.
         </p>
@@ -452,7 +452,7 @@ export function ProjectSettings({
           className="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-slate-50 p-4 rounded-xl border border-slate-200"
         >
           <div className="flex flex-col gap-1 sm:col-span-1">
-            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Vejrsituation/Årsag</label>
+            <label className="text-xs font-bold text-slate-500">Vejrsituation/Årsag</label>
             <input
               type="text"
               value={weatherLabel}
@@ -464,7 +464,7 @@ export function ProjectSettings({
           </div>
 
           <div className="flex flex-col gap-1">
-            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Startdato</label>
+            <label className="text-xs font-bold text-slate-500">Startdato</label>
             <input
               type="date"
               value={weatherStart}
@@ -475,7 +475,7 @@ export function ProjectSettings({
           </div>
 
           <div className="flex flex-col gap-1">
-            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Slutdato</label>
+            <label className="text-xs font-bold text-slate-500">Slutdato</label>
             <input
               type="date"
               value={weatherEnd}
@@ -498,12 +498,12 @@ export function ProjectSettings({
         </form>
 
         <div className="flex flex-col gap-2">
-          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+          <span className="text-xs font-bold text-slate-500">
             Registrerede vejrspildsdage ({weatherDelays.length}):
           </span>
 
           {weatherDelays.length === 0 ? (
-            <div className="text-center py-8 border border-dashed border-slate-200 rounded-lg text-[11px] text-slate-400">
+            <div className="text-center py-8 border border-dashed border-slate-200 rounded-lg text-xs text-slate-500">
               Der er pt. ikke registreret nogen manuelle vejrspildsdage i tidsplanen.
             </div>
           ) : (
@@ -514,10 +514,10 @@ export function ProjectSettings({
                   className="bg-sky-50/50 border border-sky-100 rounded-xl p-3 flex justify-between items-center text-xs transition hover:shadow-2xs"
                 >
                   <div className="flex items-start gap-2.5 min-w-0">
-                    <span className="text-lg shrink-0 mt-0.5 select-none">❄️</span>
+                    <Snowflake className="w-5 h-5 shrink-0 mt-0.5 text-sky-600" />
                     <div className="min-w-0">
                       <h4 className="font-bold text-sky-950 leading-tight truncate">{wd.label}</h4>
-                      <p className="text-[10px] text-sky-750 mt-1 font-semibold flex items-center gap-1 font-mono">
+                      <p className="text-xs text-sky-750 mt-1 font-semibold flex items-center gap-1 font-mono">
                         <span>{formatDateLabel(wd.startDate)}</span>
                         <span>-</span>
                         <span>{formatDateLabel(wd.endDate)}</span>

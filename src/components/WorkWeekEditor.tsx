@@ -36,21 +36,21 @@ function DayRow({ label, day, offLabel, onChange }: { label: string; day: DaySch
         {day ? (
           <>
             <input type="time" aria-label={`${label} start`} value={formatTime(day.start)} onChange={setTime((m) => ({ start: m }))} className={timeInput} />
-            <span className="text-slate-400 text-xs">til</span>
+            <span className="text-slate-500 text-xs">til</span>
             <input type="time" aria-label={`${label} slut`} value={formatTime(day.end)} onChange={setTime((m) => ({ end: m }))} className={timeInput} />
-            <span className="text-[11px] font-bold text-slate-500 ml-auto" data-testid="day-hours">
+            <span className="text-xs font-bold text-slate-500 ml-auto" data-testid="day-hours">
               {fmtHours(hoursOfDay(day))} t
             </span>
           </>
         ) : (
-          <span className="text-[11px] text-slate-400 font-semibold">{offLabel ?? "Fri"}</span>
+          <span className="text-xs text-slate-500 font-semibold">{offLabel ?? "Fri"}</span>
         )}
       </div>
       {day && (
         <div className="flex flex-col gap-1.5 pl-1">
           {day.breaks.map((b, i) => (
             <div key={i} className="flex items-center gap-1.5">
-              <span className="text-[10px] font-bold text-slate-400 w-10">Pause</span>
+              <span className="text-xs font-bold text-slate-500 w-10">Pause</span>
               <input
                 type="time"
                 aria-label={`${label} pause start`}
@@ -61,7 +61,7 @@ function DayRow({ label, day, offLabel, onChange }: { label: string; day: DaySch
                 }}
                 className={timeInput}
               />
-              <span className="text-slate-400 text-xs">til</span>
+              <span className="text-slate-500 text-xs">til</span>
               <input
                 type="time"
                 aria-label={`${label} pause slut`}
@@ -84,7 +84,7 @@ function DayRow({ label, day, offLabel, onChange }: { label: string; day: DaySch
               const from = last ? last.to + 120 : Math.min(day.end - 30, day.start + 180);
               set({ breaks: [...day.breaks, { from, to: from + 15 }] });
             }}
-            className="self-start text-[10px] font-extrabold text-sky-700 hover:text-sky-900 flex items-center gap-1 cursor-pointer"
+            className="self-start text-xs font-extrabold text-sky-700 hover:text-sky-900 flex items-center gap-1 cursor-pointer"
           >
             <Plus className="w-3 h-3" /> Tilføj pause
           </button>

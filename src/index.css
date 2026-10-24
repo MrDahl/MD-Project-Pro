@@ -48,3 +48,58 @@
   to   { transform: translateX(0); opacity: 1; }
 }
 .animate-drawer-in { animation: drawer-in 0.18s ease-out; }
+
+/* ---------- Touch: comfortable tap targets on phones and tablets ---------- */
+@media (pointer: coarse) {
+  button:not([data-gantt] button),
+  select,
+  input[type="date"],
+  input[type="time"],
+  input[type="number"],
+  input[type="text"] {
+    min-height: 44px;
+  }
+  input[type="checkbox"] {
+    width: 22px;
+    height: 22px;
+  }
+}
+
+/* ---------- Dark mode (inverts the light design; colours of bars and dots are kept) ---------- */
+html.dark {
+  filter: invert(1) hue-rotate(180deg);
+  background: #fff;
+}
+html.dark [style*="background"],
+html.dark [data-bar],
+html.dark img,
+html.dark canvas {
+  filter: invert(1) hue-rotate(180deg);
+}
+
+/* ---------- Print: clean task list without screen controls ---------- */
+@media print {
+  header,
+  nav,
+  footer,
+  [data-testid="warnings-panel"] {
+    display: none !important;
+  }
+  body {
+    background: #fff !important;
+  }
+  [data-task-id] {
+    break-inside: avoid;
+    box-shadow: none !important;
+    border-color: #cbd5e1 !important;
+    content-visibility: visible !important;
+  }
+  [data-task-id] button,
+  [data-testid="toggle-select"],
+  [data-testid="print-list"] {
+    display: none !important;
+  }
+  html.dark {
+    filter: none;
+  }
+}

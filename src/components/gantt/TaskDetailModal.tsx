@@ -26,9 +26,9 @@ export function TaskDetailModal({ task, tradeById, onEdit, onClose }: TaskDetail
                 <div className="flex justify-between items-start gap-3">
                   <div>
                     <div className="flex items-center gap-1.5">
-                      <span className="text-[10px] font-black text-slate-400 font-mono tracking-widest">OPGAVEINFORMATION</span>
+                      <span className="text-xs font-black text-slate-500 font-mono">OPGAVEINFORMATION</span>
                       {task.isCritical && (
-                        <span className="bg-red-50 text-red-600 border border-red-200 text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded flex items-center gap-0.5 shrink-0 animate-pulse">
+                        <span className="bg-red-50 text-red-600 border border-red-200 text-xs font-black px-1.5 py-0.5 rounded flex items-center gap-0.5 shrink-0 animate-pulse">
                           <Flame className="w-2.5 h-2.5 fill-red-500 text-red-500" />
                           Critical Path
                         </span>
@@ -40,7 +40,7 @@ export function TaskDetailModal({ task, tradeById, onEdit, onClose }: TaskDetail
                   </div>
                   <button
                     onClick={() => onClose()}
-                    className="p-1 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-600 cursor-pointer transition shrink-0"
+                    className="p-1 hover:bg-slate-100 rounded-lg text-slate-500 hover:text-slate-600 cursor-pointer transition shrink-0"
                   >
                     <X className="w-5 h-5" />
                   </button>
@@ -55,31 +55,31 @@ export function TaskDetailModal({ task, tradeById, onEdit, onClose }: TaskDetail
                 {/* Stats Grid */}
                 <div className="grid grid-cols-2 gap-3.5 bg-slate-50/50 p-3.5 rounded-xl border border-slate-150">
                   <div className="flex flex-col">
-                    <span className="text-[9px] font-black uppercase tracking-wider text-slate-400">Tidsrum</span>
+                    <span className="text-xs font-black text-slate-500">Tidsrum</span>
                     <span className="text-xs font-extrabold text-slate-700 mt-1">
                       {task.calcStart && task.calcEnd 
                         ? `${new Date(`${task.calcStart}T12:00:00`).toLocaleDateString("da-DK", { day: "numeric", month: "short" })} - ${new Date(`${task.calcEnd}T12:00:00`).toLocaleDateString("da-DK", { day: "numeric", month: "short" })}`
                         : "Ikke planlagt"}
                     </span>
-                    {clockText(task) && <span className="text-[10px] font-bold text-slate-500">{clockText(task)}</span>}
+                    {clockText(task) && <span className="text-xs font-bold text-slate-500">{clockText(task)}</span>}
                   </div>
 
                   <div className="flex flex-col">
-                    <span className="text-[9px] font-black uppercase tracking-wider text-slate-400">Varighed</span>
+                    <span className="text-xs font-black text-slate-500">Varighed</span>
                     <span className="text-xs font-extrabold text-slate-700 mt-1">
                       {durationText(task)}
                     </span>
                   </div>
 
                   <div className="flex flex-col">
-                    <span className="text-[9px] font-black uppercase tracking-wider text-slate-400">Total Udgift</span>
+                    <span className="text-xs font-black text-slate-500">Total Udgift</span>
                     <span className="text-sm font-black text-slate-800 mt-1 font-mono">
                       {(task.calcCost || 0).toLocaleString("da-DK")} kr.
                     </span>
                   </div>
 
                   <div className="flex flex-col">
-                    <span className="text-[9px] font-black uppercase tracking-wider text-slate-400">Status / Fremdrift</span>
+                    <span className="text-xs font-black text-slate-500">Status / Fremdrift</span>
                     <div className="flex items-center gap-1.5 mt-1.5">
                       <div className="flex-1 h-2 bg-slate-200 rounded-full overflow-hidden">
                         <div 
@@ -87,7 +87,7 @@ export function TaskDetailModal({ task, tradeById, onEdit, onClose }: TaskDetail
                           style={{ width: `${task.progress || 0}%` }} 
                         />
                       </div>
-                      <span className="text-[10px] font-bold text-slate-500 font-mono leading-none">
+                      <span className="text-xs font-bold text-slate-500 font-mono leading-none">
                         {task.progress || 0}%
                       </span>
                     </div>
@@ -97,22 +97,22 @@ export function TaskDetailModal({ task, tradeById, onEdit, onClose }: TaskDetail
                 {/* Metadata Indicators (Weekend, holiday, weather constraints) */}
                 <div className="flex flex-wrap gap-1.5">
                   {task.allowWeekend && (
-                    <span className="text-[9px] font-extrabold bg-indigo-50 border border-indigo-200 text-indigo-700 px-2 py-0.5 rounded-md leading-none">
+                    <span className="text-xs font-extrabold bg-indigo-50 border border-indigo-200 text-indigo-700 px-2 py-0.5 rounded-md leading-none">
                       Kørsel i weekender tilladt
                     </span>
                   )}
                   {task.allowHoliday && (
-                    <span className="text-[9px] font-extrabold bg-purple-50 border border-purple-200 text-purple-700 px-2 py-0.5 rounded-md leading-none">
+                    <span className="text-xs font-extrabold bg-purple-50 border border-purple-200 text-purple-700 px-2 py-0.5 rounded-md leading-none">
                       Arbejde på helligdage tilladt
                     </span>
                   )}
                   {task.weatherIndependent ? (
-                    <span className="text-[9px] font-extrabold bg-emerald-50 border border-emerald-200 text-emerald-700 px-2 py-0.5 rounded-md leading-none flex items-center gap-0.5">
+                    <span className="text-xs font-extrabold bg-emerald-50 border border-emerald-200 text-emerald-700 px-2 py-0.5 rounded-md leading-none flex items-center gap-0.5">
                       <Sun className="w-3 h-3 text-emerald-500" />
                       <span>Løbende uafhængig af uvejr</span>
                     </span>
                   ) : (
-                    <span className="text-[9px] font-extrabold bg-amber-50 border border-amber-200 text-amber-700 px-2 py-0.5 rounded-md leading-none flex items-center gap-0.5">
+                    <span className="text-xs font-extrabold bg-amber-50 border border-amber-200 text-amber-700 px-2 py-0.5 rounded-md leading-none flex items-center gap-0.5">
                       <CloudLightning className="w-3 h-3 text-amber-500" />
                       <span>Vejrfølsom opgave (Sættes på pause)</span>
                     </span>
