@@ -34,7 +34,7 @@ export function NewProjectDialog({ open, hasContent, onSaveFirst, onConfirm, onT
             : "Guiden hjælper dig i gang med et nyt projekt."}
         </p>
         <div className="flex flex-col gap-1.5" data-testid="template-list">
-          <span className="text-xs font-black text-slate-500">Eller start fra en skabelon</span>
+          <span className="text-xs font-black text-slate-600">Eller start fra en skabelon</span>
           {TEMPLATE_LIST.map((t) => (
             <button
               key={t.id}
@@ -43,7 +43,7 @@ export function NewProjectDialog({ open, hasContent, onSaveFirst, onConfirm, onT
               className="text-left px-3 py-2 rounded-lg border border-slate-200 hover:bg-slate-50 hover:border-slate-300 cursor-pointer"
             >
               <span className="block text-xs font-extrabold text-slate-800">{t.name}</span>
-              <span className="block text-xs text-slate-500 font-medium">{t.description}</span>
+              <span className="block text-xs text-slate-600 font-medium">{t.description}</span>
             </button>
           ))}
         </div>

@@ -48,7 +48,7 @@ export function ContextMenu({ menu, onEdit, onDuplicate, onDelete, onClose }: Pr
       style={{ left, top }}
       className="fixed z-[90] w-52 bg-white border border-slate-200 shadow-xl rounded-xl p-1.5 flex flex-col"
     >
-      <div className="px-3 py-1.5 text-xs font-bold text-slate-500 truncate">{menu.title}</div>
+      <div className="px-3 py-1.5 text-xs font-bold text-slate-600 truncate">{menu.title}</div>
       <button type="button" role="menuitem" className={`${item} text-slate-800 hover:bg-slate-100`} onClick={() => { onClose(); onEdit(menu.taskId); }}>
         <Pencil className="w-4 h-4 shrink-0" /> Rediger
       </button>

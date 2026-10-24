@@ -61,7 +61,7 @@ export function DayActionModal({
                     type="button"
                     onClick={() => setDayActionType("holiday")}
                     className={`flex-1 py-1.5 text-xs font-black rounded-md transition cursor-pointer ${
-                      dayActionType === "holiday" ? "bg-white text-slate-800 shadow-2xs" : "text-slate-500 hover:text-slate-800"
+                      dayActionType === "holiday" ? "bg-white text-slate-800 shadow-2xs" : "text-slate-600 hover:text-slate-800"
                     }`}
                   >
                     Lukkedag / Ferie
@@ -70,7 +70,7 @@ export function DayActionModal({
                     type="button"
                     onClick={() => setDayActionType("weather")}
                     className={`flex-1 py-1.5 text-xs font-black rounded-md transition cursor-pointer ${
-                      dayActionType === "weather" ? "bg-white text-slate-800 shadow-2xs" : "text-slate-500 hover:text-slate-800"
+                      dayActionType === "weather" ? "bg-white text-slate-800 shadow-2xs" : "text-slate-600 hover:text-slate-800"
                     }`}
                   >
                     Uvejr / Vejrforhold
@@ -80,7 +80,7 @@ export function DayActionModal({
                 {dayActionType === "holiday" ? (
                   <div className="flex flex-col gap-3">
                     <div className="flex flex-col gap-1">
-                      <label className="text-xs font-bold text-slate-500">Navngiv lukkedag / ferie</label>
+                      <label className="text-xs font-bold text-slate-600">Navngiv lukkedag / ferie</label>
                       <input
                         type="text"
                         value={dayHolidayName}
@@ -126,7 +126,7 @@ export function DayActionModal({
                 ) : (
                   <div className="flex flex-col gap-3">
                     <div className="flex flex-col gap-1">
-                      <label className="text-xs font-bold text-slate-500">Navngiv vejrforhold</label>
+                      <label className="text-xs font-bold text-slate-600">Navngiv vejrforhold</label>
                       <input
                         type="text"
                         value={dayWeatherLabel}
@@ -137,7 +137,7 @@ export function DayActionModal({
                     </div>
 
                     <div className="flex flex-col gap-1">
-                      <label className="text-xs font-bold text-slate-500">Slutdato for vejrforhold</label>
+                      <label className="text-xs font-bold text-slate-600">Slutdato for vejrforhold</label>
                       <input
                         type="date"
                         value={dayWeatherEnd}

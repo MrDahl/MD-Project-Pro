@@ -590,7 +590,7 @@ export function GanttChart({
       <div className="flex flex-col items-center justify-center p-12 text-center bg-white rounded-xl shadow-xs border border-slate-100">
         <Calendar className="w-12 h-12 text-slate-300 mb-3" />
         <h3 className="text-base font-semibold text-slate-700">Tidsplanen er tom</h3>
-        <p className="text-slate-500 text-sm max-w-sm mt-1">
+        <p className="text-slate-600 text-sm max-w-sm mt-1">
           Tryk på <strong>Opret ny opgave</strong> for at se Gantt-diagrammet her.
         </p>
       </div>
@@ -653,13 +653,13 @@ export function GanttChart({
         {timeMode && (
           <div className="absolute bottom-0 inset-x-0 h-3 pointer-events-none">
             {[6, 8, 10, 12, 14, 16].map((h) => (
-              <span key={h} style={{ left: `${((h * 60 - TIME_FROM) / (TIME_TO - TIME_FROM)) * 100}%` }} className="absolute -translate-x-1/2 text-xs font-bold text-slate-500">
+              <span key={h} style={{ left: `${((h * 60 - TIME_FROM) / (TIME_TO - TIME_FROM)) * 100}%` }} className="absolute -translate-x-1/2 text-xs font-bold text-slate-600">
                 {h}
               </span>
             ))}
           </div>
         )}
-        <span className="text-[8.5px] font-black text-slate-500 select-none">{MONTHS_SHORT[date.getUTCMonth()]}</span>
+        <span className="text-[8.5px] font-black text-slate-600 select-none">{MONTHS_SHORT[date.getUTCMonth()]}</span>
         <div className="flex items-center gap-0.5 mt-0.5 select-none font-black">
           <span className={`text-[12px] font-black ${isWe || isHol || isWeather ? "text-slate-900" : "text-slate-800"}`}>
             {date.getUTCDate()}
@@ -766,7 +766,7 @@ export function GanttChart({
               type="button"
               onClick={() => setFilterScope("all")}
               className={`px-3 py-1.5 text-xs font-extrabold rounded-md transition ${
-                filterScope === "all" ? "bg-white text-sky-700 shadow-xs" : "text-slate-500 hover:text-slate-800"
+                filterScope === "all" ? "bg-white text-sky-700 shadow-xs" : "text-slate-600 hover:text-slate-800"
               }`}
             >
               Hele projektet
@@ -775,7 +775,7 @@ export function GanttChart({
               type="button"
               onClick={() => setFilterScope("stage")}
               className={`px-3 py-1.5 text-xs font-extrabold rounded-md transition ${
-                filterScope === "stage" ? "bg-white text-sky-700 shadow-xs" : "text-slate-500 hover:text-slate-800"
+                filterScope === "stage" ? "bg-white text-sky-700 shadow-xs" : "text-slate-600 hover:text-slate-800"
               }`}
             >
               Etape
@@ -784,7 +784,7 @@ export function GanttChart({
               type="button"
               onClick={() => setFilterScope("month")}
               className={`px-3 py-1.5 text-xs font-extrabold rounded-md transition ${
-                filterScope === "month" ? "bg-white text-sky-700 shadow-xs" : "text-slate-500 hover:text-slate-800"
+                filterScope === "month" ? "bg-white text-sky-700 shadow-xs" : "text-slate-600 hover:text-slate-800"
               }`}
             >
               Måned
@@ -793,7 +793,7 @@ export function GanttChart({
               type="button"
               onClick={() => setFilterScope("year")}
               className={`px-3 py-1.5 text-xs font-extrabold rounded-md transition ${
-                filterScope === "year" ? "bg-white text-sky-700 shadow-xs" : "text-slate-500 hover:text-slate-800"
+                filterScope === "year" ? "bg-white text-sky-700 shadow-xs" : "text-slate-600 hover:text-slate-800"
               }`}
             >
               År
@@ -803,7 +803,7 @@ export function GanttChart({
           {/* Conditional Sub-selectors based on focusing choice */}
           {filterScope === "stage" && stages && stages.length > 0 && (
             <div className="flex items-center gap-1.5">
-              <span className="text-xs text-slate-500 font-extrabold">Etape:</span>
+              <span className="text-xs text-slate-600 font-extrabold">Etape:</span>
               <select
                 value={selectedStageId}
                 onChange={(e) => setSelectedStageId(e.target.value)}
@@ -820,7 +820,7 @@ export function GanttChart({
 
           {filterScope === "month" && availableMonths.length > 0 && (
             <div className="flex items-center gap-1.5">
-              <span className="text-xs text-slate-500 font-extrabold">Måned:</span>
+              <span className="text-xs text-slate-600 font-extrabold">Måned:</span>
               <select
                 value={selectedMonthStr}
                 onChange={(e) => setSelectedMonthStr(e.target.value)}
@@ -837,7 +837,7 @@ export function GanttChart({
 
           {filterScope === "year" && availableYears.length > 0 && (
             <div className="flex items-center gap-1.5">
-              <span className="text-xs text-slate-500 font-extrabold">År:</span>
+              <span className="text-xs text-slate-600 font-extrabold">År:</span>
               <select
                 value={selectedYearVal}
                 onChange={(e) => setSelectedYearVal(Number(e.target.value))}
@@ -889,7 +889,7 @@ export function GanttChart({
                 <span>Hent som HTML</span>
               </button>
               <div className="my-1 border-t border-slate-100" />
-              <div className="px-3 pt-1 pb-0.5 flex items-center gap-1.5 text-xs font-bold text-slate-500">
+              <div className="px-3 pt-1 pb-0.5 flex items-center gap-1.5 text-xs font-bold text-slate-600">
                 <span>Baseline</span>
                 <HelpTip label="Hjælp: baseline" text="Et øjebliksbillede af planen. Når du ændrer planen senere, kan du se afvigelsen som en grå skygge bag bjælkerne." />
               </div>
@@ -961,7 +961,7 @@ export function GanttChart({
           )}
           <label className="flex items-center gap-1.5 text-sm font-bold text-slate-700 cursor-pointer">
             <input type="checkbox" checked={showArrows} onChange={(e) => setShowArrows(e.target.checked)} className="accent-sky-600 w-4 h-4" />
-            <Link2 className="w-3.5 h-3.5 text-slate-500" />
+            <Link2 className="w-3.5 h-3.5 text-slate-600" />
             <span>Vis afhængigheder</span>
           </label>
           <HelpTip label="Hjælp: afhængigheder" text="Pilene viser, hvilke opgaver der venter på hinanden. Røde bjælker ligger på den kritiske vej: bliver de forsinket, rykker projektets slutdato." />
@@ -1030,7 +1030,7 @@ export function GanttChart({
               <div className="w-11 shrink-0 sticky left-0 z-40 bg-slate-100 border-r border-slate-250 text-slate-650 p-1 flex items-center justify-center shadow-xs">
                 <button
                   onClick={() => setColumnCollapsed(false)}
-                  className="p-1 text-slate-500 hover:text-slate-800 rounded hover:bg-slate-200 transition cursor-pointer"
+                  className="p-1 text-slate-600 hover:text-slate-800 rounded hover:bg-slate-200 transition cursor-pointer"
                   title="Vis opgavekolonne"
                 >
                   <ChevronRight className="w-4 h-4 shrink-0" />
@@ -1041,7 +1041,7 @@ export function GanttChart({
                 <span>Opgave</span>
                 <button
                   onClick={() => setColumnCollapsed(true)}
-                  className="p-1 text-slate-500 hover:text-slate-800 rounded hover:bg-slate-200 transition cursor-pointer"
+                  className="p-1 text-slate-600 hover:text-slate-800 rounded hover:bg-slate-200 transition cursor-pointer"
                   title="Skjul opgavekolonne"
                 >
                   <ChevronLeft className="w-4 h-4 shrink-0" />
@@ -1108,7 +1108,7 @@ export function GanttChart({
       </div>
 
       {/* Visual Color Codes Footer Legend */}
-      <div className="flex flex-wrap gap-x-5 gap-y-2.5 text-xs font-bold text-slate-500 mt-2 p-3 bg-slate-50 rounded-lg border border-slate-200/55 select-none md:items-center">
+      <div className="flex flex-wrap gap-x-5 gap-y-2.5 text-xs font-bold text-slate-600 mt-2 p-3 bg-slate-50 rounded-lg border border-slate-200/55 select-none md:items-center">
         <div className="flex items-center gap-1.5">
           <span className="w-3.5 h-3.5 rounded bg-amber-500/10 border border-amber-300 flex items-center justify-center text-xs shrink-0"><Lightbulb className="w-3 h-3 text-amber-600" /></span>
           <span>Tip: Træk bjælken for at rykke startdato. Træk i højre kant for at forlænge varigheden.</span>
@@ -1118,7 +1118,7 @@ export function GanttChart({
           <span>I dag</span>
         </div>
         <div className="flex items-center gap-1.5">
-          <span className="text-slate-500 font-black leading-none shrink-0">⤷</span>
+          <span className="text-slate-600 font-black leading-none shrink-0">⤷</span>
           <span>Afhængighed (pil fra forgænger til opgave)</span>
         </div>
         <div className="flex items-center gap-1.5">

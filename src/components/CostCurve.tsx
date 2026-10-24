@@ -5,10 +5,11 @@ import { dayNumber, dayToStr } from "../utils/scheduler";
 
 const W = 640;
 const H = 260;
-const M = { l: 64, r: 16, t: 14, b: 30 };
+const M = { l: 72, r: 16, t: 14, b: 34 };
 const MONTHS = ["jan", "feb", "mar", "apr", "maj", "jun", "jul", "aug", "sep", "okt", "nov", "dec"];
 
 const kr = (n: number) => Math.round(n).toLocaleString("da-DK");
+const axisLabel = (n: number) => (n >= 1e6 ? `${(n / 1e6).toLocaleString("da-DK", { maximumFractionDigits: 1 })} mio.` : kr(n));
 
 /** Rounds `max` up to a "nice" axis maximum and returns the tick step. */
 function niceScale(max: number): { top: number; step: number } {
@@ -35,7 +36,7 @@ export function CostCurve({ tasks, baseline }: { tasks: Task[]; baseline?: Basel
   }, [tasks, baseline]);
 
   if (!chart) {
-    return <p className="text-xs text-slate-500 font-medium">Kurven vises, når der er opgaver med omkostninger.</p>;
+    return <p className="text-xs text-slate-600 font-medium">Kurven vises, når der er opgaver med omkostninger.</p>;
   }
 
   const { lo, hi, curve, baseCurve, scale } = chart;
@@ -76,13 +77,13 @@ export function CostCurve({ tasks, baseline }: { tasks: Task[]; baseline?: Basel
         {yTicks.map((v) => (
           <g key={v}>
             <line x1={M.l} x2={W - M.r} y1={y(v)} y2={y(v)} stroke="#e2e8f0" strokeWidth="1" />
-            <text x={M.l - 8} y={y(v) + 3.5} textAnchor="end" fontSize="10" fill="#64748b" fontFamily="monospace">
-              {kr(v)}
+            <text x={M.l - 8} y={y(v) + 3.5} textAnchor="end" fontSize="15" fill="#475569">
+              {axisLabel(v)}
             </text>
           </g>
         ))}
         {xTicks.map((t) => (
-          <text key={t.day} x={x(t.day)} y={H - 10} textAnchor="middle" fontSize="10" fill="#64748b">
+          <text key={t.day} x={x(t.day)} y={H - 10} textAnchor="middle" fontSize="15" fill="#475569">
             {t.label}
           </text>
         ))}
@@ -97,7 +98,7 @@ export function CostCurve({ tasks, baseline }: { tasks: Task[]; baseline?: Basel
         {baseCurve && <polyline points={points(baseCurve.values)} fill="none" stroke="#94a3b8" strokeWidth="2" strokeDasharray="6 4" strokeLinejoin="round" />}
         <polyline points={points(curve.values)} fill="none" stroke="#0f172a" strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />
       </svg>
-      <figcaption className="flex flex-wrap gap-x-5 gap-y-1 text-xs font-bold text-slate-500">
+      <figcaption className="flex flex-wrap gap-x-5 gap-y-1 text-xs font-bold text-slate-600">
         <span className="flex items-center gap-1.5">
           <span className="w-5 h-0.5 bg-slate-900 rounded" /> Nuværende plan
         </span>

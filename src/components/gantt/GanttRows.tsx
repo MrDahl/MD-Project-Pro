@@ -68,7 +68,7 @@ export const GanttStageRow = memo(function GanttStageRow({
               aria-label={`${collapsed ? "Fold ud" : "Fold sammen"}: ${stage.name}`}
               title={collapsed ? `Vis ${taskCount} opgaver` : "Skjul opgaverne i denne etape"}
               onClick={() => onToggle(stage.id)}
-              className="p-0.5 -ml-1 rounded hover:bg-slate-200 text-slate-500 cursor-pointer shrink-0"
+              className="p-0.5 -ml-1 rounded hover:bg-slate-200 text-slate-600 cursor-pointer shrink-0"
             >
               {collapsed ? <ChevronRight className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
             </button>
@@ -77,7 +77,7 @@ export const GanttStageRow = memo(function GanttStageRow({
               {stage.name}
             </span>
           </div>
-          <span className="text-xs font-bold text-slate-500 mt-1 pl-4 leading-none">
+          <span className="text-xs font-bold text-slate-600 mt-1 pl-4 leading-none">
             {collapsed ? `${taskCount} opgaver skjult` : "Etape / Fase"}
           </span>
         </div>
@@ -196,14 +196,14 @@ export const GanttTaskRow = memo(function GanttTaskRow({
           title="Klik for at se opgavedetaljer"
         >
           <div className="flex items-center gap-1.5 min-w-0">
-            <span className="text-xs font-extrabold text-slate-500 shrink-0">{number}.</span>
+            <span className="text-xs font-extrabold text-slate-600 shrink-0">{number}.</span>
             <span className={`text-xs font-black leading-tight truncate ${task.isCritical ? "text-red-650" : "text-slate-700"}`}>
               {task.title}
             </span>
             {task.isCritical && <Flame className="w-3.5 h-3.5 text-red-500 fill-red-500 shrink-0 inline ml-1" />}
           </div>
           <div className="flex items-center gap-1.5 flex-wrap mt-1">
-            <span className="text-xs text-slate-500 font-bold truncate leading-none">
+            <span className="text-xs text-slate-600 font-bold truncate leading-none">
               {task.tradeIds && task.tradeIds.length > 0
                 ? task.tradeIds
                     .map((tid) => tradeById.get(tid)?.name || "")
@@ -373,7 +373,7 @@ export const GanttTaskRow = memo(function GanttTaskRow({
             className="absolute text-xs font-black text-slate-700 whitespace-nowrap z-15 pointer-events-none drop-shadow-xs flex items-center gap-1.5 bg-white/90 border border-slate-200/50 py-1 px-2.5 rounded-full shadow-2xs"
           >
             <span className={`font-black ${task.isCritical ? "text-red-650" : "text-slate-800"}`}>{task.title}</span>
-            <span className="text-slate-500 font-bold">({task.durationHours ? `${task.durationHours.toLocaleString("da-DK")}t` : `${task.duration}d`})</span>
+            <span className="text-slate-600 font-bold">({task.durationHours ? `${task.durationHours.toLocaleString("da-DK")}t` : `${task.duration}d`})</span>
             {deviation !== null && deviation !== undefined && deviation !== 0 && (
               <span className={`font-black ${deviation > 0 ? "text-red-600" : "text-emerald-600"}`} title="Afvigelse fra baseline (kalenderdage)">
                 {deviation > 0 ? `+${deviation}` : deviation}d

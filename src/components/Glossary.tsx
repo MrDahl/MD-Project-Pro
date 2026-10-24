@@ -77,7 +77,7 @@ export function Glossary({ onTriggerWizard }: GlossaryProps) {
         </div>
         <div>
           <h3 className="text-base font-bold text-slate-800">Projektledelsens Vidensbase</h3>
-          <p className="text-xs text-slate-500">Forklaringer og faglige begreber beskrevet på en letforståelig måde</p>
+          <p className="text-xs text-slate-600">Forklaringer og faglige begreber beskrevet på en letforståelig måde</p>
         </div>
       </div>
 
@@ -96,7 +96,7 @@ export function Glossary({ onTriggerWizard }: GlossaryProps) {
                     : "bg-white hover:bg-slate-50 border-slate-200 text-slate-700"
                 }`}
               >
-                <IconComp className={`w-4 h-4 shrink-0 ${activeIdx === i ? "text-amber-400" : "text-slate-500"}`} />
+                <IconComp className={`w-4 h-4 shrink-0 ${activeIdx === i ? "text-amber-400" : "text-slate-600"}`} />
                 <span>{term.title}</span>
               </button>
             );
@@ -106,7 +106,7 @@ export function Glossary({ onTriggerWizard }: GlossaryProps) {
         {/* Selected Term detail panel */}
         <div className="md:col-span-8 flex flex-col gap-3.5 bg-slate-50 p-4 rounded-xl border border-slate-100 leading-relaxed text-xs">
           <div>
-            <span className="text-xs font-bold text-slate-500">Faglig Definition:</span>
+            <span className="text-xs font-bold text-slate-600">Faglig Definition:</span>
             <p className="text-slate-900 font-bold text-sm mt-0.5">{TERMS[activeIdx].definition}</p>
           </div>
 
@@ -126,7 +126,7 @@ export function Glossary({ onTriggerWizard }: GlossaryProps) {
           <div className="md:col-span-12 border-t border-slate-200/60 pt-4 mt-2 flex flex-col sm:flex-row items-center justify-between gap-3 p-4 bg-slate-50/70 rounded-xl border border-slate-200/80">
             <div className="text-left">
               <span className="font-extrabold text-slate-800 text-xs block">Har du brug for en hurtig introduktion?</span>
-              <p className="text-xs text-slate-500 mt-0.5">Du kan genstarte opsætnings-guiden (Wizard) for at slette dine kladder og sætte et nyt projekt op fra bunden.</p>
+              <p className="text-xs text-slate-600 mt-0.5">Du kan genstarte opsætnings-guiden (Wizard) for at slette dine kladder og sætte et nyt projekt op fra bunden.</p>
             </div>
             <button
               onClick={onTriggerWizard}

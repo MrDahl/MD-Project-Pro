@@ -1,3 +1,4 @@
+import { CostRows, groupCostRows } from "./CostRows";
 import { useState } from "react";
 import { Users } from "lucide-react";
 import type { Stage, Task, Trade } from "../types";
@@ -24,7 +25,7 @@ export function ResourceReport({ tasks, trades, stages, workHoursPerDay }: Props
 
   return (
     <div className="flex flex-col gap-3" data-testid="resource-report">
-      <h4 className="text-xs font-bold text-slate-500 border-b border-slate-100 pb-1 flex items-center gap-1">
+      <h4 className="text-xs font-bold text-slate-600 border-b border-slate-100 pb-1 flex items-center gap-1">
         <Users className="w-3.5 h-3.5" />
         <span>Overblik pr. faggruppe</span>
       </h4>
@@ -51,14 +52,14 @@ export function ResourceReport({ tasks, trades, stages, workHoursPerDay }: Props
           <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: trade.color }} />
           {trade.name}
         </span>
-        <span data-testid="resource-total" className="font-black font-mono text-slate-900">
+        <span data-testid="resource-total" className="font-black tabular-nums text-slate-900">
           {kr(rep.total)}
         </span>
       </div>
 
       {rep.byRole.length > 0 && (
         <div className="flex flex-col gap-1.5">
-          <div className="grid grid-cols-[1fr_70px_80px_100px] gap-2 text-xs font-black text-slate-500 px-2.5">
+          <div className="grid grid-cols-[1fr_70px_80px_100px] gap-2 text-xs font-black text-slate-600 px-2.5">
             <span>Rolle</span>
             <span className="text-right">Timer</span>
             <span className="text-right">Mandedage</span>
@@ -67,11 +68,11 @@ export function ResourceReport({ tasks, trades, stages, workHoursPerDay }: Props
           {rep.byRole.map((r) => (
             <div key={r.roleId} data-testid="role-cost" className="grid grid-cols-[1fr_70px_80px_100px] gap-2 text-xs p-2.5 bg-white border border-slate-200 rounded-xl">
               <span className="font-bold text-slate-700 truncate">
-                {r.name} <span className="text-slate-500 font-semibold">(har {r.count})</span>
+                {r.name} <span className="text-slate-600 font-semibold">(har {r.count})</span>
               </span>
-              <span className="text-right font-mono text-slate-600">{Math.round(r.hours).toLocaleString("da-DK")}</span>
-              <span className="text-right font-mono text-slate-600">{days(r.hours).toLocaleString("da-DK", { maximumFractionDigits: 1 })}</span>
-              <span className="text-right font-mono font-extrabold text-slate-800">{kr(r.cost)}</span>
+              <span className="text-right tabular-nums text-slate-600">{Math.round(r.hours).toLocaleString("da-DK")}</span>
+              <span className="text-right tabular-nums text-slate-600">{days(r.hours).toLocaleString("da-DK", { maximumFractionDigits: 1 })}</span>
+              <span className="text-right tabular-nums font-extrabold text-slate-800">{kr(r.cost)}</span>
             </div>
           ))}
         </div>
@@ -79,33 +80,29 @@ export function ResourceReport({ tasks, trades, stages, workHoursPerDay }: Props
 
       {rep.byActivity.length > 0 && (
         <div className="flex flex-col gap-1.5">
-          <span className="text-xs font-black text-slate-500 px-0.5">Aktiviteter</span>
+          <span className="text-xs font-black text-slate-600 px-0.5">Aktiviteter</span>
           {rep.byActivity.map((a) => (
             <div key={a.label} className="flex justify-between text-xs p-2.5 bg-white border border-slate-200 rounded-xl">
               <span className="font-semibold text-slate-700 truncate">
-                {a.label} <span className="text-slate-500">({a.tasks} opgaver)</span>
+                {a.label} <span className="text-slate-600">({a.tasks} opgaver)</span>
               </span>
-              <span className="font-mono font-extrabold text-slate-800">{kr(a.cost)}</span>
+              <span className="tabular-nums font-extrabold text-slate-800">{kr(a.cost)}</span>
             </div>
           ))}
         </div>
       )}
 
       {rep.unstaffed > 0.5 && rep.byRole.length > 0 && (
-        <div className="text-xs text-slate-500 font-semibold">Ubemandede opgaver (standardtakst): {kr(rep.unstaffed)}</div>
+        <div className="text-xs text-slate-600 font-semibold">Ubemandede opgaver (standardtakst): {kr(rep.unstaffed)}</div>
       )}
 
       <div className="flex flex-col gap-1.5">
-        <span className="text-xs font-black text-slate-500 px-0.5">Opgaver ({rep.byTask.length})</span>
-        <div className="flex flex-col gap-1.5 max-h-[240px] overflow-y-auto">
-          {rep.byTask.length === 0 && <span className="text-xs text-slate-500 font-medium">Ingen opgaver for denne faggruppe i valgt omfang.</span>}
-          {rep.byTask.map((t) => (
-            <div key={t.id} className="flex justify-between text-xs p-2 bg-slate-50 border border-slate-200 rounded-lg">
-              <span className="truncate max-w-[70%] text-slate-700 font-semibold">{t.title}</span>
-              <span className="font-mono font-bold text-slate-800">{kr(t.cost)}</span>
-            </div>
-          ))}
-        </div>
+        <span className="text-xs font-black text-slate-600 px-0.5">Opgaver ({rep.byTask.length}), dyreste først</span>
+        {rep.byTask.length === 0 ? (
+          <span className="text-xs text-slate-600 font-medium">Ingen opgaver for denne faggruppe i valgt omfang.</span>
+        ) : (
+          <CostRows rows={groupCostRows(rep.byTask.map((t) => ({ id: t.id, title: t.title, cost: t.cost })))} />
+        )}
       </div>
     </div>
   );

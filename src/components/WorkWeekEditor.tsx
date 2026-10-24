@@ -36,21 +36,21 @@ function DayRow({ label, day, offLabel, onChange }: { label: string; day: DaySch
         {day ? (
           <>
             <input type="time" aria-label={`${label} start`} value={formatTime(day.start)} onChange={setTime((m) => ({ start: m }))} className={timeInput} />
-            <span className="text-slate-500 text-xs">til</span>
+            <span className="text-slate-600 text-xs">til</span>
             <input type="time" aria-label={`${label} slut`} value={formatTime(day.end)} onChange={setTime((m) => ({ end: m }))} className={timeInput} />
-            <span className="text-xs font-bold text-slate-500 ml-auto" data-testid="day-hours">
+            <span className="text-xs font-bold text-slate-600 ml-auto" data-testid="day-hours">
               {fmtHours(hoursOfDay(day))} t
             </span>
           </>
         ) : (
-          <span className="text-xs text-slate-500 font-semibold">{offLabel ?? "Fri"}</span>
+          <span className="text-xs text-slate-600 font-semibold">{offLabel ?? "Fri"}</span>
         )}
       </div>
       {day && (
         <div className="flex flex-col gap-1.5 pl-1">
           {day.breaks.map((b, i) => (
             <div key={i} className="flex items-center gap-1.5">
-              <span className="text-xs font-bold text-slate-500 w-10">Pause</span>
+              <span className="text-xs font-bold text-slate-600 w-10">Pause</span>
               <input
                 type="time"
                 aria-label={`${label} pause start`}
@@ -61,7 +61,7 @@ function DayRow({ label, day, offLabel, onChange }: { label: string; day: DaySch
                 }}
                 className={timeInput}
               />
-              <span className="text-slate-500 text-xs">til</span>
+              <span className="text-slate-600 text-xs">til</span>
               <input
                 type="time"
                 aria-label={`${label} pause slut`}

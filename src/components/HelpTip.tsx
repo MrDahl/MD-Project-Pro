@@ -45,7 +45,7 @@ export function HelpTip({ text, label, link = true }: HelpTipProps) {
           e.stopPropagation();
           setOpen(!open);
         }}
-        className="text-slate-500 hover:text-sky-700 cursor-pointer p-1 -m-1 rounded-full"
+        className="text-slate-600 hover:text-sky-700 cursor-pointer p-1 -m-1 rounded-full"
       >
         <HelpCircle className="w-4 h-4" />
       </button>

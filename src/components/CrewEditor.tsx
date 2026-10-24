@@ -20,11 +20,11 @@ export function CrewEditor({ trades, assignments, onChange }: Props) {
   return (
     <div className="flex flex-col gap-3 bg-slate-50 p-3 rounded-lg border border-slate-200" data-testid="crew-editor">
       <div>
-        <label className="text-xs font-bold text-slate-500 flex items-center gap-1">
-          <HardHat className="w-3.5 h-3.5 text-slate-500" />
+        <label className="text-xs font-bold text-slate-600 flex items-center gap-1">
+          <HardHat className="w-3.5 h-3.5 text-slate-600" />
           <span>Bemanding pr. aktivitet</span>
         </label>
-        <p className="text-xs text-slate-500 font-medium leading-relaxed mt-1">
+        <p className="text-xs text-slate-600 font-medium leading-relaxed mt-1">
           Del opgaven op i aktiviteter og vælg hvem der udfører dem. Prisen beregnes ud fra rollernes timepriser i stedet for faggruppens standardtakst.
         </p>
       </div>
@@ -67,7 +67,7 @@ export function CrewEditor({ trades, assignments, onChange }: Props) {
                       className={`${input} w-16`}
                     />
                   )}
-                  <button type="button" aria-label="Fjern aktivitet" onClick={() => onChange(assignments.filter((x) => x.id !== a.id))} className="p-1.5 rounded-lg text-slate-500 hover:text-red-600 hover:bg-red-50 cursor-pointer">
+                  <button type="button" aria-label="Fjern aktivitet" onClick={() => onChange(assignments.filter((x) => x.id !== a.id))} className="p-1.5 rounded-lg text-slate-600 hover:text-red-600 hover:bg-red-50 cursor-pointer">
                     <Trash2 className="w-4 h-4" />
                   </button>
                 </div>
@@ -105,7 +105,7 @@ export function CrewEditor({ trades, assignments, onChange }: Props) {
                   >
                     <Plus className="w-3 h-3" /> Tilføj person
                   </button>
-                  <span className="text-xs font-bold text-slate-500">
+                  <span className="text-xs font-bold text-slate-600">
                     {a.hours !== undefined
                       ? `${Math.round(crewHourly(a, tr.roles) * a.hours).toLocaleString("da-DK")} kr. i alt`
                       : `${Math.round(crewHourly(a, tr.roles) * ((a.percent ?? 100) / 100)).toLocaleString("da-DK")} kr./t`}

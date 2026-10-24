@@ -18,16 +18,16 @@ export function RolesEditor({ roles, onChange }: Props) {
   const total = roles.reduce((s, r) => s + r.rate * r.count, 0);
   return (
     <div className="flex flex-col gap-2" data-testid="roles-editor">
-      <label className="text-xs font-bold text-slate-500 flex items-center gap-1">
-        <Users className="w-3.5 h-3.5 text-slate-500" />
+      <label className="text-xs font-bold text-slate-600 flex items-center gap-1">
+        <Users className="w-3.5 h-3.5 text-slate-600" />
         <span>Underressourcer (medarbejdere)</span>
       </label>
-      <p className="text-xs text-slate-500 font-medium leading-relaxed">
+      <p className="text-xs text-slate-600 font-medium leading-relaxed">
         Fx 1 overmontør, 2 svende og 3 lærlinge med hver sin timepris. På opgaverne kan du så bemande hver aktivitet (kabeltræk, rillefræsning ...) og få prisen pr. rolle.
       </p>
       {roles.length > 0 && (
         <div className="bg-slate-50 border border-slate-100 rounded-lg p-2.5 flex flex-col gap-1.5">
-          <div className="grid grid-cols-[1fr_64px_88px_32px] gap-1.5 text-xs font-black text-slate-500 px-0.5">
+          <div className="grid grid-cols-[1fr_64px_88px_32px] gap-1.5 text-xs font-black text-slate-600 px-0.5">
             <span>Rolle</span>
             <span>Antal</span>
             <span>kr./t pr. person</span>
@@ -39,7 +39,7 @@ export function RolesEditor({ roles, onChange }: Props) {
               <input aria-label="Rollenavn" value={r.name} onChange={(e) => update(r.id, { name: e.target.value })} placeholder="Svend" className={input} />
               <input aria-label="Antal" type="number" min={1} value={r.count} onChange={(e) => update(r.id, { count: Math.max(1, parseInt(e.target.value) || 1) })} className={input} />
               <input aria-label="Timepris" type="number" min={0} value={r.rate} onChange={(e) => update(r.id, { rate: Math.max(0, parseInt(e.target.value) || 0) })} className={input} />
-              <button type="button" aria-label="Fjern rolle" onClick={() => onChange(roles.filter((x) => x.id !== r.id))} className="p-1.5 rounded-lg text-slate-500 hover:text-red-600 hover:bg-red-50 cursor-pointer">
+              <button type="button" aria-label="Fjern rolle" onClick={() => onChange(roles.filter((x) => x.id !== r.id))} className="p-1.5 rounded-lg text-slate-600 hover:text-red-600 hover:bg-red-50 cursor-pointer">
                 <Trash2 className="w-4 h-4" />
               </button>
             </div>
@@ -54,7 +54,7 @@ export function RolesEditor({ roles, onChange }: Props) {
               {open === r.id && <WorkWeekEditor week={r.workWeek} onChange={(w) => update(r.id, { workWeek: w })} plainLabel="Som faggruppen" />}
             </div>
           ))}
-          <div className="text-xs font-bold text-slate-500 pt-1 border-t border-slate-200">
+          <div className="text-xs font-bold text-slate-600 pt-1 border-t border-slate-200">
             Hele holdet: {roles.reduce((s, r) => s + r.count, 0)} personer &middot; {total.toLocaleString("da-DK")} kr./t
           </div>
         </div>

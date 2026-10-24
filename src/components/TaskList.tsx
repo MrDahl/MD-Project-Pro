@@ -94,7 +94,7 @@ export function TaskList({ tasks, trades, stages, stageById, tradeById, onNew, o
     <div className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center gap-2 bg-white border border-slate-200 rounded-xl p-3 shadow-2xs">
         <div className="relative flex-1 min-w-[180px]">
-          <Search className="w-4 h-4 text-slate-500 absolute left-2.5 top-1/2 -translate-y-1/2" />
+          <Search className="w-4 h-4 text-slate-600 absolute left-2.5 top-1/2 -translate-y-1/2" />
           <input
             type="search"
             value={filter.query}
@@ -133,18 +133,19 @@ export function TaskList({ tasks, trades, stages, stageById, tradeById, onNew, o
       </div>
 
       <div className="flex items-center justify-between gap-2 px-1">
-        <h3 className="text-xs md:text-xs font-bold text-slate-500" data-testid="task-count">
+        <h3 className="text-xs md:text-xs font-bold text-slate-600" data-testid="task-count">
           {active ? `Viser ${items.length} af ${tasks.length} opgaver` : `Opgaver (${tasks.length})`}
         </h3>
         <div className="flex items-center gap-2">
         <button
           type="button"
           data-testid="print-list"
+          aria-label="Print liste"
           onClick={() => window.print()}
           className="border font-extrabold text-xs py-2 px-3 rounded-lg cursor-pointer flex items-center gap-1 min-h-[34px] bg-white hover:bg-slate-100 border-slate-200 text-slate-700 print:hidden"
         >
           <Printer className="w-3.5 h-3.5" />
-          <span>Print liste</span>
+          <span className="hidden sm:inline">Print liste</span>
         </button>
         <button
           type="button"
@@ -156,7 +157,7 @@ export function TaskList({ tasks, trades, stages, stageById, tradeById, onNew, o
           }`}
         >
           <CheckSquare className="w-3.5 h-3.5" />
-          <span>Vælg flere</span>
+          <span className="whitespace-nowrap">Vælg flere</span>
         </button>
         <button
           type="button"
@@ -189,13 +190,13 @@ export function TaskList({ tasks, trades, stages, stageById, tradeById, onNew, o
 
 
       {tasks.length === 0 ? (
-        <div className="bg-white border border-dashed border-slate-200 p-8 md:p-12 text-center rounded-xl text-xs text-slate-500 flex flex-col items-center justify-center">
+        <div className="bg-white border border-dashed border-slate-200 p-8 md:p-12 text-center rounded-xl text-xs text-slate-600 flex flex-col items-center justify-center">
           <ListChecks className="w-10 h-10 text-slate-200 mb-2" />
-          <p className="font-semibold text-slate-500">Intet planlagt endnu</p>
-          <p className="text-xs text-slate-500 mt-1 max-w-xs leading-relaxed">Tryk på "Ny opgave" og angiv faggrupper og varighed for at se dem her.</p>
+          <p className="font-semibold text-slate-600">Intet planlagt endnu</p>
+          <p className="text-xs text-slate-600 mt-1 max-w-xs leading-relaxed">Tryk på "Ny opgave" og angiv faggrupper og varighed for at se dem her.</p>
         </div>
       ) : items.length === 0 ? (
-        <div className="bg-white border border-dashed border-slate-200 p-8 text-center rounded-xl text-xs text-slate-500 font-semibold">
+        <div className="bg-white border border-dashed border-slate-200 p-8 text-center rounded-xl text-xs text-slate-600 font-semibold">
           Ingen opgaver matcher dit filter.
         </div>
       ) : (
@@ -206,7 +207,7 @@ export function TaskList({ tasks, trades, stages, stageById, tradeById, onNew, o
                 <h4 className="flex items-center gap-1.5 text-xs font-black text-slate-700 mt-2 px-1">
                   <Layers className="w-3.5 h-3.5" style={{ color: g.stage?.color ?? "#94a3b8" }} />
                   {g.stage ? g.stage.name : "Uden etape"}
-                  <span className="text-slate-500 font-bold">({g.rows.length})</span>
+                  <span className="text-slate-600 font-bold">({g.rows.length})</span>
                 </h4>
               )}
               {g.rows.map(({ task, number }) => (

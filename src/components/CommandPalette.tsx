@@ -47,7 +47,7 @@ export function CommandPalette({ items, onPick, onClose }: Props) {
     <div className="fixed inset-0 z-[100] bg-slate-900/40 flex items-start justify-center pt-[12vh] px-3" onMouseDown={onClose} data-testid="palette">
       <div className="w-full max-w-xl bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden" onMouseDown={(e) => e.stopPropagation()}>
         <div className="flex items-center gap-2 px-4 border-b border-slate-200">
-          <Search className="w-5 h-5 text-slate-500 shrink-0" />
+          <Search className="w-5 h-5 text-slate-600 shrink-0" />
           <input
             ref={inputRef}
             data-testid="palette-input"
@@ -58,10 +58,10 @@ export function CommandPalette({ items, onPick, onClose }: Props) {
             aria-label="Søg efter opgave eller fane"
             className="flex-1 py-4 text-base font-medium text-slate-800 outline-none bg-transparent"
           />
-          <kbd className="hidden sm:block text-xs text-slate-500 border border-slate-300 rounded px-1.5 py-0.5">Esc</kbd>
+          <kbd className="hidden sm:block text-xs text-slate-600 border border-slate-300 rounded px-1.5 py-0.5">Esc</kbd>
         </div>
         <ul className="max-h-[50vh] overflow-y-auto p-1.5" role="listbox">
-          {shown.length === 0 && <li className="px-3 py-6 text-center text-sm text-slate-500">Ingen resultater</li>}
+          {shown.length === 0 && <li className="px-3 py-6 text-center text-sm text-slate-600">Ingen resultater</li>}
           {shown.map((it, i) => (
             <li key={it.kind + it.id} role="option" aria-selected={i === idx}>
               <button
@@ -71,9 +71,9 @@ export function CommandPalette({ items, onPick, onClose }: Props) {
                 onClick={() => onPick(it)}
                 className={`w-full flex items-center gap-3 px-3 py-2.5 min-h-[44px] rounded-lg text-left cursor-pointer ${i === idx ? "bg-sky-50" : ""}`}
               >
-                {it.kind === "tab" ? <CalendarDays className="w-4 h-4 text-slate-500 shrink-0" /> : <ListChecks className="w-4 h-4 text-slate-500 shrink-0" />}
+                {it.kind === "tab" ? <CalendarDays className="w-4 h-4 text-slate-600 shrink-0" /> : <ListChecks className="w-4 h-4 text-slate-600 shrink-0" />}
                 <span className="flex-1 min-w-0 truncate text-sm font-bold text-slate-800">{it.label}</span>
-                <span className="text-xs text-slate-500 shrink-0">{it.hint}</span>
+                <span className="text-xs text-slate-600 shrink-0">{it.hint}</span>
               </button>
             </li>
           ))}

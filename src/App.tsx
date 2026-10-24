@@ -25,10 +25,11 @@ import { NewProjectDialog } from "./components/NewProjectDialog";
 import { useProject } from "./state/useProject";
 import { BACKUP_KEY, WIZARD_KEY, looksLikeProject, normalizeProject, readNumber, writeFlag } from "./state/project";
 import { GOTO_TAB_EVENT } from "./components/HelpTip";
+import { CostRows, groupCostRows } from "./components/CostRows";
 import { EmptyState } from "./components/EmptyState";
 import { ContextMenu, type ContextMenuState } from "./components/ContextMenu";
 import { CommandPalette, type PaletteItem } from "./components/CommandPalette";
-import { Printer, Trash2, ListChecks, CalendarDays, UsersRound, DollarSign, Settings as SettingsIcon, Info, XCircle, Pencil, PlusCircle, HelpCircle, FolderKanban, Menu, X, HardHat, ClipboardList } from "lucide-react";
+import { Printer, Trash2, ListChecks, CalendarDays, UsersRound, DollarSign, Settings as SettingsIcon, Info, XCircle, Pencil, PlusCircle, HelpCircle, FolderKanban, HardHat, ClipboardList } from "lucide-react";
 
 // Rarely used views are loaded on demand to keep the first load small
 const Glossary = lazy(() => import("./components/Glossary").then((m) => ({ default: m.Glossary })));
@@ -37,12 +38,12 @@ const Wizard = lazy(() => import("./components/Wizard").then((m) => ({ default: 
 
 type TabId = "tidsplan" | "resources" | "budget" | "settings" | "glossary";
 
-const TABS: { id: TabId; label: string; Icon: typeof CalendarDays }[] = [
-  { id: "tidsplan", label: "Tidsplan", Icon: CalendarDays },
-  { id: "resources", label: "Faggrupper", Icon: UsersRound },
-  { id: "budget", label: "Økonomi", Icon: DollarSign },
-  { id: "settings", label: "Projekt & kalender", Icon: SettingsIcon },
-  { id: "glossary", label: "Vidensbase", Icon: HelpCircle },
+const TABS: { id: TabId; label: string; short: string; Icon: typeof CalendarDays }[] = [
+  { id: "tidsplan", label: "Tidsplan", short: "Tidsplan", Icon: CalendarDays },
+  { id: "resources", label: "Faggrupper", short: "Faggrupper", Icon: UsersRound },
+  { id: "budget", label: "Økonomi", short: "Økonomi", Icon: DollarSign },
+  { id: "settings", label: "Projekt & kalender", short: "Kalender", Icon: SettingsIcon },
+  { id: "glossary", label: "Vidensbase", short: "Viden", Icon: HelpCircle },
 ];
 
 const BACKUP_INTERVAL_MS = 7 * 24 * 3600 * 1000;
@@ -91,7 +92,6 @@ export default function App() {
     window.addEventListener(GOTO_TAB_EVENT, go);
     return () => window.removeEventListener(GOTO_TAB_EVENT, go);
   }, []);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   // On phones the Gantt chart is too cramped: show the task list (with dates) instead
   const [isPhone, setIsPhone] = useState(() => typeof window !== "undefined" && window.matchMedia("(max-width: 639px)").matches);
   useEffect(() => {
@@ -560,10 +560,10 @@ export default function App() {
       )}
 
       {/* Main Container Dashboard */}
-      <main className="flex-1 max-w-7xl w-full mx-auto p-3 md:p-6 flex flex-col gap-4 md:gap-5">
+      <main className="flex-1 max-w-7xl w-full mx-auto p-3 md:p-6 pb-24 sm:pb-6 flex flex-col gap-4 md:gap-5">
         
         {/* Modern high-density Page Title Section with FolderKanban and Project Name */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-white border border-slate-200 p-4 rounded-xl shadow-xs">
+        <div className="hidden sm:flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-white border border-slate-200 p-4 rounded-xl shadow-xs">
           <div className="flex items-center gap-3">
             <div className="p-2.5 bg-slate-100 text-slate-700 rounded-xl">
               <FolderKanban className="w-5 h-5 shrink-0" />
@@ -573,49 +573,58 @@ export default function App() {
                 {appState.projectInfo?.projectName || "MD Projekt"}
               </h2>
               {appState.projectInfo?.address ? (
-                <p className="text-xs md:text-xs text-slate-500 font-semibold mt-0.5 whitespace-normal leading-relaxed">
+                <p className="text-xs md:text-xs text-slate-600 font-semibold mt-0.5 whitespace-normal leading-relaxed">
                   {appState.projectInfo.address}
                   {appState.projectInfo.customer ? ` • Kunde: ${appState.projectInfo.customer}` : ""}
                   {appState.projectInfo.manager ? ` • Ansvarlig: ${appState.projectInfo.manager}` : ""}
                 </p>
-              ) : (
-                <p className="text-xs md:text-xs text-slate-450 font-semibold mt-0.5">
-                  Projektdetaljer og planlægningsoverblik
-                </p>
-              )}
+              ) : null}
             </div>
           </div>
         </div>
 
+        {/* Phone: one compact summary card */}
+        <div data-testid="kpi-compact" className="sm:hidden bg-white border border-slate-200 rounded-xl px-4 py-3 shadow-2xs print:hidden">
+          <div className="flex items-baseline justify-between gap-3 flex-wrap">
+            <span className="text-lg font-extrabold text-slate-900 tabular-nums">{projectTotalCost.toLocaleString("da-DK")} kr.</span>
+            <span className="text-sm font-bold text-slate-700">
+              Slut {projectEndDate ? new Date(`${projectEndDate}T12:00:00`).toLocaleDateString("da-DK", { day: "numeric", month: "short", year: "numeric" }) : "–"}
+            </span>
+          </div>
+          <div className="text-sm font-medium text-slate-600 mt-0.5">
+            {appState.tasks.length} opgaver · {appState.trades.length} faggrupper
+          </div>
+        </div>
+
         {/* High Density KPI Statistics Metrics */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 md:gap-3 print:hidden">
+        <div className="hidden sm:grid grid-cols-2 lg:grid-cols-4 gap-2 md:gap-3 print:hidden">
           <div className="bg-white border border-slate-200 rounded-xl p-3 flex flex-col justify-between shadow-2xs">
-            <span className="text-xs md:text-xs font-black text-slate-500 block mb-1">Total Sagspris</span>
+            <span className="text-xs md:text-xs font-black text-slate-600 block mb-1">Total Sagspris</span>
             <div className="flex items-baseline gap-0.5 md:gap-1 flex-wrap">
-              <span className="text-sm md:text-lg font-black font-mono text-slate-900">{projectTotalCost.toLocaleString("da-DK")}</span>
-              <span className="text-xs md:text-xs font-black text-slate-450 font-mono">kr.</span>
+              <span className="text-sm md:text-lg font-black tabular-nums text-slate-900">{projectTotalCost.toLocaleString("da-DK")}</span>
+              <span className="text-xs md:text-xs font-black text-slate-450 tabular-nums">kr.</span>
             </div>
           </div>
           <div className="bg-white border border-slate-200 rounded-xl p-3 flex flex-col justify-between shadow-2xs">
-            <span className="text-xs md:text-xs font-black text-slate-500 block mb-1">Færdiggørelsesdato</span>
+            <span className="text-xs md:text-xs font-black text-slate-600 block mb-1">Færdiggørelsesdato</span>
             <div className="flex items-baseline gap-1">
-              <span className="text-sm md:text-lg font-black text-slate-900 font-mono">
+              <span className="text-sm md:text-lg font-black text-slate-900 tabular-nums">
                 {projectEndDate ? new Date(`${projectEndDate}T12:00:00`).toLocaleDateString("da-DK", { day: "numeric", month: "short" }) : "Ingen"}
               </span>
             </div>
           </div>
           <div className="bg-white border border-slate-200 rounded-xl p-3 flex flex-col justify-between shadow-2xs">
-            <span className="text-xs md:text-xs font-black text-slate-500 block mb-1">Opgaver</span>
+            <span className="text-xs md:text-xs font-black text-slate-600 block mb-1">Opgaver</span>
             <div className="flex items-baseline gap-1">
-              <span className="text-sm md:text-lg font-black text-slate-900 font-mono">{appState.tasks.length}</span>
-              <span className="text-xs md:text-xs text-slate-500 font-mono font-black">stk.</span>
+              <span className="text-sm md:text-lg font-black text-slate-900 tabular-nums">{appState.tasks.length}</span>
+              <span className="text-xs md:text-xs text-slate-600 tabular-nums font-black">stk.</span>
             </div>
           </div>
           <div className="bg-white border border-slate-200 rounded-xl p-3 flex flex-col justify-between shadow-2xs">
-            <span className="text-xs md:text-xs font-black text-slate-500 block mb-1">Faggrupper</span>
+            <span className="text-xs md:text-xs font-black text-slate-600 block mb-1">Faggrupper</span>
             <div className="flex items-baseline gap-1">
-              <span className="text-sm md:text-lg font-black text-slate-900 font-mono">{appState.trades.length}</span>
-              <span className="text-xs md:text-xs text-slate-500 font-mono font-black">stk.</span>
+              <span className="text-sm md:text-lg font-black text-slate-900 tabular-nums">{appState.trades.length}</span>
+              <span className="text-xs md:text-xs text-slate-600 tabular-nums font-black">stk.</span>
             </div>
           </div>
         </div>
@@ -643,47 +652,32 @@ export default function App() {
 
         {/* Tab navigation: dropdown on mobile, tab bar on larger screens */}
         <nav className="relative print:hidden" aria-label="Hovedmenu">
-          <div className="sm:hidden flex flex-col border border-slate-200 rounded-xl bg-white overflow-hidden shadow-2xs">
-            <button
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              aria-expanded={mobileMenuOpen}
-              className="w-full px-4 py-3 flex items-center justify-between font-extrabold text-sm text-slate-800 bg-slate-50 hover:bg-slate-100/80 transition cursor-pointer"
-            >
-              <div className="flex items-center gap-2">
-                {(() => {
-                  const cur = TABS.find((t) => t.id === activeTab)!;
-                  return (
-                    <>
-                      <cur.Icon className="w-5 h-5 text-slate-700" />
-                      <span>{cur.label}{cur.id === "tidsplan" ? ` (${appState.tasks.length})` : ""}</span>
-                    </>
-                  );
-                })()}
-              </div>
-              <div className="p-1 rounded-md hover:bg-slate-200 transition">
-                {mobileMenuOpen ? <X className="w-5 h-5 text-slate-600" /> : <Menu className="w-5 h-5 text-slate-600" />}
-              </div>
-            </button>
-            {mobileMenuOpen && (
-              <div className="divide-y divide-slate-100 bg-white animate-menu-in">
-                {TABS.map(({ id, label, Icon }) => (
-                  <button
-                    key={id}
-                    onClick={() => {
-                      setActiveTab2(id);
-                      setMobileMenuOpen(false);
-                    }}
-                    className={`w-full px-5 py-3 text-left font-bold text-xs flex items-center gap-3 transition cursor-pointer ${
-                      activeTab === id ? "text-slate-900 bg-slate-100" : "text-slate-600 hover:bg-slate-50"
-                    }`}
-                  >
-                    <Icon className="w-4 h-4 shrink-0" />
-                    <span>{label}{id === "tidsplan" ? ` (${appState.tasks.length})` : ""}</span>
-                  </button>
-                ))}
-              </div>
-            )}
+          {isPhone && (
+          <div
+            data-testid="bottom-nav"
+            className="sm:hidden fixed bottom-0 inset-x-0 z-40 bg-white border-t border-slate-200 flex shadow-[0_-2px_8px_rgba(0,0,0,0.06)] pb-[env(safe-area-inset-bottom)]"
+            role="tablist"
+          >
+            {TABS.map(({ id, label, short, Icon }) => (
+              <button
+                key={id}
+                role="tab"
+                aria-selected={activeTab === id}
+                aria-label={label}
+                onClick={() => {
+                  setActiveTab2(id);
+                  window.scrollTo({ top: 0 });
+                }}
+                className={`flex-1 flex flex-col items-center justify-center gap-0.5 py-2 min-h-[56px] text-xs font-bold cursor-pointer ${
+                  activeTab === id ? "text-sky-700" : "text-slate-600"
+                }`}
+              >
+                <Icon className="w-6 h-6" />
+                <span>{short}</span>
+              </button>
+            ))}
           </div>
+          )}
 
           <div className="hidden sm:flex border-b border-slate-200 overflow-x-auto pb-px scrollbar-hide gap-1 max-w-full" role="tablist">
             {TABS.map(({ id, label, Icon }) => (
@@ -696,10 +690,10 @@ export default function App() {
                 className={`px-4 py-3 font-semibold text-xs flex items-center gap-1.5 cursor-pointer whitespace-nowrap transition-all border-b-2 min-h-[44px] ${
                   activeTab === id
                     ? "border-slate-800 text-slate-900 bg-white rounded-t-lg font-black"
-                    : "border-transparent text-slate-500 hover:text-slate-800"
+                    : "border-transparent text-slate-600 hover:text-slate-800"
                 }`}
               >
-                <Icon className="w-4 h-4 shrink-0 text-slate-500" />
+                <Icon className="w-4 h-4 shrink-0 text-slate-600" />
                 <span>{label}{id === "tidsplan" ? ` (${appState.tasks.length})` : ""}</span>
               </button>
             ))}
@@ -715,14 +709,14 @@ export default function App() {
 
 
               {/* Inner Sub-navigation toggle */}
-              <div className="flex bg-slate-100/80 p-1.5 rounded-xl self-start max-w-full border border-slate-200/50 shadow-3xs select-none">
+              <div className="hidden sm:flex bg-slate-100/80 p-1.5 rounded-xl self-start max-w-full border border-slate-200/50 shadow-3xs select-none">
                 <button
                   type="button"
                   onClick={() => setTidsplanView("gantt")}
                   className={`hidden sm:flex items-center gap-2 px-4 py-2 text-xs font-black transition-all cursor-pointer rounded-lg ${
                     tidsplanView === "gantt"
                       ? "bg-white text-slate-900 shadow-xs"
-                      : "text-slate-500 hover:text-slate-800 hover:bg-white/40"
+                      : "text-slate-600 hover:text-slate-800 hover:bg-white/40"
                   }`}
                 >
                   <CalendarDays className="w-4 h-4 text-slate-600" />
@@ -734,7 +728,7 @@ export default function App() {
                   className={`flex items-center gap-2 px-4 py-2 text-xs font-black transition-all cursor-pointer rounded-lg ${
                     tidsplanView === "list"
                       ? "bg-white text-slate-900 shadow-xs"
-                      : "text-slate-500 hover:text-slate-800 hover:bg-white/40"
+                      : "text-slate-600 hover:text-slate-800 hover:bg-white/40"
                   }`}
                 >
                   <ListChecks className="w-4 h-4 text-slate-600" />
@@ -768,7 +762,7 @@ export default function App() {
                           <CalendarDays className="w-5 h-5 text-slate-700" />
                           <span>Tidsplan & Gantt-diagram</span>
                         </h3>
-                        <p className="text-xs text-slate-500 font-semibold mt-1 leading-normal">
+                        <p className="text-xs text-slate-600 font-semibold mt-1 leading-normal">
                           Træk i midten for at forskyde opgaverne på den rigtige rækkefølge eller træk højre kant for at ændre varigheden.
                         </p>
                       </div>
@@ -823,15 +817,15 @@ export default function App() {
 
               {/* Workers list */}
               <div className="lg:col-span-7 flex flex-col gap-3">
-                <h3 className="text-xs md:text-xs font-bold text-slate-500 mb-1 px-1">
+                <h3 className="text-xs md:text-xs font-bold text-slate-600 mb-1 px-1">
                   Aktive faggrupper ({appState.trades.length})
                 </h3>
 
                 {appState.trades.length === 0 ? (
-                  <div className="bg-white border border-dashed border-slate-200 p-8 md:p-12 text-center rounded-xl text-xs text-slate-500 flex flex-col items-center justify-center">
+                  <div className="bg-white border border-dashed border-slate-200 p-8 md:p-12 text-center rounded-xl text-xs text-slate-600 flex flex-col items-center justify-center">
                     <UsersRound className="w-10 h-10 text-slate-200 mb-2" />
-                    <p className="font-semibold text-slate-500">Ingen faggrupper oprettet</p>
-                    <p className="text-xs text-slate-500 mt-1 select-none">
+                    <p className="font-semibold text-slate-600">Ingen faggrupper oprettet</p>
+                    <p className="text-xs text-slate-600 mt-1 select-none">
                       Opret dem til venstre, for at tildele dem dine arbejdsopgaver.
                     </p>
                   </div>
@@ -851,7 +845,7 @@ export default function App() {
                             />
                             <div className="min-w-0">
                               <h4 className="text-xs font-extrabold text-slate-700 leading-none truncate">{tr.name}</h4>
-                              <span className="text-xs text-slate-500 font-bold block mt-1.5 leading-tight">
+                              <span className="text-xs text-slate-600 font-bold block mt-1.5 leading-tight">
                                 {tr.isFixedPrice ? (
                                   <span>Fast kontraktkontrakt: {tr.rate.toLocaleString("da-DK")} kr.</span>
                                 ) : (
@@ -861,7 +855,7 @@ export default function App() {
                                 )}
                               </span>
                               {(tr.roles || []).length > 0 && (
-                                <span data-testid="trade-roles" className="text-xs text-slate-500 font-semibold block mt-1 leading-tight">
+                                <span data-testid="trade-roles" className="text-xs text-slate-600 font-semibold block mt-1 leading-tight">
                                   Hold: {(tr.roles || []).map((r) => `${r.count} ${r.name.toLowerCase()}`).join(", ")}
                                 </span>
                               )}
@@ -878,7 +872,7 @@ export default function App() {
                             <div className="flex gap-1.5">
                               <button
                                 onClick={() => setEditTradeId(tr.id)}
-                                className="p-2 bg-slate-50 hover:bg-slate-100 text-slate-500 hover:text-slate-600 rounded-lg cursor-pointer border-0 transition min-w-[34px] min-h-[34px] flex items-center justify-center"
+                                className="p-2 bg-slate-50 hover:bg-slate-100 text-slate-600 hover:text-slate-600 rounded-lg cursor-pointer border-0 transition min-w-[34px] min-h-[34px] flex items-center justify-center"
                                 title="Rediger"
                               >
                                 <Pencil className="w-3.5 h-3.5" />
@@ -921,22 +915,22 @@ export default function App() {
 
               {/* Printable header box */}
               <div className="hidden print:flex flex-col gap-1 mb-6">
-                <span className="text-xs font-extrabold text-slate-500 leading-none">
+                <span className="text-xs font-extrabold text-slate-600 leading-none">
                   Firma- og Sagsafleveringsrapport
                 </span>
                 <h2 className="text-2xl font-black text-slate-800 tracking-tight leading-none">MD Project Budget</h2>
-                <div className="text-xs text-slate-500 mt-1 font-bold">
+                <div className="text-xs text-slate-600 mt-1 font-bold">
                   Udskrevet: {new Date().toLocaleDateString("da-DK")}
                 </div>
               </div>
 
               {/* Overall total cost meter */}
               <div className="p-4 md:p-6 bg-emerald-50 rounded-2xl border border-emerald-100/55 text-center flex flex-col items-center">
-                <span className="text-xs md:text-xs font-bold text-slate-500">Total sagspris</span>
-                <span className="text-xl md:text-3xl font-black text-emerald-800 tracking-tight mt-1 font-mono">
+                <span className="text-xs md:text-xs font-bold text-slate-600">Total sagspris</span>
+                <span className="text-xl md:text-3xl font-black text-emerald-800 tracking-tight mt-1 tabular-nums">
                   {projectTotalCost.toLocaleString("da-DK")} kr.
                 </span>
-                <div className="text-xs md:text-xs text-slate-500 font-bold mt-1 max-w-sm">
+                <div className="text-xs md:text-xs text-slate-600 font-bold mt-1 max-w-sm">
                   Planlagt deadline:{" "}
                   <span className="text-slate-800 font-black">
                     {projectEndDate ? new Date(`${projectEndDate}T12:00:00`).toLocaleDateString("da-DK", { day: "numeric", month: "long", year: "numeric" }) : "Ingen"}
@@ -954,14 +948,14 @@ export default function App() {
                     return (
                       <>
                         <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl">
-                          <span className="text-xs font-black text-slate-500 block mb-1">Slutdato mod baseline</span>
+                          <span className="text-xs font-black text-slate-600 block mb-1">Slutdato mod baseline</span>
                           <span className={`font-black ${tone(dDays ?? 0)}`}>
                             {dDays === null ? "Ingen data" : dDays === 0 ? "Uændret" : `${dDays > 0 ? "+" : ""}${dDays} kalenderdage`}
                           </span>
                         </div>
                         <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl">
-                          <span className="text-xs font-black text-slate-500 block mb-1">Sagspris mod baseline</span>
-                          <span className={`font-black font-mono ${tone(dCost)}`}>
+                          <span className="text-xs font-black text-slate-600 block mb-1">Sagspris mod baseline</span>
+                          <span className={`font-black tabular-nums ${tone(dCost)}`}>
                             {dCost === 0 ? "Uændret" : `${dCost > 0 ? "+" : ""}${Math.round(dCost).toLocaleString("da-DK")} kr.`}
                           </span>
                         </div>
@@ -973,7 +967,7 @@ export default function App() {
 
               {/* Accumulated cost over time */}
               <div className="flex flex-col gap-2">
-                <h4 className="text-xs font-bold text-slate-500 border-b border-slate-100 pb-1">Omkostninger over tid (S-kurve)</h4>
+                <h4 className="text-xs font-bold text-slate-600 border-b border-slate-100 pb-1">Omkostninger over tid (S-kurve)</h4>
                 <CostCurve tasks={calculatedTasks} baseline={appState.baseline} />
               </div>
 
@@ -983,7 +977,7 @@ export default function App() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5 md:gap-6 mt-1">
                 {/* 1. Cost per trade */}
                 <div className="flex flex-col gap-2.5">
-                  <h4 className="text-xs font-bold text-slate-500 border-b border-slate-100 pb-1 flex items-center gap-1">
+                  <h4 className="text-xs font-bold text-slate-600 border-b border-slate-100 pb-1 flex items-center gap-1">
                     <HardHat className="w-3.5 h-3.5 shrink-0" />
                     <span>Udgifter pr faggruppe</span>
                   </h4>
@@ -999,7 +993,7 @@ export default function App() {
                             <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: tr.color }} />
                             <span className="truncate">{tr.name}</span>
                           </span>
-                          <span className="font-extrabold text-slate-800 font-mono shrink-0">
+                          <span className="font-extrabold text-slate-800 tabular-nums shrink-0">
                             {stats.cost.toLocaleString("da-DK")} kr.
                           </span>
                         </div>
@@ -1010,23 +1004,11 @@ export default function App() {
 
                 {/* 2. Cost per task */}
                 <div className="flex flex-col gap-2.5">
-                  <h4 className="text-xs font-bold text-slate-500 border-b border-slate-100 pb-1 flex items-center gap-1">
+                  <h4 className="text-xs font-bold text-slate-600 border-b border-slate-100 pb-1 flex items-center gap-1">
                     <ClipboardList className="w-3.5 h-3.5 shrink-0" />
                     <span>Udgifter pr opgave</span>
                   </h4>
-                  <div className="flex flex-col gap-2 max-h-[260px] overflow-y-auto">
-                    {calculatedTasks.map((t) => (
-                      <div
-                        key={t.id}
-                        className="flex justify-between items-center text-xs p-2.5 bg-slate-50 rounded-xl border border-slate-200"
-                      >
-                        <span className="font-semibold text-slate-700 truncate max-w-[65%]">{t.title}</span>
-                        <span className="font-extrabold text-slate-800 font-mono shrink-0">
-                          {(t.calcCost || 0).toLocaleString("da-DK")} kr.
-                        </span>
-                      </div>
-                    ))}
-                  </div>
+                  <CostRows rows={groupCostRows(calculatedTasks.map((t) => ({ id: t.id, title: t.title, cost: t.calcCost || 0 })))} />
                 </div>
               </div>
             </div>
@@ -1066,14 +1048,14 @@ export default function App() {
       </main>
 
       {/* Minimalistisk Footer */}
-      <footer className="bg-slate-50 border-t border-slate-200/60 py-4 text-center text-xs text-slate-500 select-none print:hidden">
+      <footer className="bg-slate-50 border-t border-slate-200/60 py-4 text-center text-xs text-slate-600 select-none print:hidden">
         <p className="font-medium">
           Udviklet af{" "}
           <a
             href="https://www.marcdahl.dk"
             target="_blank"
             rel="noopener noreferrer"
-            className="text-slate-500 hover:text-slate-800 font-extrabold hover:underline transition"
+            className="text-slate-600 hover:text-slate-800 font-extrabold hover:underline transition"
           >
             Marc Sonne Dahl
           </a>
@@ -1093,7 +1075,7 @@ export default function App() {
 
       {drawer && (
         <TaskDrawer title={editTaskId ? "Rediger opgave" : "Ny opgave"} onClose={() => setDrawer(null)}>
-          <Suspense fallback={<p className="text-xs text-slate-500">Indlæser…</p>}>
+          <Suspense fallback={<p className="text-xs text-slate-600">Indlæser…</p>}>
             <TaskForm
               hoursPerDay={appState.settings.workHoursPerDay}
               tasks={appState.tasks}

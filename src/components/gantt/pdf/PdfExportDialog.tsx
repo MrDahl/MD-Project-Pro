@@ -45,17 +45,17 @@ export function PdfExportDialog({ input, hasBaseline, busy, error, onExport, onC
             <h2 id="pdf-dialog-title" className="text-base font-black text-slate-900 flex items-center gap-2">
               <FileText className="w-5 h-5 text-sky-600" /> Gem tidsplan som PDF
             </h2>
-            <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+            <p className="text-xs text-slate-600 mt-1 leading-relaxed">
               Vektor-PDF med kalender, opgaver og faggrupper ved bjælkerne. Tekst og streger er knivskarpe, også ved stor udskrift.
             </p>
           </div>
-          <button type="button" onClick={onClose} aria-label="Luk" className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 cursor-pointer">
+          <button type="button" onClick={onClose} aria-label="Luk" className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-600 cursor-pointer">
             <X className="w-5 h-5" />
           </button>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <label className="flex flex-col gap-1 text-xs font-black text-slate-500">
+          <label className="flex flex-col gap-1 text-xs font-black text-slate-600">
             Omfang
             <select aria-label="Omfang" value={opts.scope} onChange={(e) => set({ scope: e.target.value })} className={field}>
               <option value="all">Hele projektet</option>
@@ -67,7 +67,7 @@ export function PdfExportDialog({ input, hasBaseline, busy, error, onExport, onC
             </select>
           </label>
 
-          <label className="flex flex-col gap-1 text-xs font-black text-slate-500">
+          <label className="flex flex-col gap-1 text-xs font-black text-slate-600">
             Papir
             <select aria-label="Papir" value={opts.paper} onChange={(e) => set({ paper: e.target.value as Paper })} className={field}>
               <option value="auto">Automatisk størrelse (ét stort ark)</option>
@@ -80,7 +80,7 @@ export function PdfExportDialog({ input, hasBaseline, busy, error, onExport, onC
           </label>
 
           {opts.paper === "auto" ? (
-            <label className="flex flex-col gap-1 text-xs font-black text-slate-500">
+            <label className="flex flex-col gap-1 text-xs font-black text-slate-600">
               Detaljegrad
               <select aria-label="Detaljegrad" value={opts.dayWidth} onChange={(e) => set({ dayWidth: Number(e.target.value) })} className={field}>
                 <option value={5}>Detaljeret (5 mm pr. dag)</option>
@@ -89,7 +89,7 @@ export function PdfExportDialog({ input, hasBaseline, busy, error, onExport, onC
               </select>
             </label>
           ) : (
-            <label className="flex flex-col gap-1 text-xs font-black text-slate-500">
+            <label className="flex flex-col gap-1 text-xs font-black text-slate-600">
               Retning
               <select aria-label="Retning" value={opts.portrait ? "p" : "l"} onChange={(e) => set({ portrait: e.target.value === "p" })} className={field}>
                 <option value="l">Liggende</option>
@@ -98,7 +98,7 @@ export function PdfExportDialog({ input, hasBaseline, busy, error, onExport, onC
             </label>
           )}
 
-          <label className="flex flex-col gap-1 text-xs font-black text-slate-500">
+          <label className="flex flex-col gap-1 text-xs font-black text-slate-600">
             Opgaver pr. side (maks)
             <select aria-label="Opgaver pr. side" value={opts.maxTasks} onChange={(e) => set({ maxTasks: Number(e.target.value) })} className={field}>
               <option value={300}>300</option>

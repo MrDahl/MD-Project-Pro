@@ -1,3 +1,4 @@
+import { HelpTip } from "./HelpTip";
 import React, { useState, useEffect } from "react";
 import { Trade, Role, WeekSchedule } from "../types";
 import { WorkWeekEditor } from "./WorkWeekEditor";
@@ -89,7 +90,7 @@ export function TradeForm({ trades, editTradeId, onSave, onCancel }: TradeFormPr
 
       {/* Row 1: Name */}
       <div className="flex flex-col gap-1">
-        <label className="text-xs font-bold text-slate-500">Navn på faggruppe</label>
+        <label className="text-xs font-bold text-slate-600">Navn på faggruppe</label>
         <input
           type="text"
           value={name}
@@ -108,13 +109,14 @@ export function TradeForm({ trades, editTradeId, onSave, onCancel }: TradeFormPr
           onChange={(e) => setIsFixedPrice(e.target.checked)}
           className="w-4 h-4 accent-slate-700"
         />
-        <span>Fast pris / Engangsbeløb (Beregnes pr. tilknyttet opgave i stedet for timepris dagspris)</span>
+        <span>Fast pris pr. opgave</span>
+        <HelpTip label="Hjælp: fast pris" link={false} text="Faggruppen afregnes med ét beløb pr. tilknyttet opgave i stedet for en timepris." />
       </label>
 
       {/* Row 3: Standard Rate Expense */}
       <div className="flex flex-col gap-1">
-        <label className="text-xs font-bold text-slate-500 flex items-center gap-1">
-          <Coins className="w-3.5 h-3.5 text-slate-500" />
+        <label className="text-xs font-bold text-slate-600 flex items-center gap-1">
+          <Coins className="w-3.5 h-3.5 text-slate-600" />
           <span>{isFixedPrice ? "Fast pris pr. tilknyttet opgave (kr.)" : roles.length > 0 ? "Standard timepris (bruges når en opgave ikke er bemandet)" : "Standard timepris (kr./t)"}</span>
         </label>
         <input
@@ -131,8 +133,8 @@ export function TradeForm({ trades, editTradeId, onSave, onCancel }: TradeFormPr
       {!isFixedPrice && (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-slate-50 p-3.5 rounded-lg border border-slate-100">
           <div className="flex flex-col gap-1">
-            <label className="text-xs font-bold text-slate-500 flex items-center gap-1">
-              <Percent className="w-3.5 h-3.5 text-slate-500" />
+            <label className="text-xs font-bold text-slate-600 flex items-center gap-1">
+              <Percent className="w-3.5 h-3.5 text-slate-600" />
               <span>Weekend-tillæg i %</span>
             </label>
             <input
@@ -147,8 +149,8 @@ export function TradeForm({ trades, editTradeId, onSave, onCancel }: TradeFormPr
           </div>
 
           <div className="flex flex-col gap-1">
-            <label className="text-xs font-bold text-slate-500 flex items-center gap-1">
-              <Percent className="w-3.5 h-3.5 text-slate-500" />
+            <label className="text-xs font-bold text-slate-600 flex items-center gap-1">
+              <Percent className="w-3.5 h-3.5 text-slate-600" />
               <span>Helligdags-tillæg i %</span>
             </label>
             <input
@@ -166,7 +168,7 @@ export function TradeForm({ trades, editTradeId, onSave, onCancel }: TradeFormPr
 
       {!isFixedPrice && (
         <div className="flex flex-col gap-2">
-          <label className="text-xs font-bold text-slate-500">Arbejdstid for denne faggruppe</label>
+          <label className="text-xs font-bold text-slate-600">Arbejdstid for denne faggruppe</label>
           <WorkWeekEditor week={workWeek} onChange={setWorkWeek} plainLabel="Som projektet" />
         </div>
       )}
@@ -175,8 +177,8 @@ export function TradeForm({ trades, editTradeId, onSave, onCancel }: TradeFormPr
 
       {/* Row 5: Preset colors selections */}
       <div className="flex flex-col gap-1.5">
-        <label className="text-xs font-bold text-slate-500 flex items-center gap-1">
-          <Palette className="w-3.5 h-3.5 text-slate-500" />
+        <label className="text-xs font-bold text-slate-600 flex items-center gap-1">
+          <Palette className="w-3.5 h-3.5 text-slate-600" />
           <span>Vælg farve til tidsplan</span>
         </label>
         <div className="flex flex-wrap gap-2 bg-slate-50 p-2.5 rounded-lg border border-slate-100 justify-between items-center">
@@ -218,7 +220,7 @@ export function TradeForm({ trades, editTradeId, onSave, onCancel }: TradeFormPr
           <button
             type="button"
             onClick={onCancel}
-            className="px-4 bg-white hover:bg-slate-55 border border-slate-200 rounded-lg text-xs font-bold text-slate-500 cursor-pointer flex items-center justify-center gap-1"
+            className="px-4 bg-white hover:bg-slate-55 border border-slate-200 rounded-lg text-xs font-bold text-slate-600 cursor-pointer flex items-center justify-center gap-1"
           >
             <Ban className="w-4 h-4" />
             <span>Annuller</span>

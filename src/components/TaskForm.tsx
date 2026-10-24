@@ -169,7 +169,7 @@ export function TaskForm({ tasks, trades, stages, editTaskId, onSave, onCancel, 
       </h3>
       {/* Row 1: Title & Desc */}
       <div className="flex flex-col gap-1">
-        <label className="text-xs font-bold text-slate-500">Opgavetitel</label>
+        <label className="text-xs font-bold text-slate-600">Opgavetitel</label>
         <input
           type="text"
           value={title}
@@ -188,8 +188,8 @@ export function TaskForm({ tasks, trades, stages, editTaskId, onSave, onCancel, 
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="flex flex-col gap-1">
-              <label className="text-xs font-bold text-slate-500 flex items-center gap-1">
-                <Clock className="w-3.5 h-3.5 text-slate-500" />
+              <label className="text-xs font-bold text-slate-600 flex items-center gap-1">
+                <Clock className="w-3.5 h-3.5 text-slate-600" />
                 <span>Udførelsesinterval (Gentages hver x. dag)</span>
               </label>
               <input
@@ -203,8 +203,8 @@ export function TaskForm({ tasks, trades, stages, editTaskId, onSave, onCancel, 
             </div>
 
             <div className="flex flex-col gap-1">
-              <label className="text-xs font-bold text-slate-500 flex items-center gap-1">
-                <DollarSign className="w-3.5 h-3.5 text-slate-500" />
+              <label className="text-xs font-bold text-slate-600 flex items-center gap-1">
+                <DollarSign className="w-3.5 h-3.5 text-slate-600" />
                 <span>Fast Enhedspris pr. overførsel / gang (kr.)</span>
               </label>
               <input
@@ -219,7 +219,7 @@ export function TaskForm({ tasks, trades, stages, editTaskId, onSave, onCancel, 
           </div>
 
           <div className="flex flex-col gap-2">
-            <label className="text-xs font-bold text-slate-500">Periode / Varighed for gentagelse</label>
+            <label className="text-xs font-bold text-slate-600">Periode / Varighed for gentagelse</label>
             <div className="flex gap-4">
               <label className="flex items-center gap-2 text-xs font-bold text-slate-600 cursor-pointer select-none">
                 <input
@@ -249,7 +249,7 @@ export function TaskForm({ tasks, trades, stages, editTaskId, onSave, onCancel, 
 
           {recurringRangeType === "stages" && (
             <div className="flex flex-col gap-1">
-              <label className="text-xs font-bold text-slate-500">Vælg etaper til gentagelsescyklus</label>
+              <label className="text-xs font-bold text-slate-600">Vælg etaper til gentagelsescyklus</label>
               {stages.length === 0 ? (
                 <span className="text-xs text-red-500 font-semibold">Du skal oprette etaper i fanen Projekt først!</span>
               ) : (
@@ -288,8 +288,8 @@ export function TaskForm({ tasks, trades, stages, editTaskId, onSave, onCancel, 
               </div>
             ) : (
               <div className="flex flex-col gap-1">
-                <label className="text-xs font-bold text-slate-500 flex items-center gap-1">
-                  <Clock className="w-3.5 h-3.5 text-slate-500" />
+                <label className="text-xs font-bold text-slate-600 flex items-center gap-1">
+                  <Clock className="w-3.5 h-3.5 text-slate-600" />
                   <span>Varighed</span>
                   <HelpTip label="Hjælp: varighed" text="Arbejdsdage tæller kun hverdage, uden helligdage. Vælg timer for små opgaver, der placeres efter klokken i arbejdsdagen." />
                 </label>
@@ -329,7 +329,7 @@ export function TaskForm({ tasks, trades, stages, editTaskId, onSave, onCancel, 
                   </select>
                 </div>
                 {unit === "hours" && (
-                  <span className="text-xs text-slate-500 font-medium leading-snug">
+                  <span className="text-xs text-slate-600 font-medium leading-snug">
                     Placeres efter arbejdstiden med klokkeslæt. Små opgaver kan følge efter hinanden samme dag.
                   </span>
                 )}
@@ -340,9 +340,9 @@ export function TaskForm({ tasks, trades, stages, editTaskId, onSave, onCancel, 
 
       {/* Trades Checkboxes Selection container */}
       <div className="flex flex-col gap-1">
-        <label className="text-xs font-bold text-slate-500">{isRecurring ? "Hvilken faggruppe står for servicen?" : "Faggruppe"}</label>
+        <label className="text-xs font-bold text-slate-600">{isRecurring ? "Hvilken faggruppe står for servicen?" : "Faggruppe"}</label>
         {trades.length === 0 ? (
-          <span className="text-xs text-slate-500 font-medium">Opret faggrupper under fanen Faggrupper først.</span>
+          <span className="text-xs text-slate-600 font-medium">Opret faggrupper under fanen Faggrupper først.</span>
         ) : (
           <div className="grid grid-cols-2 md:grid-cols-3 gap-2 bg-slate-50 p-3 rounded-lg border border-slate-200 max-h-[140px] overflow-y-auto">
             {trades.map((tr) => {
@@ -372,13 +372,13 @@ export function TaskForm({ tasks, trades, stages, editTaskId, onSave, onCancel, 
         <>
           {/* Predecessors: any number, Finish-to-Start or Start-to-Start, with lag/lead */}
           <div className="flex flex-col gap-2" data-testid="predecessors">
-            <label className="text-xs font-bold text-slate-500 flex items-center gap-1">
-              <Link className="w-3.5 h-3.5 text-slate-500" />
+            <label className="text-xs font-bold text-slate-600 flex items-center gap-1">
+              <Link className="w-3.5 h-3.5 text-slate-600" />
               <span>Afhænger af (forgængere)</span>
               <HelpTip label="Hjælp: forgængere" text="Hvilke opgaver skal være færdige (eller startet), før denne kan begynde. Systemet flytter opgaven automatisk, hvis forgængeren rykker." />
             </label>
             {links.length === 0 && (
-              <p className="text-xs text-slate-500 font-medium">Ingen: opgaven starter med projektet eller på sin manuelle startdato.</p>
+              <p className="text-xs text-slate-600 font-medium">Ingen: opgaven starter med projektet eller på sin manuelle startdato.</p>
             )}
             {links.map((l, idx) => (
               <div key={idx} className="flex flex-wrap items-center gap-2 bg-slate-50 border border-slate-200 rounded-lg p-2">
@@ -409,7 +409,7 @@ export function TaskForm({ tasks, trades, stages, editTaskId, onSave, onCancel, 
                   <option value="SS">Start → Start</option>
                 </select>
                 <HelpTip label="Hjælp: Slut → Start og Start → Start" text="Slut → Start (FS): efterfølgeren starter, når forgængeren er færdig. Start → Start (SS): de to starter samtidig, evt. med forskydning, så arbejdet kan overlappe." />
-                <label className="flex items-center gap-1 text-xs font-bold text-slate-500" title="Positivt tal = ventetid, negativt = forspring (kalenderdage)">
+                <label className="flex items-center gap-1 text-xs font-bold text-slate-600" title="Positivt tal = ventetid, negativt = forspring (kalenderdage)">
                   <span>Forskydning</span>
                   <HelpTip label="Hjælp: forskydning" text="Ventetid (positivt tal) eller forspring (negativt) i kalenderdage mellem de to opgaver, fx 3 dages hærdetid for beton." />
                   <input
@@ -452,13 +452,13 @@ export function TaskForm({ tasks, trades, stages, editTaskId, onSave, onCancel, 
           className="w-full flex items-center justify-between gap-2 px-3 py-3 min-h-[44px] text-sm font-bold text-slate-700 cursor-pointer hover:bg-slate-50 rounded-xl"
         >
           <span className="whitespace-nowrap">Flere indstillinger</span>
-          <span className="hidden sm:inline text-xs font-medium text-slate-500 truncate">Beskrivelse, startdato, etape, underressourcer, weekend m.m.</span>
+          <span className="hidden sm:inline text-xs font-medium text-slate-600 truncate">Beskrivelse, startdato, etape, underressourcer, weekend m.m.</span>
           <ChevronDown className={`w-4 h-4 shrink-0 transition-transform ${moreOpen ? "rotate-180" : ""}`} />
         </button>
         {moreOpen && (
           <div className="flex flex-col gap-4 p-3 border-t border-slate-200" data-testid="more-panel">
       <div className="flex flex-col gap-1">
-        <label className="text-xs font-bold text-slate-500">Kort beskrivelse (valgfri)</label>
+        <label className="text-xs font-bold text-slate-600">Kort beskrivelse (valgfri)</label>
         <textarea
           value={desc}
           onChange={(e) => setDesc(e.target.value)}
@@ -474,7 +474,7 @@ export function TaskForm({ tasks, trades, stages, editTaskId, onSave, onCancel, 
             <RefreshCw className="w-3.5 h-3.5 text-slate-550 animate-spin-slow" />
             <span>Er dette en tilbagevendende serviceopgave?</span>
           </span>
-          <span className="text-xs text-slate-500 mt-0.5">
+          <span className="text-xs text-slate-600 mt-0.5">
             Gentages automatisk med faste intervaller og afregnes pr. gang (Tømning, tilsyn m.m.).
           </span>
         </div>
@@ -496,7 +496,7 @@ export function TaskForm({ tasks, trades, stages, editTaskId, onSave, onCancel, 
             <div className="flex items-center justify-between">
               <div className="flex flex-col">
                 <span className="text-xs font-bold text-slate-800">Marker som Milepæl?</span>
-                <span className="text-xs text-slate-500 mt-0.5">Et centralt kontrolpunkt (0 dg. varighed).</span>
+                <span className="text-xs text-slate-600 mt-0.5">Et centralt kontrolpunkt (0 dg. varighed).</span>
               </div>
               <label className="relative inline-flex items-center cursor-pointer">
                 <input
@@ -511,7 +511,7 @@ export function TaskForm({ tasks, trades, stages, editTaskId, onSave, onCancel, 
 
             {/* Task Progress Selector */}
             <div className="flex flex-col gap-1">
-              <label className="text-xs font-bold text-slate-500 block">Færdiggørelsesgrad</label>
+              <label className="text-xs font-bold text-slate-600 block">Færdiggørelsesgrad</label>
               <div className="flex bg-white border border-slate-200 rounded-lg p-0.5">
                 {[0, 25, 50, 75, 100].map((val) => (
                   <button
@@ -531,8 +531,8 @@ export function TaskForm({ tasks, trades, stages, editTaskId, onSave, onCancel, 
             </div>
           </div>
             <div className="flex flex-col gap-1">
-              <label className="text-xs font-bold text-slate-500 flex items-center gap-1">
-                <Calendar className="w-3.5 h-3.5 text-slate-500" />
+              <label className="text-xs font-bold text-slate-600 flex items-center gap-1">
+                <Calendar className="w-3.5 h-3.5 text-slate-600" />
                 <span>Fast startdato (valgfri)</span>
               </label>
               <input
@@ -542,7 +542,7 @@ export function TaskForm({ tasks, trades, stages, editTaskId, onSave, onCancel, 
                 className="bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs font-semibold text-slate-700 outline-none focus:border-slate-500"
               />
               {unit === "hours" && !isMilestone && manualStart && (
-                <label className="flex items-center gap-1.5 text-xs font-bold text-slate-500 mt-1">
+                <label className="flex items-center gap-1.5 text-xs font-bold text-slate-600 mt-1">
                   Tidligst kl.
                   <input
                     type="time"
@@ -556,8 +556,8 @@ export function TaskForm({ tasks, trades, stages, editTaskId, onSave, onCancel, 
             </div>
           {/* Stage Association Selector */}
           <div className="flex flex-col gap-1">
-            <label className="text-xs font-bold text-slate-500 flex items-center gap-1">
-              <Layers className="w-3.5 h-3.5 text-slate-500" />
+            <label className="text-xs font-bold text-slate-600 flex items-center gap-1">
+              <Layers className="w-3.5 h-3.5 text-slate-600" />
               <span>Associeret Etape / Projektfase (valgfri)</span>
             </label>
             <select
@@ -628,7 +628,7 @@ export function TaskForm({ tasks, trades, stages, editTaskId, onSave, onCancel, 
         <button
           type="button"
           onClick={onCancel}
-          className="px-4 bg-white hover:bg-slate-55 border border-slate-200 rounded-lg text-xs font-bold text-slate-500 cursor-pointer flex items-center justify-center gap-1"
+          className="px-4 bg-white hover:bg-slate-55 border border-slate-200 rounded-lg text-xs font-bold text-slate-600 cursor-pointer flex items-center justify-center gap-1"
         >
           <Ban className="w-4 h-4" />
           <span>Annuller</span>

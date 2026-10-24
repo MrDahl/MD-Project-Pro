@@ -26,7 +26,7 @@ export function TaskDrawer({ title, onClose, children }: Props) {
             type="button"
             onClick={onClose}
             aria-label="Luk"
-            className="p-1.5 rounded-lg hover:bg-slate-200 text-slate-500 cursor-pointer"
+            className="p-1.5 rounded-lg hover:bg-slate-200 text-slate-600 cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>

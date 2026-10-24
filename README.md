@@ -329,7 +329,8 @@ Projektet gemmes kun i din egen browser. Intet sendes til en server.
 - **Husker dig:** fane, Gantt/liste, zoom, filtre, afhængighedspile og foldede etaper huskes til næste gang.
 - **Mørk tilstand:** måne-knappen i toppen.
 - **Print liste:** *Opgaver → Print liste* giver en ren udskrift uden knapper.
-- **Mobil og tablet:** på telefonen vises opgaverne som en liste med datoer i stedet for Gantt, og knapper er mindst 44 px.
+- **Mobil og tablet:** på telefonen vises opgaverne som en liste med datoer i stedet for Gantt, og knapper er mindst 44 px. Menuen i bunden skifter fane med tommelfingeren, ⋯ i toppen samler Fortryd, Gem, Åbn og mørk tilstand, og toppen ruller væk, så der er plads til opgaverne. Hvert opgavekort har en ⋮-knap med Rediger, Dupliker og Slet.
+- **Økonomi:** "Udgifter pr. opgave" viser de ti dyreste først (opgaver med samme navn lægges sammen, fx ×4) og har *Vis alle*. S-kurven viser beløb i millioner.
 - **Tom plan:** er der ingen opgaver, får du store knapper til *Start fra skabelon* og *Opret første opgave*.
 
 ## 14. Spørgsmål og svar
