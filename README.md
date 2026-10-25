@@ -118,6 +118,7 @@ Gantt viser alle opgaver som bjælker i faggruppens farve. Weekender er grønne,
 
 **Flyt og ret**
 
+- **Klik på en opgaves navn** i venstre kolonne, så ruller Gantt til opgavens start, og rækken lyser kort op. Klik på selve bjælken åbner detaljerne.
 - **Dobbeltklik** på en bjælke (eller et opgavekort) åbner redigering. **Højreklik** giver *Rediger*, *Dupliker* og *Slet*.
 - Træk i bjælken for at flytte startdatoen (sætter en fast start).
 - Træk i højre kant for at ændre varigheden i dage.

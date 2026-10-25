@@ -123,6 +123,9 @@ interface GanttTaskRowProps extends RowBase {
   /** Calendar days the end has moved against the baseline (positive = later). */
   deviation?: number | null;
   onOpenDetail: (task: Task) => void;
+  /** Click on the task name: scroll the chart to the start of the task */
+  onFocusTask: (task: Task) => void;
+  flashId?: string | null;
   onExpandColumn: () => void;
   onPointerDown: (e: React.PointerEvent<HTMLDivElement>, task: Task, type: "move" | "resize-right") => void;
   onPointerMove: (e: React.PointerEvent<HTMLDivElement>) => void;
@@ -148,6 +151,8 @@ export const GanttTaskRow = memo(function GanttTaskRow({
   base,
   deviation,
   onOpenDetail,
+  onFocusTask,
+  flashId,
   onExpandColumn,
   onPointerDown,
   onPointerMove,
@@ -191,9 +196,10 @@ export const GanttTaskRow = memo(function GanttTaskRow({
       ) : (
         <div
           data-task-id={task.id}
-          onClick={() => onOpenDetail(task)}
-          className="w-52 shrink-0 border-r border-slate-250 p-3 h-full flex flex-col justify-center cursor-pointer hover:bg-slate-50 transition sticky left-0 bg-white z-20 shadow-xs"
-          title="Klik for at se opgavedetaljer"
+          data-testid="task-label"
+          onClick={() => onFocusTask(task)}
+          className={`w-52 shrink-0 border-r border-slate-250 p-3 h-full flex flex-col justify-center cursor-pointer hover:bg-slate-50 transition sticky left-0 z-20 shadow-xs ${flashId === task.id ? "bg-sky-100 ring-2 ring-inset ring-sky-400" : "bg-white"}`}
+          title="Klik for at hoppe til opgavens start. Dobbeltklik for at redigere."
         >
           <div className="flex items-center gap-1.5 min-w-0">
             <span className="text-xs font-extrabold text-slate-600 shrink-0">{number}.</span>

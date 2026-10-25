@@ -484,6 +484,28 @@ export function GanttChart({
     setJumpTo(null);
   }, [jumpTo, minDay, maxDay, colW, labelW, filterScope]);
 
+  // --- Click on a task name (left column): scroll the chart to the start of that task ---
+  const [flashId, setFlashId] = useState<string | null>(null);
+  const flashTimer = useRef<number | undefined>(undefined);
+  const focusTask = useCallback(
+    (task: Task) => {
+      const startDay = dayNumber(task.calcStart);
+      if (startDay === null) return;
+      window.clearTimeout(flashTimer.current);
+      setFlashId(task.id);
+      flashTimer.current = window.setTimeout(() => setFlashId(null), 1400);
+      if (startDay < minDay || startDay > maxDay) {
+        // outside the current focus area: show the whole project, then jump
+        if (filterScope !== "all") setFilterScope("all");
+        setJumpTo(startDay);
+        return;
+      }
+      const el = scrollRef.current;
+      if (el) el.scrollTo({ left: Math.max(0, (startDay - minDay) * colW - colW * 2), behavior: "smooth" });
+    },
+    [minDay, maxDay, colW, filterScope]
+  );
+
   // --- Keyboard control of a bar: arrows move, +/- change duration, Enter opens details ---
   const focusNeighbour = useCallback((taskId: string, dir: -1 | 1) => {
     const { visibleTasks: list, stageCount } = live.current;
@@ -741,6 +763,8 @@ export function GanttChart({
           base={showBaseline ? baseSpans.get(task.id) : undefined}
           deviation={showBaseline ? endDeviationDays(task, baseTasks.get(task.id)) : null}
           onOpenDetail={openDetail}
+          onFocusTask={focusTask}
+          flashId={flashId}
           onExpandColumn={expandColumn}
           onPointerDown={handlePointerDown}
           onPointerMove={handlePointerMove}
