@@ -25,6 +25,7 @@ import { NewProjectDialog } from "./components/NewProjectDialog";
 import { useProject } from "./state/useProject";
 import { BACKUP_KEY, WIZARD_KEY, looksLikeProject, normalizeProject, readNumber, writeFlag } from "./state/project";
 import { GOTO_TAB_EVENT } from "./components/HelpTip";
+import { FOCUS_TASK_EVENT } from "./components/gantt/GanttChart";
 import { CostRows, groupCostRows } from "./components/CostRows";
 import { EmptyState } from "./components/EmptyState";
 import { ContextMenu, type ContextMenuState } from "./components/ContextMenu";
@@ -551,10 +552,24 @@ export default function App() {
         <CommandPalette
           items={paletteItems}
           onClose={() => setPaletteOpen(false)}
-          onPick={(it) => {
+          onPick={(it, edit) => {
             setPaletteOpen(false);
-            if (it.kind === "tab") setActiveTab2(it.id as TabId);
-            else setDrawer({ taskId: it.id });
+            if (it.kind === "tab") {
+              setActiveTab2(it.id as TabId);
+              return;
+            }
+            const ganttShown = !isPhone;
+            if (edit || !ganttShown) {
+              setDrawer({ taskId: it.id });
+              return;
+            }
+            // show the task in the Gantt chart (switch to it first if needed)
+            const needSwitch = activeTab !== "tidsplan" || tidsplanView !== "gantt";
+            if (needSwitch) {
+              setActiveTab2("tidsplan");
+              setTidsplanView("gantt");
+            }
+            window.setTimeout(() => window.dispatchEvent(new CustomEvent(FOCUS_TASK_EVENT, { detail: it.id })), needSwitch ? 400 : 0);
           }}
         />
       )}

@@ -2,17 +2,30 @@ import type { Task, Trade } from "../../types";
 import { multiColorGradient } from "./model";
 import { durationText, clockText } from "../../utils/tasks";
 import { useEscapeKey } from "../useEscapeKey";
-import { X, Flame, ExternalLink, CloudLightning, Sun } from "lucide-react";
+import { taskLinks } from "../../utils/links";
+import { X, Flame, ExternalLink, CloudLightning, Sun, ArrowLeft, ArrowRight } from "lucide-react";
 
 interface TaskDetailModalProps {
   task: Task;
   tradeById: Map<string, Trade>;
   onEdit: (task: Task) => void;
+  /** All tasks, used to list predecessors and successors */
+  allTasks: Task[];
+  /** Close the window and scroll the chart to another task */
+  onGoto: (task: Task) => void;
   onClose: () => void;
 }
 
-export function TaskDetailModal({ task, tradeById, onEdit, onClose }: TaskDetailModalProps) {
+export function TaskDetailModal({ task, tradeById, onEdit, allTasks, onGoto, onClose }: TaskDetailModalProps) {
   useEscapeKey(onClose);
+  const byId = new Map(allTasks.map((t) => [t.id, t]));
+  const preds = taskLinks(task).map((l) => byId.get(l.taskId)).filter((t): t is Task => !!t);
+  const succs = allTasks.filter((t) => t.id !== task.id && taskLinks(t).some((l) => l.taskId === task.id));
+  const jump = (t: Task) => {
+    onClose();
+    onGoto(t);
+  };
+  const chip = "inline-flex items-center gap-1.5 max-w-full px-2.5 py-1.5 min-h-[36px] rounded-lg border border-slate-200 bg-white hover:bg-sky-50 hover:border-sky-300 text-xs font-bold text-slate-700 cursor-pointer text-left";
   return (
           <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center z-50 p-4" id="task-detail-modal" onClick={onClose}>
             <div role="dialog" aria-modal="true" aria-label={`Opgave: ${task.title}`} onClick={(e) => e.stopPropagation()} className="bg-white rounded-2xl shadow-2xl w-full max-w-md border border-slate-100 overflow-hidden flex flex-col">
@@ -26,11 +39,11 @@ export function TaskDetailModal({ task, tradeById, onEdit, onClose }: TaskDetail
                 <div className="flex justify-between items-start gap-3">
                   <div>
                     <div className="flex items-center gap-1.5">
-                      <span className="text-xs font-black text-slate-600 tabular-nums">OPGAVEINFORMATION</span>
+                      <span className="text-xs font-black text-slate-600 tabular-nums">Opgaveinformation</span>
                       {task.isCritical && (
                         <span className="bg-red-50 text-red-600 border border-red-200 text-xs font-black px-1.5 py-0.5 rounded flex items-center gap-0.5 shrink-0 animate-pulse">
                           <Flame className="w-2.5 h-2.5 fill-red-500 text-red-500" />
-                          Critical Path
+                          Kritisk vej
                         </span>
                       )}
                     </div>
@@ -119,6 +132,37 @@ export function TaskDetailModal({ task, tradeById, onEdit, onClose }: TaskDetail
                   )}
                 </div>
 
+                {(preds.length > 0 || succs.length > 0) && (
+                  <div className="flex flex-col gap-2" data-testid="detail-links">
+                    {preds.length > 0 && (
+                      <div className="flex flex-col gap-1">
+                        <span className="text-xs font-black text-slate-600">Forgængere</span>
+                        <div className="flex flex-wrap gap-1.5">
+                          {preds.map((t) => (
+                            <button key={t.id} type="button" data-testid="goto-pred" onClick={() => jump(t)} className={chip}>
+                              <ArrowLeft className="w-3.5 h-3.5 shrink-0" />
+                              <span className="truncate">{t.title}</span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {succs.length > 0 && (
+                      <div className="flex flex-col gap-1">
+                        <span className="text-xs font-black text-slate-600">Efterfølgere</span>
+                        <div className="flex flex-wrap gap-1.5">
+                          {succs.map((t) => (
+                            <button key={t.id} type="button" data-testid="goto-succ" onClick={() => jump(t)} className={chip}>
+                              <span className="truncate">{t.title}</span>
+                              <ArrowRight className="w-3.5 h-3.5 shrink-0" />
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {/* Action Buttons */}
                 <div className="flex gap-2.5 pt-1 border-t border-slate-100">
                   <button
@@ -130,7 +174,7 @@ export function TaskDetailModal({ task, tradeById, onEdit, onClose }: TaskDetail
                     className="flex-1 py-3 bg-slate-800 hover:bg-slate-900 active:bg-slate-950 text-white text-xs font-black rounded-xl flex items-center justify-center gap-1.5 cursor-pointer shadow-md transition"
                   >
                     <ExternalLink className="w-4 h-4 text-slate-350" />
-                    <span>Gå til opgave</span>
+                    <span>Rediger opgave</span>
                   </button>
                   <button
                     type="button"

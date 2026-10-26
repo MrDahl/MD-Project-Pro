@@ -126,6 +126,7 @@ interface GanttTaskRowProps extends RowBase {
   /** Click on the task name: scroll the chart to the start of the task */
   onFocusTask: (task: Task) => void;
   flashId?: string | null;
+  selectedId?: string | null;
   onExpandColumn: () => void;
   onPointerDown: (e: React.PointerEvent<HTMLDivElement>, task: Task, type: "move" | "resize-right") => void;
   onPointerMove: (e: React.PointerEvent<HTMLDivElement>) => void;
@@ -153,6 +154,7 @@ export const GanttTaskRow = memo(function GanttTaskRow({
   onOpenDetail,
   onFocusTask,
   flashId,
+  selectedId,
   onExpandColumn,
   onPointerDown,
   onPointerMove,
@@ -198,7 +200,7 @@ export const GanttTaskRow = memo(function GanttTaskRow({
           data-task-id={task.id}
           data-testid="task-label"
           onClick={() => onFocusTask(task)}
-          className={`w-52 shrink-0 border-r border-slate-250 p-3 h-full flex flex-col justify-center cursor-pointer hover:bg-slate-50 transition sticky left-0 z-20 shadow-xs ${flashId === task.id ? "bg-sky-100 ring-2 ring-inset ring-sky-400" : "bg-white"}`}
+          className={`w-52 shrink-0 border-r border-slate-250 p-3 h-full flex flex-col justify-center cursor-pointer hover:bg-slate-50 transition sticky left-0 z-20 shadow-xs ${flashId === task.id ? "bg-sky-100 ring-2 ring-inset ring-sky-400" : selectedId === task.id ? "bg-sky-50 border-l-4 border-l-sky-500" : "bg-white"}`}
           title="Klik for at hoppe til opgavens start. Dobbeltklik for at redigere."
         >
           <div className="flex items-center gap-1.5 min-w-0">

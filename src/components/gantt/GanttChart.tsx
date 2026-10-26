@@ -4,6 +4,8 @@ import { baselineById, endDeviationDays } from "../../utils/baseline";
 import { buildCalendar, dayNumber, dayToStr, isWeekendDay, weekdayOf } from "../../utils/scheduler";
 import { Calendar, Zap, ChevronLeft, ChevronRight, FolderDown, Flame, SlidersHorizontal, ZoomIn, Link2, FileText, Snowflake, Lightbulb, Share2, ChevronDown, Bookmark, Trash2 } from "lucide-react";
 import { HelpTip } from "../HelpTip";
+import { GanttMinimap, type MiniRow } from "./GanttMinimap";
+export const FOCUS_TASK_EVENT = "mdpp:focus-task";
 import { usePersistedState } from "../../utils/persist";
 import { todayStr } from "../../utils/dates";
 import { taskLinks } from "../../utils/links";
@@ -224,6 +226,16 @@ export function GanttChart({
     return m;
   }, [scheduled]);
   const rowCount = visibleStages.length + visibleTasks.length;
+  const miniRows = useMemo<MiniRow[]>(() => {
+    const out: MiniRow[] = [];
+    visibleTasks.forEach((t, i) => {
+      const a = dayNumber(t.calcStart);
+      const b = dayNumber(t.calcEnd);
+      if (a === null || b === null) return;
+      out.push({ row: i, start: Math.max(a, minDay), end: Math.min(b, maxDay), color: tradeById.get((t.tradeIds || [])[0])?.color || "#64748b", critical: !!t.isCritical });
+    });
+    return out;
+  }, [visibleTasks, minDay, maxDay, tradeById]);
 
   // Dependency arrows (finish -> start). Built once per layout; only the ones near the viewport are drawn.
   const arrows = useMemo(() => {
@@ -294,6 +306,9 @@ export function GanttChart({
   const dims = useRef({ days, rowCount, labelW, colW });
   dims.current = { days, rowCount, labelW, colW };
   const frame = useRef(0);
+  const topInfo = useRef({ tasks: visibleTasks, stageCount: visibleStages.length });
+  topInfo.current = { tasks: visibleTasks, stageCount: visibleStages.length };
+  const [topStageId, setTopStageId] = useState<string | null>(null);
 
   const measure = useCallback(() => {
     const el = scrollRef.current;
@@ -307,6 +322,9 @@ export function GanttChart({
     const top = el.scrollTop - HEADER_H;
     const firstRow = Math.max(0, Math.floor((Math.floor(top / ROW_H) - ROW_OVERSCAN) / ROW_SNAP) * ROW_SNAP);
     const lastRow = Math.min(r - 1, Math.ceil((Math.ceil((top + el.clientHeight) / ROW_H) + ROW_OVERSCAN) / ROW_SNAP) * ROW_SNAP);
+
+    const topIdx = Math.floor(top / ROW_H) - topInfo.current.stageCount;
+    setTopStageId(topIdx >= 0 ? topInfo.current.tasks[topIdx]?.stageId ?? null : null);
 
     setWin((p) =>
       p.firstCol === firstCol && p.lastCol === lastCol && p.firstRow === firstRow && p.lastRow === lastRow
@@ -425,6 +443,7 @@ export function GanttChart({
   const detailTimer = useRef<number | undefined>(undefined);
   const openDetail = useCallback((t: Task) => {
     window.clearTimeout(detailTimer.current);
+    setSelectedId(t.id);
     detailTimer.current = window.setTimeout(() => setDetailTask(t), 230);
   }, []);
 
@@ -486,6 +505,7 @@ export function GanttChart({
 
   // --- Click on a task name (left column): scroll the chart to the start of that task ---
   const [flashId, setFlashId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const flashTimer = useRef<number | undefined>(undefined);
   const focusTask = useCallback(
     (task: Task) => {
@@ -493,6 +513,7 @@ export function GanttChart({
       if (startDay === null) return;
       window.clearTimeout(flashTimer.current);
       setFlashId(task.id);
+      setSelectedId(task.id);
       flashTimer.current = window.setTimeout(() => setFlashId(null), 1400);
       if (startDay < minDay || startDay > maxDay) {
         // outside the current focus area: show the whole project, then jump
@@ -505,6 +526,17 @@ export function GanttChart({
     },
     [minDay, maxDay, colW, filterScope]
   );
+
+  // Other parts of the app (Ctrl+K) can ask the chart to show a task
+  useEffect(() => {
+    const on = (e: Event) => {
+      const id = (e as CustomEvent).detail;
+      const t = live.current.tasks.find((x) => x.id === id);
+      if (t) focusTask(t);
+    };
+    window.addEventListener(FOCUS_TASK_EVENT, on);
+    return () => window.removeEventListener(FOCUS_TASK_EVENT, on);
+  }, [focusTask]);
 
   // --- Keyboard control of a bar: arrows move, +/- change duration, Enter opens details ---
   const focusNeighbour = useCallback((taskId: string, dir: -1 | 1) => {
@@ -765,6 +797,7 @@ export function GanttChart({
           onOpenDetail={openDetail}
           onFocusTask={focusTask}
           flashId={flashId}
+          selectedId={selectedId}
           onExpandColumn={expandColumn}
           onPointerDown={handlePointerDown}
           onPointerMove={handlePointerMove}
@@ -1030,6 +1063,21 @@ export function GanttChart({
         </div>
       </div>
 
+      {visibleTasks.length > 20 && (
+        <GanttMinimap
+          scrollRef={scrollRef}
+          rows={miniRows}
+          rowCount={rowCount}
+          stageRows={visibleStages.length}
+          minDay={minDay}
+          days={days}
+          colW={colW}
+          labelW={labelW}
+          headerH={HEADER_H}
+          rowH={ROW_H}
+        />
+      )}
+
       {/* Main Gantt scroll wrapper (scrolls in both directions; only nearby rows/columns are rendered) */}
       <div
         ref={scrollRef}
@@ -1089,6 +1137,18 @@ export function GanttChart({
           </div>
 
           {/* Body: one shared background layer + absolutely positioned visible rows */}
+          {topStageId && stageById.get(topStageId) && (
+            <div style={{ position: "sticky", top: HEADER_H, height: 0, zIndex: 25 }} aria-hidden="true">
+              <span
+                data-testid="sticky-stage"
+                style={{ position: "sticky", left: labelW + 8, display: "inline-flex", marginTop: 4, borderColor: stageById.get(topStageId)!.color }}
+                className="items-center gap-1.5 bg-white/95 border-2 rounded-full px-3 py-1 text-xs font-bold text-slate-800 shadow-md pointer-events-none"
+              >
+                <span className="w-2 h-2 rounded-full" style={{ backgroundColor: stageById.get(topStageId)!.color }} />
+                {stageById.get(topStageId)!.name}
+              </span>
+            </div>
+          )}
           <div style={{ height: rowCount * ROW_H }} className="relative">
             <div style={{ left: labelW, width: timelineWidth, ...gridBackground }} className="absolute inset-y-0 pointer-events-none">
               {overlays.holidayCols.map((col) => (
@@ -1201,7 +1261,7 @@ export function GanttChart({
       )}
 
       {detailTask && (
-        <TaskDetailModal task={detailTask} tradeById={tradeById} onEdit={onEditTask} onClose={() => setDetailTask(null)} />
+        <TaskDetailModal task={detailTask} tradeById={tradeById} onEdit={onEditTask} allTasks={tasks} onGoto={focusTask} onClose={() => setDetailTask(null)} />
       )}
     </div>
   );

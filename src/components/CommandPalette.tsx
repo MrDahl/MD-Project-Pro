@@ -10,7 +10,8 @@ export interface PaletteItem {
 
 interface Props {
   items: PaletteItem[];
-  onPick: (item: PaletteItem) => void;
+  /** `edit` is true for Shift+Enter or when the pencil is used */
+  onPick: (item: PaletteItem, edit: boolean) => void;
   onClose: () => void;
 }
 
@@ -37,7 +38,7 @@ export function CommandPalette({ items, onPick, onClose }: Props) {
       setIdx((i) => Math.max(0, i - 1));
     } else if (e.key === "Enter") {
       e.preventDefault();
-      if (shown[idx]) onPick(shown[idx]);
+      if (shown[idx]) onPick(shown[idx], e.shiftKey);
     } else if (e.key === "Escape") {
       onClose();
     }
@@ -68,7 +69,7 @@ export function CommandPalette({ items, onPick, onClose }: Props) {
                 type="button"
                 data-testid="palette-item"
                 onMouseEnter={() => setIdx(i)}
-                onClick={() => onPick(it)}
+                onClick={(e) => onPick(it, e.shiftKey)}
                 className={`w-full flex items-center gap-3 px-3 py-2.5 min-h-[44px] rounded-lg text-left cursor-pointer ${i === idx ? "bg-sky-50" : ""}`}
               >
                 {it.kind === "tab" ? <CalendarDays className="w-4 h-4 text-slate-600 shrink-0" /> : <ListChecks className="w-4 h-4 text-slate-600 shrink-0" />}
@@ -78,6 +79,10 @@ export function CommandPalette({ items, onPick, onClose }: Props) {
             </li>
           ))}
         </ul>
+        <div className="px-4 py-2 border-t border-slate-100 text-xs text-slate-600 flex flex-wrap gap-x-4">
+          <span><kbd className="font-bold">Enter</kbd> vis i tidsplanen</span>
+          <span><kbd className="font-bold">Shift+Enter</kbd> rediger</span>
+        </div>
       </div>
     </div>
   );

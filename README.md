@@ -119,6 +119,9 @@ Gantt viser alle opgaver som bjælker i faggruppens farve. Weekender er grønne,
 **Flyt og ret**
 
 - **Klik på en opgaves navn** i venstre kolonne, så ruller Gantt til opgavens start, og rækken lyser kort op. Klik på selve bjælken åbner detaljerne.
+- **Minikort:** i store projekter (over 20 opgaver) vises hele projektet i miniature over diagrammet. Klik eller træk i det for at hoppe langt. Rammen viser, hvad du ser lige nu.
+- **Etapens navn** bliver stående øverst, mens du ruller ned gennem en lang plan.
+- **Forgængere og efterfølgere:** i en opgaves detaljer kan du trykke på en forgænger eller efterfølger for at hoppe direkte til den.
 - **Dobbeltklik** på en bjælke (eller et opgavekort) åbner redigering. **Højreklik** giver *Rediger*, *Dupliker* og *Slet*.
 - Træk i bjælken for at flytte startdatoen (sætter en fast start).
 - Træk i højre kant for at ændre varigheden i dage.
@@ -314,7 +317,7 @@ Projektet gemmes kun i din egen browser. Intet sendes til en server.
 |---|---|
 | Ctrl+Z | Fortryd |
 | Ctrl+Shift+Z / Ctrl+Y | Gentag |
-| Ctrl+K | Søg efter opgave eller fane og hop direkte derhen |
+| Ctrl+K | Søg efter opgave eller fane. Enter viser opgaven i Gantt, Shift+Enter åbner den til redigering |
 | Escape | Luk dialog, menu eller sidepanel |
 | Tab | Vælg næste bjælke i Gantt |
 | ← → | Flyt valgt bjælke en dag (Shift: en uge) |
@@ -326,7 +329,7 @@ Projektet gemmes kun i din egen browser. Intet sendes til en server.
 
 ### Små hjælpere
 
-- **Søg (Ctrl+K):** skriv en del af en opgaves navn eller en fane. Piletaster og Enter åbner opgaven eller fanen.
+- **Søg (Ctrl+K):** skriv en del af en opgaves navn eller en fane. Enter viser opgaven i Gantt-diagrammet (eller åbner fanen), Shift+Enter åbner opgaven til redigering.
 - **Husker dig:** fane, Gantt/liste, zoom, filtre, afhængighedspile og foldede etaper huskes til næste gang.
 - **Mørk tilstand:** måne-knappen i toppen.
 - **Print liste:** *Opgaver → Print liste* giver en ren udskrift uden knapper.
