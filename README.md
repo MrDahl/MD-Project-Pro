@@ -347,6 +347,23 @@ Findes en faggruppe, etape eller opgave ikke, oprettes opgaven alligevel, og du 
 
 Nederst i Gantt ligger rækken **Ny opgave**. Træk hen over de dage, opgaven skal ligge på, og slip. Formularen åbner med fast startdato og antal arbejdsdage udfyldt (weekender og helligdage tæller ikke med).
 
+### Ret advarsler med ét tryk
+
+Åbn advarslerne over tidsplanen. Mange har en knap, der løser problemet:
+
+- **Dobbeltbooking:** *Sæt "B" efter "A"* lægger opgaven efter den anden, så faggruppen ikke er to steder på én gang.
+- **Opgave uden for sin etape:** *Forlæng etapen til …* eller *Flyt etapens start til …*.
+
+Alt kan fortrydes med Ctrl+Z.
+
+### Tjek min plan
+
+Knappen **Tjek min plan** (ved hurtig-tilføj-linjen) giver en venlig tjekliste: har alle opgaver en faggruppe og en pris, er der dobbeltbookinger, ligger opgaverne i deres etaper, hænger de sammen med forgængere, hvor stor en del af planen er kritisk, og er der en milepæl. Du ser, hvor mange tjek der er bestået, og kan hoppe til et eksempel på hvert problem. Det er rådgivning: planen er stadig gyldig, selv om et tjek er gult.
+
+### Installér som app og brug uden net
+
+I Chrome, Edge og på Android kommer knappen **Installér** frem (på telefon under ⋯). På iPhone og iPad vælger du *Del → Føj til hjemmeskærm*. Appen starter derefter som en almindelig app og virker uden internet, når den har været åbnet én gang med net. Planen gemmes i enheden, og et **Offline**-mærke i toppen viser, at du ikke har forbindelse. Husk stadig at tage en sikkerhedskopi med *Gem*, og husk at planen ligger i den enkelte browser eller app, ikke på tværs af enheder.
+
 ### Små hjælpere
 
 - **Søg (Ctrl+K):** skriv en del af en opgaves navn eller en fane. Enter viser opgaven i Gantt-diagrammet (eller åbner fanen), Shift+Enter åbner opgaven til redigering.

@@ -1,14 +1,16 @@
 import { useState } from "react";
-import { Zap } from "lucide-react";
+import { Zap, ClipboardCheck } from "lucide-react";
 import { HelpTip } from "./HelpTip";
 
 interface Props {
   /** Returns warnings to show (empty list = all fine), or null if nothing was created */
   onAdd: (text: string) => string[] | null;
+  /** Opens the "Tjek min plan" window */
+  onCheck?: () => void;
 }
 
 /** One line to add a task fast: "Maling 5 dage @Maler efter Gipsplader" + Enter. */
-export function QuickAdd({ onAdd }: Props) {
+export function QuickAdd({ onAdd, onCheck }: Props) {
   const [text, setText] = useState("");
   const [notes, setNotes] = useState<string[]>([]);
   return (
@@ -41,6 +43,19 @@ export function QuickAdd({ onAdd }: Props) {
         <button type="submit" disabled={!text.trim()} className="px-3 py-2 min-h-[36px] rounded-lg bg-slate-800 text-white text-sm font-bold cursor-pointer disabled:bg-slate-200 disabled:text-slate-600 disabled:cursor-default">
           Tilføj
         </button>
+        {onCheck && (
+          <button
+            type="button"
+            data-testid="open-plan-check"
+            onClick={onCheck}
+            title="Tjek min plan"
+            aria-label="Tjek min plan"
+            className="flex items-center gap-1.5 px-3 py-2 min-h-[36px] rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-800 text-sm font-bold cursor-pointer shrink-0"
+          >
+            <ClipboardCheck className="w-4 h-4" />
+            <span className="hidden sm:inline">Tjek min plan</span>
+          </button>
+        )}
       </div>
       {notes.length > 0 && (
         <p data-testid="quick-add-notes" className="text-xs font-semibold text-amber-800 px-1">

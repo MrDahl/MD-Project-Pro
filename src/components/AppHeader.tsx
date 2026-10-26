@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { FolderDown, FolderUp, FilePlus2, Undo2, Redo2, ShieldAlert, Moon, Sun, Search, MoreHorizontal } from "lucide-react";
+import { FolderDown, FolderUp, FilePlus2, Undo2, Redo2, ShieldAlert, Moon, Sun, Search, MoreHorizontal, Download, WifiOff } from "lucide-react";
 
 interface Props {
   canUndo: boolean;
@@ -17,6 +17,9 @@ interface Props {
   dark: boolean;
   onToggleDark: () => void;
   onSearch: () => void;
+  /** Set when the browser offers to install the app */
+  onInstall?: () => void;
+  offline?: boolean;
 }
 
 const btn =
@@ -70,6 +73,9 @@ function PhoneMenu(p: Props) {
               }}
             />
           </label>
+          {p.onInstall && (
+            <button type="button" role="menuitem" data-testid="install-app-phone" className={item} onClick={go(p.onInstall)}><Download className="w-4 h-4" />Installér som app</button>
+          )}
           <div className="my-1 border-t border-slate-100" />
           <button type="button" role="menuitem" className={item} onClick={go(p.onToggleDark)}>
             {p.dark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
@@ -108,6 +114,18 @@ export function AppHeader(p: Props) {
       </div>
 
       <div className="flex items-center gap-1.5 sm:flex-wrap justify-end shrink-0">
+        {p.offline && (
+          <span data-testid="offline-badge" className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-slate-800 text-white text-xs font-bold" title="Du er offline. Alt gemmes stadig i browseren.">
+            <WifiOff className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Offline</span>
+          </span>
+        )}
+        {p.onInstall && (
+          <button type="button" data-testid="install-app" onClick={p.onInstall} className={btnDesk} title="Installér appen på din enhed, så den også virker uden net">
+            <Download className="w-4 h-4 text-slate-600" />
+            <span className="hidden md:inline">Installér</span>
+          </button>
+        )}
         <PhoneMenu {...p} />
         {p.backupDue && (
           <button

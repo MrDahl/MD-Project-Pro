@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { findWarnings } from "./warnings.ts";
+import { applyFix, findWarnings } from "./warnings.ts";
 import type { Stage, Task, Trade } from "../types.ts";
 
 const trade = (id: string): Trade => ({ id, name: id.toUpperCase(), rate: 1, isFixedPrice: false, weekendSupplement: 0, holidaySupplement: 0, color: "#000" });
@@ -54,4 +54,37 @@ test("long task overlapping two later ones is reported for both", () => {
 test("unscheduled tasks are reported", () => {
   const w = findWarnings([task("a", null, null)], [trade("m")], []);
   assert.deepEqual(w.map((x) => x.kind), ["unscheduled"]);
+});
+
+const fixTrade = { id: "tr", name: "Maler", color: "#000", roles: [] } as unknown as Trade;
+const mkFix = (id: string, start: string, end: string, extra: Partial<Task> = {}): Task =>
+  ({ id, title: id.toUpperCase(), tradeIds: ["tr"], calcStart: start, calcEnd: end, duration: 1, dependencies: [], dependencyId: null, ...extra }) as unknown as Task;
+
+test("double booking offers 'after' fix that applies a dependency", () => {
+  const tasks = [mkFix("a", "2026-03-02", "2026-03-06"), mkFix("b", "2026-03-04", "2026-03-10")];
+  const w = findWarnings(tasks, [fixTrade], []).find((x) => x.kind === "double-booking")!;
+  assert.ok(w.fix && w.fix.type === "after");
+  const r = applyFix(w.fix!, tasks, []);
+  const b = r.tasks.find((t) => t.id === "b")!;
+  assert.deepEqual(b.dependencies, [{ taskId: "a", type: "FS", lag: 0 }]);
+  assert.equal(b.dependencyId, "a");
+});
+
+test("no 'after' fix when it would create a loop", () => {
+  const tasks = [mkFix("a", "2026-03-02", "2026-03-06"), mkFix("b", "2026-03-04", "2026-03-10", { dependencies: [{ taskId: "a", type: "SS", lag: 0 }], dependencyId: "a" })];
+  const w = findWarnings(tasks, [fixTrade], []).find((x) => x.kind === "double-booking")!;
+  // b is a descendant of a, so putting a after b would loop; b after a is fine and converts the SS link to FS
+  assert.ok(w.fix);
+  const r = applyFix(w.fix!, tasks, []);
+  assert.equal(r.tasks.find((t) => t.id === "b")!.dependencies![0].type, "FS");
+});
+
+test("stage fixes extend or move the stage dates", () => {
+  const stage = { id: "s", name: "E1", startDate: "2026-03-03", endDate: "2026-03-05", color: "#000" } as Stage;
+  const tasks = [mkFix("a", "2026-03-02", "2026-03-09", { stageId: "s" })];
+  const ws = findWarnings(tasks, [fixTrade], [stage]);
+  const after = ws.find((x) => x.kind === "after-stage-end")!;
+  const before = ws.find((x) => x.kind === "before-stage-start")!;
+  assert.equal(applyFix(after.fix!, tasks, [stage]).stages[0].endDate, "2026-03-09");
+  assert.equal(applyFix(before.fix!, tasks, [stage]).stages[0].startDate, "2026-03-02");
 });

@@ -5,7 +5,7 @@ import React, { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useStat
 import { Task, Trade, Settings, ProjectInfo, Stage, Holiday, WeekSchedule } from "./types";
 import { calculateSchedule } from "./utils/scheduler";
 import { danishHolidays, projectYears } from "./utils/holidays";
-import { findWarnings } from "./utils/warnings";
+import { findWarnings, applyFix, type PlanWarning } from "./utils/warnings";
 import { duplicateTask } from "./utils/taskFilter";
 import { hasLinkTo, removeLinksTo } from "./utils/links";
 import { daysBetween, makeBaseline } from "./utils/baseline";
@@ -27,6 +27,8 @@ import { BACKUP_KEY, WIZARD_KEY, looksLikeProject, normalizeProject, readNumber,
 import { GOTO_TAB_EVENT } from "./components/HelpTip";
 import { FOCUS_TASK_EVENT } from "./components/gantt/GanttChart";
 import { CostRows, groupCostRows } from "./components/CostRows";
+import { PlanCheck } from "./components/PlanCheck";
+import { checkPlan } from "./utils/planCheck";
 import { QuickAdd } from "./components/QuickAdd";
 import { buildQuickTask } from "./utils/quickAdd";
 import { EmptyState } from "./components/EmptyState";
@@ -79,6 +81,46 @@ export default function App() {
   const [dark, setDark] = useState<boolean>(() => loadUi().dark ?? false);
   const [menu, setMenu] = useState<ContextMenuState | null>(null);
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [checkOpen, setCheckOpen] = useState(false);
+  // "Install as app": the browser tells us when it is possible
+  const installEvent = useRef<any>(null);
+  const [canInstall, setCanInstall] = useState(false);
+  const [offline, setOffline] = useState(() => typeof navigator !== "undefined" && navigator.onLine === false);
+  useEffect(() => {
+    const onPrompt = (e: Event) => {
+      e.preventDefault();
+      installEvent.current = e;
+      setCanInstall(true);
+    };
+    const onInstalled = () => {
+      installEvent.current = null;
+      setCanInstall(false);
+    };
+    const on = () => setOffline(false);
+    const off = () => setOffline(true);
+    window.addEventListener("beforeinstallprompt", onPrompt);
+    window.addEventListener("appinstalled", onInstalled);
+    window.addEventListener("online", on);
+    window.addEventListener("offline", off);
+    return () => {
+      window.removeEventListener("beforeinstallprompt", onPrompt);
+      window.removeEventListener("appinstalled", onInstalled);
+      window.removeEventListener("online", on);
+      window.removeEventListener("offline", off);
+    };
+  }, []);
+  const handleInstall = async () => {
+    const ev = installEvent.current;
+    if (!ev) return;
+    ev.prompt();
+    try {
+      await ev.userChoice;
+    } catch {
+      /* dismissed */
+    }
+    installEvent.current = null;
+    setCanInstall(false);
+  };
   useEffect(() => {
     document.documentElement.classList.toggle("dark", dark);
     try {
@@ -274,6 +316,16 @@ export default function App() {
     update((p) => ({ ...p, tasks: [...p.tasks, task] }));
     showToast(`"${task.title}" er oprettet.`, true);
     return res.warnings;
+  };
+
+  const handleFixWarning = (w: PlanWarning) => {
+    const fix = w.fix;
+    if (!fix) return;
+    update((p) => {
+      const r = applyFix(fix, p.tasks, p.stages || []);
+      return { ...p, tasks: r.tasks, stages: r.stages };
+    });
+    showToast(`${fix.label}: gjort.`, true);
   };
 
   const handleDuplicateTask = useCallback(
@@ -559,6 +611,8 @@ export default function App() {
         dark={dark}
         onToggleDark={() => setDark((d) => !d)}
         onSearch={() => setPaletteOpen(true)}
+        onInstall={canInstall ? handleInstall : undefined}
+        offline={offline}
       />
       {menu && (
         <ContextMenu
@@ -567,6 +621,13 @@ export default function App() {
           onDuplicate={handleDuplicateTask}
           onDelete={handleDeleteTask}
           onClose={() => setMenu(null)}
+        />
+      )}
+      {checkOpen && (
+        <PlanCheck
+          result={checkPlan(calculatedTasks, appState.trades, appState.stages || [], warnings)}
+          onOpenTask={(id) => setDrawer({ taskId: id })}
+          onClose={() => setCheckOpen(false)}
         />
       )}
       {paletteOpen && (
@@ -741,7 +802,7 @@ export default function App() {
           {/* TAP 1: Combined Tidsplan & Gantt Chart Layout */}
           {activeTab === "tidsplan" && (
             <div className="flex flex-col gap-4">
-              <WarningsPanel warnings={warnings} onOpenTask={(id) => setDrawer({ taskId: id })} />
+              <WarningsPanel warnings={warnings} onOpenTask={(id) => setDrawer({ taskId: id })} onFix={handleFixWarning} />
 
 
               {/* Inner Sub-navigation toggle */}
@@ -772,7 +833,7 @@ export default function App() {
                 </button>
               </div>
 
-              <QuickAdd onAdd={handleQuickAdd} />
+              <QuickAdd onAdd={handleQuickAdd} onCheck={() => setCheckOpen(true)} />
 
               {/* View Rendering based on selected view mode */}
               <div className="w-full">

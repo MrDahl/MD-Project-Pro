@@ -1,7 +1,14 @@
 import type { Stage, Task, Trade } from "../types.ts";
 import { dayNumber } from "./scheduler.ts";
+import { descendantsOf, taskLinks } from "./links.ts";
 
 export type WarningKind = "after-stage-end" | "before-stage-start" | "no-trade" | "double-booking" | "role-overload" | "unscheduled";
+
+/** A change that resolves a warning with one click. */
+export type WarningFix =
+  | { type: "extend-stage-end"; stageId: string; date: string; label: string }
+  | { type: "move-stage-start"; stageId: string; date: string; label: string }
+  | { type: "after"; taskId: string; afterId: string; label: string };
 
 export interface PlanWarning {
   id: string;
@@ -9,6 +16,7 @@ export interface PlanWarning {
   /** The task(s) involved; the first one is opened when the warning is clicked. */
   taskIds: string[];
   message: string;
+  fix?: WarningFix;
 }
 
 /** Position on the clock (minutes). Tasks without clock info count as whole days. */
@@ -43,6 +51,7 @@ export function findWarnings(tasks: Task[], trades: Trade[], stages: Stage[]): P
           kind: "after-stage-end",
           taskIds: [t.id],
           message: `"${t.title}" slutter ${fmt(t.calcEnd)} - efter etapen "${stage.name}" er slut (${fmt(stage.endDate)}).`,
+          fix: { type: "extend-stage-end", stageId: stage.id, date: t.calcEnd, label: `Forlæng etapen til ${fmt(t.calcEnd)}` },
         });
       }
       if (t.calcStart < stage.startDate) {
@@ -51,6 +60,7 @@ export function findWarnings(tasks: Task[], trades: Trade[], stages: Stage[]): P
           kind: "before-stage-start",
           taskIds: [t.id],
           message: `"${t.title}" starter ${fmt(t.calcStart)} - før etapen "${stage.name}" begynder (${fmt(stage.startDate)}).`,
+          fix: { type: "move-stage-start", stageId: stage.id, date: t.calcStart, label: `Flyt etapens start til ${fmt(t.calcStart)}` },
         });
       }
     }
@@ -85,6 +95,10 @@ export function findWarnings(tasks: Task[], trades: Trade[], stages: Stage[]): P
           kind: "double-booking",
           taskIds: [t.id, holder.id],
           message: `${tradeName.get(tradeId) ?? "Faggruppen"} er på både "${holder.title}" og "${t.title}" ${fmt(from)}-${fmt(to)}${clockInfo}.`,
+          // Put the later task after the other one, unless that would make a loop
+          fix: descendantsOf(tasks, t.id).has(holder.id) || holder.id === t.id
+            ? undefined
+            : { type: "after", taskId: t.id, afterId: holder.id, label: `Sæt "${t.title}" efter "${holder.title}"` },
         });
       }
       if (!holder || endOf(t) > endOf(holder)) holder = t;
@@ -138,4 +152,26 @@ export function findWarnings(tasks: Task[], trades: Trade[], stages: Stage[]): P
 function fmtDay(day: number): string {
   const d = new Date(day * 86_400_000);
   return `${d.getUTCDate()}/${d.getUTCMonth() + 1}`;
+}
+
+/** Applies a fix to the project data (uncalculated tasks and stages). Returns new arrays. */
+export function applyFix<T extends Task>(fix: WarningFix, tasks: T[], stages: Stage[]): { tasks: T[]; stages: Stage[] } {
+  switch (fix.type) {
+    case "extend-stage-end":
+      return { tasks, stages: stages.map((s) => (s.id === fix.stageId && fix.date > s.endDate ? { ...s, endDate: fix.date } : s)) };
+    case "move-stage-start":
+      return { tasks, stages: stages.map((s) => (s.id === fix.stageId && fix.date < s.startDate ? { ...s, startDate: fix.date } : s)) };
+    case "after":
+      return {
+        stages,
+        tasks: tasks.map((t) => {
+          if (t.id !== fix.taskId) return t;
+          const links = taskLinks(t);
+          const next = links.some((l) => l.taskId === fix.afterId)
+            ? links.map((l) => (l.taskId === fix.afterId ? { ...l, type: "FS" as const, lag: Math.max(0, l.lag) } : l))
+            : [...links, { taskId: fix.afterId, type: "FS" as const, lag: 0 }];
+          return { ...t, dependencies: next, dependencyId: next[0].taskId };
+        }),
+      };
+  }
 }
