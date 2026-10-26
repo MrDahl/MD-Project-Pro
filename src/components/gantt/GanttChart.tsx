@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useSta
 import type { Task, Trade, Stage, WeatherDelay, Holiday, Baseline, ProjectInfo } from "../../types";
 import { baselineById, endDeviationDays } from "../../utils/baseline";
 import { buildCalendar, dayNumber, dayToStr, isWeekendDay, weekdayOf } from "../../utils/scheduler";
-import { Calendar, Zap, ChevronLeft, ChevronRight, FolderDown, Flame, SlidersHorizontal, ZoomIn, Link2, FileText, Snowflake, Lightbulb, Share2, ChevronDown, Bookmark, Trash2 } from "lucide-react";
+import { Calendar, Zap, ChevronLeft, ChevronRight, FolderDown, Flame, SlidersHorizontal, ZoomIn, Link2, FileText, Snowflake, Lightbulb, Share2, ChevronDown, Bookmark, Trash2, Plus } from "lucide-react";
 import { HelpTip } from "../HelpTip";
 import { GanttMinimap, type MiniRow } from "./GanttMinimap";
 export const FOCUS_TASK_EVENT = "mdpp:focus-task";
@@ -52,6 +52,8 @@ interface GanttChartProps {
   /** `newGesture` is true for the first change of a drag, so the whole drag becomes one undo step. */
   onUpdateTasks: (updatedTasks: Task[], newGesture: boolean) => void;
   onEditTask: (task: Task) => void;
+  /** Drag in the bottom row: create a task starting on this date and lasting this many workdays */
+  onCreateRange?: (startDate: string, durationDays: number) => void;
   onAddHoliday: (date: string, name: string) => void;
   onDeleteHoliday: (idx: number) => void;
   onAddWeatherDelay: (label: string, start: string, end: string) => void;
@@ -98,6 +100,7 @@ export function GanttChart({
   onClearBaseline,
   onUpdateTasks,
   onEditTask,
+  onCreateRange,
   onAddHoliday,
   onDeleteHoliday,
   onAddWeatherDelay,
@@ -506,6 +509,12 @@ export function GanttChart({
   // --- Click on a task name (left column): scroll the chart to the start of that task ---
   const [flashId, setFlashId] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  // Drag in the bottom row to create a task on the chosen days
+  const [createDrag, setCreateDrag] = useState<{ a: number; b: number } | null>(null)
+  const createDay = (e: React.PointerEvent<HTMLDivElement>) => {
+    const r = e.currentTarget.getBoundingClientRect();
+    return minDay + Math.min(Math.max(0, Math.floor((e.clientX - r.left) / colW)), Math.max(0, maxDay - minDay));
+  };
   const flashTimer = useRef<number | undefined>(undefined);
   const focusTask = useCallback(
     (task: Task) => {
@@ -1188,6 +1197,56 @@ export function GanttChart({
               />
             )}
           </div>
+
+          {onCreateRange && (
+            <div data-testid="create-row" style={{ height: ROW_H, width: totalWidth }} className="flex border-t border-dashed border-slate-300 bg-slate-50/70">
+              <div style={{ width: labelW }} className="shrink-0 sticky left-0 z-20 bg-slate-50 border-r border-slate-200 flex items-center gap-1.5 px-3 text-xs font-bold text-sky-700">
+                <Plus className="w-3.5 h-3.5 shrink-0" />
+                {!columnCollapsed && <span className="truncate">Ny opgave</span>}
+              </div>
+              <div
+                data-testid="create-track"
+                style={{ width: timelineWidth }}
+                className="relative cursor-crosshair touch-none"
+                onPointerDown={(e) => {
+                  if (e.button !== 0) return;
+                  e.currentTarget.setPointerCapture(e.pointerId);
+                  const d = createDay(e);
+                  setCreateDrag({ a: d, b: d });
+                }}
+                onPointerMove={(e) => {
+                  if (createDrag) setCreateDrag({ a: createDrag.a, b: createDay(e) });
+                }}
+                onPointerUp={(e) => {
+                  if (!createDrag) return;
+                  const from = Math.min(createDrag.a, createDrag.b);
+                  const to = Math.max(createDrag.a, createDrag.b);
+                  setCreateDrag(null);
+                  try {
+                    e.currentTarget.releasePointerCapture(e.pointerId);
+                  } catch {
+                    /* already released */
+                  }
+                  let work = 0;
+                  for (let d = from; d <= to; d++) if (cal.isWorkingDay(d, false, false)) work++;
+                  onCreateRange(dayToStr(from), Math.max(1, work));
+                }}
+                onPointerCancel={() => setCreateDrag(null)}
+              >
+                {createDrag ? (
+                  <div
+                    data-testid="create-ghost"
+                    style={{ left: (Math.min(createDrag.a, createDrag.b) - minDay) * colW, width: (Math.abs(createDrag.b - createDrag.a) + 1) * colW, top: 6, bottom: 6 }}
+                    className="absolute rounded-md bg-sky-400/50 border-2 border-sky-600 pointer-events-none"
+                  />
+                ) : (
+                  <span style={{ position: "sticky", left: labelW + 12 }} className="inline-block py-3 text-xs font-semibold text-slate-600 pointer-events-none">
+                    Træk her for at oprette en ny opgave med de valgte dage
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 

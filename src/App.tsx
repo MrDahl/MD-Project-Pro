@@ -27,6 +27,8 @@ import { BACKUP_KEY, WIZARD_KEY, looksLikeProject, normalizeProject, readNumber,
 import { GOTO_TAB_EVENT } from "./components/HelpTip";
 import { FOCUS_TASK_EVENT } from "./components/gantt/GanttChart";
 import { CostRows, groupCostRows } from "./components/CostRows";
+import { QuickAdd } from "./components/QuickAdd";
+import { buildQuickTask } from "./utils/quickAdd";
 import { EmptyState } from "./components/EmptyState";
 import { ContextMenu, type ContextMenuState } from "./components/ContextMenu";
 import { CommandPalette, type PaletteItem } from "./components/CommandPalette";
@@ -118,7 +120,7 @@ export default function App() {
   stateRef.current = appState;
 
   // Side panel for creating/editing a task (taskId null = new task)
-  const [drawer, setDrawer] = useState<{ taskId: string | null } | null>(null);
+  const [drawer, setDrawer] = useState<{ taskId: string | null; preset?: { manualStart: string; duration: number } } | null>(null);
   const editTaskId = drawer?.taskId ?? null;
   const [editTradeId, setEditTradeId] = useState<string | null>(null);
 
@@ -253,6 +255,25 @@ export default function App() {
       showToast("Ny opgave oprettet.", true);
     }
     setDrawer(null);
+  };
+
+  const handleQuickAdd = (text: string): string[] | null => {
+    const cur = stateRef.current;
+    const res = buildQuickTask(text, {
+      trades: cur.trades,
+      stages: cur.stages || [],
+      tasks: cur.tasks,
+      hoursPerDay: cur.settings.workHoursPerDay,
+      newId: `task-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+    });
+    if (!res.task) {
+      showToast(res.warnings[0] || "Skriv et navn til opgaven.");
+      return null;
+    }
+    const task = res.task;
+    update((p) => ({ ...p, tasks: [...p.tasks, task] }));
+    showToast(`"${task.title}" er oprettet.`, true);
+    return res.warnings;
   };
 
   const handleDuplicateTask = useCallback(
@@ -751,6 +772,8 @@ export default function App() {
                 </button>
               </div>
 
+              <QuickAdd onAdd={handleQuickAdd} />
+
               {/* View Rendering based on selected view mode */}
               <div className="w-full">
                 {tidsplanView === "list" || isPhone ? (
@@ -804,6 +827,7 @@ export default function App() {
                       onClearBaseline={handleClearBaseline}
                       onUpdateTasks={(ts, newGesture) => update((p) => ({ ...p, tasks: ts }), { history: newGesture })}
                       onEditTask={(task) => setDrawer({ taskId: task.id })}
+                      onCreateRange={(manualStart, duration) => setDrawer({ taskId: null, preset: { manualStart, duration } })}
                       onAddHoliday={handleAddHoliday}
                       onDeleteHoliday={handleDeleteHoliday}
                       onAddWeatherDelay={handleAddWeatherDelay}
@@ -1097,6 +1121,7 @@ export default function App() {
               trades={appState.trades}
               stages={appState.stages || []}
               editTaskId={editTaskId}
+              preset={drawer.preset}
               hideHeading
               onSave={handleSaveTask}
               onCancel={() => setDrawer(null)}

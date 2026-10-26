@@ -18,9 +18,11 @@ interface TaskFormProps {
   hideHeading?: boolean;
   /** Project hours per day, used to estimate the days of an hour-based task */
   hoursPerDay?: number;
+  /** Start date and length from a drag in the Gantt chart (new tasks only) */
+  preset?: { manualStart: string; duration: number };
 }
 
-export function TaskForm({ tasks, trades, stages, editTaskId, onSave, onCancel, hideHeading, hoursPerDay = 7.4 }: TaskFormProps) {
+export function TaskForm({ tasks, trades, stages, editTaskId, onSave, onCancel, hideHeading, hoursPerDay = 7.4, preset }: TaskFormProps) {
   const [title, setTitle] = useState("");
   const [desc, setDesc] = useState("");
   const [manualStart, setManualStart] = useState("");
@@ -47,8 +49,8 @@ export function TaskForm({ tasks, trades, stages, editTaskId, onSave, onCancel, 
   const [selectedRecurringStageIds, setSelectedRecurringStageIds] = useState<string[]>([]);
 
   useEffect(() => {
-    setMoreOpen(false);
-  }, [editTaskId]);
+    setMoreOpen(!!preset); // the fixed start date lives under "Flere indstillinger"
+  }, [editTaskId, preset]);
 
   useEffect(() => {
     if (editTaskId) {
@@ -86,8 +88,8 @@ export function TaskForm({ tasks, trades, stages, editTaskId, onSave, onCancel, 
   const resetForm = () => {
     setTitle("");
     setDesc("");
-    setManualStart("");
-    setDuration(3);
+    setManualStart(preset?.manualStart ?? "");
+    setDuration(preset?.duration ?? 3);
     setUnit("days");
     setHours(4);
     setStartTime("");

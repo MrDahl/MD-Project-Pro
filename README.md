@@ -327,6 +327,26 @@ Projektet gemmes kun i din egen browser. Intet sendes til en server.
 
 ---
 
+### Hurtig-tilføj
+
+Over opgavelisten og Gantt ligger en enkelt linje. Skriv navn og varighed, tryk Enter, og opgaven er lavet:
+
+| Skriv | Resultat |
+|---|---|
+| `Maling 5 dage` | opgave på 5 arbejdsdage |
+| `Gulv 2 uger` | 10 arbejdsdage |
+| `Fræsning 4 timer` | timeopgave |
+| `Maling 5 dage @Maler` | tildelt faggruppen Maler (delvist navn er nok) |
+| `Maling 5 dage #Indvendigt` | placeret i etapen Indvendigt |
+| `Maling 5 dage efter Gipsplader` | kommer efter opgaven Gipsplader |
+| `Aflevering milepæl` | milepæl |
+
+Findes en faggruppe, etape eller opgave ikke, oprettes opgaven alligevel, og du får besked om, hvad der manglede.
+
+### Træk for at oprette i Gantt
+
+Nederst i Gantt ligger rækken **Ny opgave**. Træk hen over de dage, opgaven skal ligge på, og slip. Formularen åbner med fast startdato og antal arbejdsdage udfyldt (weekender og helligdage tæller ikke med).
+
 ### Små hjælpere
 
 - **Søg (Ctrl+K):** skriv en del af en opgaves navn eller en fane. Enter viser opgaven i Gantt-diagrammet (eller åbner fanen), Shift+Enter åbner opgaven til redigering.
